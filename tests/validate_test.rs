@@ -1,7 +1,7 @@
+use app::models::{RealmRepresentation, RoleRepresentation};
 use app::validate;
 use std::fs;
 use tempfile::tempdir;
-use app::models::{RealmRepresentation, RoleRepresentation};
 
 #[test]
 fn test_validate() {
@@ -15,7 +15,11 @@ fn test_validate() {
         display_name: None,
         extra: std::collections::HashMap::new(),
     };
-    fs::write(input_dir.join("realm.yaml"), serde_yaml::to_string(&realm).unwrap()).unwrap();
+    fs::write(
+        input_dir.join("realm.yaml"),
+        serde_yaml::to_string(&realm).unwrap(),
+    )
+    .unwrap();
 
     let result = validate::run(input_dir.clone());
     assert!(result.is_ok());
@@ -33,7 +37,11 @@ fn test_validate_empty_role_name() {
         display_name: None,
         extra: std::collections::HashMap::new(),
     };
-    fs::write(input_dir.join("realm.yaml"), serde_yaml::to_string(&realm).unwrap()).unwrap();
+    fs::write(
+        input_dir.join("realm.yaml"),
+        serde_yaml::to_string(&realm).unwrap(),
+    )
+    .unwrap();
 
     // Create roles directory
     let roles_dir = input_dir.join("roles");
@@ -49,11 +57,20 @@ fn test_validate_empty_role_name() {
         client_role: false,
         extra: std::collections::HashMap::new(),
     };
-    fs::write(roles_dir.join("role.yaml"), serde_yaml::to_string(&role).unwrap()).unwrap();
+    fs::write(
+        roles_dir.join("role.yaml"),
+        serde_yaml::to_string(&role).unwrap(),
+    )
+    .unwrap();
 
     let result = validate::run(input_dir.clone());
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Role name is empty"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Role name is empty")
+    );
 }
 
 #[test]
@@ -68,7 +85,11 @@ fn test_validate_duplicate_role_name() {
         display_name: None,
         extra: std::collections::HashMap::new(),
     };
-    fs::write(input_dir.join("realm.yaml"), serde_yaml::to_string(&realm).unwrap()).unwrap();
+    fs::write(
+        input_dir.join("realm.yaml"),
+        serde_yaml::to_string(&realm).unwrap(),
+    )
+    .unwrap();
 
     // Create roles directory
     let roles_dir = input_dir.join("roles");
@@ -84,7 +105,11 @@ fn test_validate_duplicate_role_name() {
         client_role: false,
         extra: std::collections::HashMap::new(),
     };
-    fs::write(roles_dir.join("role1.yaml"), serde_yaml::to_string(&role1).unwrap()).unwrap();
+    fs::write(
+        roles_dir.join("role1.yaml"),
+        serde_yaml::to_string(&role1).unwrap(),
+    )
+    .unwrap();
 
     // Create second role with same name
     let role2 = RoleRepresentation {
@@ -96,11 +121,20 @@ fn test_validate_duplicate_role_name() {
         client_role: false,
         extra: std::collections::HashMap::new(),
     };
-    fs::write(roles_dir.join("role2.yaml"), serde_yaml::to_string(&role2).unwrap()).unwrap();
+    fs::write(
+        roles_dir.join("role2.yaml"),
+        serde_yaml::to_string(&role2).unwrap(),
+    )
+    .unwrap();
 
     let result = validate::run(input_dir.clone());
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Duplicate role name: admin"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate role name: admin")
+    );
 }
 
 #[test]
@@ -110,5 +144,10 @@ fn test_validate_missing_realm() {
 
     let result = validate::run(input_dir.clone());
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("realm.yaml not found"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("realm.yaml not found")
+    );
 }

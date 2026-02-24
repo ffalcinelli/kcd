@@ -1,11 +1,11 @@
-use clap::Parser;
+use anyhow::{Context, Result};
+use app::apply;
 use app::args::{Cli, Commands};
 use app::client::KeycloakClient;
 use app::inspect;
-use app::validate;
-use app::apply;
 use app::plan;
-use anyhow::{Result, Context};
+use app::validate;
+use clap::Parser;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -24,7 +24,15 @@ async fn main() -> Result<()> {
     match &cli.command {
         Commands::Inspect { output } => {
             let mut client = KeycloakClient::new(cli.server.clone(), cli.realm.clone());
-            client.login(&cli.client_id, cli.client_secret.as_deref(), cli.user.as_deref(), cli.password.as_deref()).await.context("Login failed")?;
+            client
+                .login(
+                    &cli.client_id,
+                    cli.client_secret.as_deref(),
+                    cli.user.as_deref(),
+                    cli.password.as_deref(),
+                )
+                .await
+                .context("Login failed")?;
             println!("Inspecting Keycloak configuration into {:?}", output);
             inspect::run(&client, output.clone()).await?;
         }
@@ -34,13 +42,29 @@ async fn main() -> Result<()> {
         }
         Commands::Apply { input } => {
             let mut client = KeycloakClient::new(cli.server.clone(), cli.realm.clone());
-            client.login(&cli.client_id, cli.client_secret.as_deref(), cli.user.as_deref(), cli.password.as_deref()).await.context("Login failed")?;
+            client
+                .login(
+                    &cli.client_id,
+                    cli.client_secret.as_deref(),
+                    cli.user.as_deref(),
+                    cli.password.as_deref(),
+                )
+                .await
+                .context("Login failed")?;
             println!("Applying Keycloak configuration from {:?}", input);
             apply::run(&client, input.clone()).await?;
         }
         Commands::Plan { input } => {
             let mut client = KeycloakClient::new(cli.server.clone(), cli.realm.clone());
-            client.login(&cli.client_id, cli.client_secret.as_deref(), cli.user.as_deref(), cli.password.as_deref()).await.context("Login failed")?;
+            client
+                .login(
+                    &cli.client_id,
+                    cli.client_secret.as_deref(),
+                    cli.user.as_deref(),
+                    cli.password.as_deref(),
+                )
+                .await
+                .context("Login failed")?;
             println!("Planning Keycloak configuration from {:?}", input);
             plan::run(&client, input.clone()).await?;
         }

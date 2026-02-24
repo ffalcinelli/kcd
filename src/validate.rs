@@ -1,9 +1,10 @@
 use crate::models::{
-    RealmRepresentation, ClientRepresentation, RoleRepresentation, IdentityProviderRepresentation,
-    ClientScopeRepresentation, GroupRepresentation, UserRepresentation,
-    AuthenticationFlowRepresentation, RequiredActionProviderRepresentation, ComponentRepresentation
+    AuthenticationFlowRepresentation, ClientRepresentation, ClientScopeRepresentation,
+    ComponentRepresentation, GroupRepresentation, IdentityProviderRepresentation,
+    RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation,
+    UserRepresentation,
 };
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use serde::de::DeserializeOwned;
 use std::collections::HashSet;
 use std::fs;
@@ -31,10 +32,11 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
     // 1. Validate Realm
     let realm_path = input_dir.join("realm.yaml");
     if !realm_path.exists() {
-         anyhow::bail!("realm.yaml not found in {:?}", input_dir);
+        anyhow::bail!("realm.yaml not found in {:?}", input_dir);
     }
     let realm_content = fs::read_to_string(&realm_path).context("Failed to read realm.yaml")?;
-    let realm: RealmRepresentation = serde_yaml::from_str(&realm_content).context("Failed to parse realm.yaml")?;
+    let realm: RealmRepresentation =
+        serde_yaml::from_str(&realm_content).context("Failed to parse realm.yaml")?;
 
     if realm.realm.is_empty() {
         anyhow::bail!("Realm name is empty in realm.yaml");
@@ -62,13 +64,7 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
     let clients: Vec<(PathBuf, ClientRepresentation)> = read_yaml_files(&clients_dir, "client")?;
 
     for (path, client) in clients {
-        if client.client_id.is_none()
-            || client
-                .client_id
-                .as_deref()
-                .unwrap_or("")
-                .is_empty()
-        {
+        if client.client_id.is_none() || client.client_id.as_deref().unwrap_or("").is_empty() {
             anyhow::bail!("Client ID is missing or empty in {:?}", path);
         }
     }
@@ -76,23 +72,13 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
 
     // 4. Validate Identity Providers
     let idps_dir = input_dir.join("identity-providers");
-    let idps: Vec<(PathBuf, IdentityProviderRepresentation)> =
-        read_yaml_files(&idps_dir, "idp")?;
+    let idps: Vec<(PathBuf, IdentityProviderRepresentation)> = read_yaml_files(&idps_dir, "idp")?;
 
     for (path, idp) in idps {
         if idp.alias.is_none() || idp.alias.as_deref().unwrap_or("").is_empty() {
-            anyhow::bail!(
-                "Identity Provider alias is missing or empty in {:?}",
-                path
-            );
+            anyhow::bail!("Identity Provider alias is missing or empty in {:?}", path);
         }
-        if idp.provider_id.is_none()
-            || idp
-                .provider_id
-                .as_deref()
-                .unwrap_or("")
-                .is_empty()
-        {
+        if idp.provider_id.is_none() || idp.provider_id.as_deref().unwrap_or("").is_empty() {
             anyhow::bail!(
                 "Identity Provider providerId is missing or empty in {:?}",
                 path
@@ -103,7 +89,8 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
 
     // 5. Validate Client Scopes
     let scopes_dir = input_dir.join("client-scopes");
-    let scopes: Vec<(PathBuf, ClientScopeRepresentation)> = read_yaml_files(&scopes_dir, "client-scope")?;
+    let scopes: Vec<(PathBuf, ClientScopeRepresentation)> =
+        read_yaml_files(&scopes_dir, "client-scope")?;
     for (path, scope) in scopes {
         if scope.name.as_deref().unwrap_or("").is_empty() {
             anyhow::bail!("Client Scope name is missing or empty in {:?}", path);
@@ -133,30 +120,39 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
 
     // 8. Validate Authentication Flows
     let flows_dir = input_dir.join("authentication-flows");
-    let flows: Vec<(PathBuf, AuthenticationFlowRepresentation)> = read_yaml_files(&flows_dir, "authentication-flow")?;
+    let flows: Vec<(PathBuf, AuthenticationFlowRepresentation)> =
+        read_yaml_files(&flows_dir, "authentication-flow")?;
     for (path, flow) in flows {
         if flow.alias.as_deref().unwrap_or("").is_empty() {
-            anyhow::bail!("Authentication Flow alias is missing or empty in {:?}", path);
+            anyhow::bail!(
+                "Authentication Flow alias is missing or empty in {:?}",
+                path
+            );
         }
     }
     println!("Validated authentication flows");
 
     // 9. Validate Required Actions
     let actions_dir = input_dir.join("required-actions");
-    let actions: Vec<(PathBuf, RequiredActionProviderRepresentation)> = read_yaml_files(&actions_dir, "required-action")?;
+    let actions: Vec<(PathBuf, RequiredActionProviderRepresentation)> =
+        read_yaml_files(&actions_dir, "required-action")?;
     for (path, action) in actions {
         if action.alias.as_deref().unwrap_or("").is_empty() {
             anyhow::bail!("Required Action alias is missing or empty in {:?}", path);
         }
         if action.provider_id.as_deref().unwrap_or("").is_empty() {
-            anyhow::bail!("Required Action providerId is missing or empty in {:?}", path);
+            anyhow::bail!(
+                "Required Action providerId is missing or empty in {:?}",
+                path
+            );
         }
     }
     println!("Validated required actions");
 
     // 10. Validate Components
     let components_dir = input_dir.join("components");
-    let components: Vec<(PathBuf, ComponentRepresentation)> = read_yaml_files(&components_dir, "component")?;
+    let components: Vec<(PathBuf, ComponentRepresentation)> =
+        read_yaml_files(&components_dir, "component")?;
     for (path, component) in components {
         if component.name.as_deref().unwrap_or("").is_empty() {
             anyhow::bail!("Component name is missing or empty in {:?}", path);

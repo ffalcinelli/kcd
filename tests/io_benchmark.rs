@@ -47,9 +47,7 @@ async fn benchmark_io() -> anyhow::Result<()> {
     let mut set = JoinSet::new();
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
-        set.spawn(async move {
-            process_file_async(path).await
-        });
+        set.spawn(async move { process_file_async(path).await });
     }
     while let Some(res) = set.join_next().await {
         res??;
@@ -58,7 +56,10 @@ async fn benchmark_io() -> anyhow::Result<()> {
     println!("Async implementation took: {:?}", duration_async);
 
     if duration_async < duration_blocking {
-        println!("Improvement: {:.2}x faster", duration_blocking.as_secs_f64() / duration_async.as_secs_f64());
+        println!(
+            "Improvement: {:.2}x faster",
+            duration_blocking.as_secs_f64() / duration_async.as_secs_f64()
+        );
     } else {
         println!("No improvement (or slower).");
     }
