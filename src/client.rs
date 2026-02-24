@@ -1,5 +1,8 @@
 use crate::models::{
-    ClientRepresentation, IdentityProviderRepresentation, RealmRepresentation, RoleRepresentation,
+    AuthenticationFlowRepresentation, ClientRepresentation, ClientScopeRepresentation,
+    ComponentRepresentation, GroupRepresentation, IdentityProviderRepresentation,
+    RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation,
+    UserRepresentation,
 };
 use anyhow::{Context, Result};
 use log::{debug, info};
@@ -135,6 +138,232 @@ impl KeycloakClient {
         let url = format!(
             "{}/admin/realms/{}/identity-provider/instances/{}",
             self.base_url, self.target_realm, alias
+        );
+        self.delete(&url).await
+    }
+
+    pub async fn get_client_scopes(&self) -> Result<Vec<ClientScopeRepresentation>> {
+        let url = format!(
+            "{}/admin/realms/{}/client-scopes",
+            self.base_url, self.target_realm
+        );
+        self.get(&url).await
+    }
+
+    pub async fn create_client_scope(&self, scope_rep: &ClientScopeRepresentation) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/client-scopes",
+            self.base_url, self.target_realm
+        );
+        self.post(&url, scope_rep).await
+    }
+
+    pub async fn update_client_scope(
+        &self,
+        id: &str,
+        scope_rep: &ClientScopeRepresentation,
+    ) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/client-scopes/{}",
+            self.base_url, self.target_realm, id
+        );
+        self.put(&url, scope_rep).await
+    }
+
+    pub async fn delete_client_scope(&self, id: &str) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/client-scopes/{}",
+            self.base_url, self.target_realm, id
+        );
+        self.delete(&url).await
+    }
+
+    pub async fn get_groups(&self) -> Result<Vec<GroupRepresentation>> {
+        let url = format!(
+            "{}/admin/realms/{}/groups",
+            self.base_url, self.target_realm
+        );
+        self.get(&url).await
+    }
+
+    pub async fn create_group(&self, group_rep: &GroupRepresentation) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/groups",
+            self.base_url, self.target_realm
+        );
+        self.post(&url, group_rep).await
+    }
+
+    pub async fn update_group(&self, id: &str, group_rep: &GroupRepresentation) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/groups/{}",
+            self.base_url, self.target_realm, id
+        );
+        self.put(&url, group_rep).await
+    }
+
+    pub async fn delete_group(&self, id: &str) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/groups/{}",
+            self.base_url, self.target_realm, id
+        );
+        self.delete(&url).await
+    }
+
+    pub async fn get_users(&self) -> Result<Vec<UserRepresentation>> {
+        let url = format!("{}/admin/realms/{}/users", self.base_url, self.target_realm);
+        self.get(&url).await
+    }
+
+    pub async fn create_user(&self, user_rep: &UserRepresentation) -> Result<()> {
+        let url = format!("{}/admin/realms/{}/users", self.base_url, self.target_realm);
+        self.post(&url, user_rep).await
+    }
+
+    pub async fn update_user(&self, id: &str, user_rep: &UserRepresentation) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/users/{}",
+            self.base_url, self.target_realm, id
+        );
+        self.put(&url, user_rep).await
+    }
+
+    pub async fn delete_user(&self, id: &str) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/users/{}",
+            self.base_url, self.target_realm, id
+        );
+        self.delete(&url).await
+    }
+
+    pub async fn get_authentication_flows(&self) -> Result<Vec<AuthenticationFlowRepresentation>> {
+        let url = format!(
+            "{}/admin/realms/{}/authentication/flows",
+            self.base_url, self.target_realm
+        );
+        self.get(&url).await
+    }
+
+    pub async fn create_authentication_flow(
+        &self,
+        flow_rep: &AuthenticationFlowRepresentation,
+    ) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/authentication/flows",
+            self.base_url, self.target_realm
+        );
+        self.post(&url, flow_rep).await
+    }
+
+    pub async fn update_authentication_flow(
+        &self,
+        id: &str,
+        flow_rep: &AuthenticationFlowRepresentation,
+    ) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/authentication/flows/{}",
+            self.base_url, self.target_realm, id
+        );
+        self.put(&url, flow_rep).await
+    }
+
+    pub async fn delete_authentication_flow(&self, id: &str) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/authentication/flows/{}",
+            self.base_url, self.target_realm, id
+        );
+        self.delete(&url).await
+    }
+
+    pub async fn get_required_actions(&self) -> Result<Vec<RequiredActionProviderRepresentation>> {
+        let url = format!(
+            "{}/admin/realms/{}/authentication/required-actions",
+            self.base_url, self.target_realm
+        );
+        self.get(&url).await
+    }
+
+    pub async fn update_required_action(
+        &self,
+        alias: &str,
+        action_rep: &RequiredActionProviderRepresentation,
+    ) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/authentication/required-actions/{}",
+            self.base_url, self.target_realm, alias
+        );
+        self.put(&url, action_rep).await
+    }
+
+    pub async fn register_required_action(
+        &self,
+        action_rep: &RequiredActionProviderRepresentation,
+    ) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/authentication/register-required-action",
+            self.base_url, self.target_realm
+        );
+
+        #[derive(Serialize)]
+        struct RegisterActionBody {
+            #[serde(rename = "providerId")]
+            provider_id: String,
+            name: String,
+        }
+
+        let provider_id = action_rep
+            .provider_id
+            .clone()
+            .context("Provider ID required for registration")?;
+        let name = action_rep
+            .name
+            .clone()
+            .unwrap_or_else(|| provider_id.clone());
+
+        let body = RegisterActionBody { provider_id, name };
+        self.post(&url, &body).await
+    }
+
+    pub async fn delete_required_action(&self, alias: &str) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/authentication/required-actions/{}",
+            self.base_url, self.target_realm, alias
+        );
+        self.delete(&url).await
+    }
+
+    pub async fn get_components(&self) -> Result<Vec<ComponentRepresentation>> {
+        let url = format!(
+            "{}/admin/realms/{}/components",
+            self.base_url, self.target_realm
+        );
+        self.get(&url).await
+    }
+
+    pub async fn create_component(&self, component_rep: &ComponentRepresentation) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/components",
+            self.base_url, self.target_realm
+        );
+        self.post(&url, component_rep).await
+    }
+
+    pub async fn update_component(
+        &self,
+        id: &str,
+        component_rep: &ComponentRepresentation,
+    ) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/components/{}",
+            self.base_url, self.target_realm, id
+        );
+        self.put(&url, component_rep).await
+    }
+
+    pub async fn delete_component(&self, id: &str) -> Result<()> {
+        let url = format!(
+            "{}/admin/realms/{}/components/{}",
+            self.base_url, self.target_realm, id
         );
         self.delete(&url).await
     }
