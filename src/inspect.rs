@@ -1,8 +1,8 @@
 use crate::client::KeycloakClient;
-use anyhow::{Result, Context};
-use std::path::PathBuf;
-use std::fs;
+use anyhow::{Context, Result};
 use sanitize_filename::sanitize;
+use std::fs;
+use std::path::PathBuf;
 
 pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
     if !output_dir.exists() {
@@ -16,7 +16,10 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
     println!("Exported realm configuration to realm.yaml");
 
     // Fetch clients
-    let clients = client.get_clients().await.context("Failed to fetch clients")?;
+    let clients = client
+        .get_clients()
+        .await
+        .context("Failed to fetch clients")?;
     let clients_dir = output_dir.join("clients");
     if !clients_dir.exists() {
         fs::create_dir_all(&clients_dir).context("Failed to create clients directory")?;

@@ -1,9 +1,11 @@
 use crate::client::KeycloakClient;
-use crate::models::{RealmRepresentation, ClientRepresentation, RoleRepresentation, IdentityProviderRepresentation};
-use anyhow::{Result, Context};
-use std::path::PathBuf;
-use std::fs;
+use crate::models::{
+    ClientRepresentation, IdentityProviderRepresentation, RealmRepresentation, RoleRepresentation,
+};
+use anyhow::{Context, Result};
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 
 pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
     // 1. Apply Realm
@@ -11,7 +13,10 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
     if realm_path.exists() {
         let content = fs::read_to_string(&realm_path)?;
         let realm_rep: RealmRepresentation = serde_yaml::from_str(&content)?;
-        client.update_realm(&realm_rep).await.context("Failed to update realm")?;
+        client
+            .update_realm(&realm_rep)
+            .await
+            .context("Failed to update realm")?;
         println!("Updated realm configuration");
     }
 
@@ -27,19 +32,25 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
         for entry in fs::read_dir(&roles_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let mut role_rep: RoleRepresentation = serde_yaml::from_str(&content)?;
 
                 if let Some(existing) = existing_roles_map.get(&role_rep.name) {
                     if let Some(id) = &existing.id {
                         role_rep.id = Some(id.clone()); // Use remote ID
-                        client.update_role(id, &role_rep).await.context(format!("Failed to update role {}", role_rep.name))?;
+                        client
+                            .update_role(id, &role_rep)
+                            .await
+                            .context(format!("Failed to update role {}", role_rep.name))?;
                         println!("Updated role {}", role_rep.name);
                     }
                 } else {
                     role_rep.id = None; // Don't send ID on create
-                    client.create_role(&role_rep).await.context(format!("Failed to create role {}", role_rep.name))?;
+                    client
+                        .create_role(&role_rep)
+                        .await
+                        .context(format!("Failed to create role {}", role_rep.name))?;
                     println!("Created role {}", role_rep.name);
                 }
             }
@@ -58,7 +69,7 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
         for entry in fs::read_dir(&idps_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let mut idp_rep: IdentityProviderRepresentation = serde_yaml::from_str(&content)?;
                 let alias = idp_rep.alias.as_deref().unwrap_or("");
@@ -70,13 +81,19 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
 
                 if let Some(existing) = existing_idps_map.get(alias) {
                     if let Some(internal_id) = &existing.internal_id {
-                         idp_rep.internal_id = Some(internal_id.clone());
-                         client.update_identity_provider(alias, &idp_rep).await.context(format!("Failed to update identity provider {}", alias))?;
-                         println!("Updated identity provider {}", alias);
+                        idp_rep.internal_id = Some(internal_id.clone());
+                        client
+                            .update_identity_provider(alias, &idp_rep)
+                            .await
+                            .context(format!("Failed to update identity provider {}", alias))?;
+                        println!("Updated identity provider {}", alias);
                     }
                 } else {
                     idp_rep.internal_id = None;
-                    client.create_identity_provider(&idp_rep).await.context(format!("Failed to create identity provider {}", alias))?;
+                    client
+                        .create_identity_provider(&idp_rep)
+                        .await
+                        .context(format!("Failed to create identity provider {}", alias))?;
                     println!("Created identity provider {}", alias);
                 }
             }
@@ -95,7 +112,7 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
         for entry in fs::read_dir(&clients_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let mut client_rep: ClientRepresentation = serde_yaml::from_str(&content)?;
                 let client_id = client_rep.client_id.as_deref().unwrap_or("");
@@ -109,13 +126,19 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
                     if let Some(id) = &existing.id {
                         client_rep.id = Some(id.clone()); // Use remote ID
                         let client_id = client_rep.client_id.as_deref().unwrap_or("");
-                        client.update_client(id, &client_rep).await.context(format!("Failed to update client {}", client_id))?;
+                        client
+                            .update_client(id, &client_rep)
+                            .await
+                            .context(format!("Failed to update client {}", client_id))?;
                         println!("Updated client {}", client_id);
                     }
                 } else {
                     client_rep.id = None; // Don't send ID on create
                     let client_id = client_rep.client_id.as_deref().unwrap_or("");
-                    client.create_client(&client_rep).await.context(format!("Failed to create client {}", client_id))?;
+                    client
+                        .create_client(&client_rep)
+                        .await
+                        .context(format!("Failed to create client {}", client_id))?;
                     println!("Created client {}", client_id);
                 }
             }
