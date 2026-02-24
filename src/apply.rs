@@ -1,0 +1,91 @@
+use crate::client::KeycloakClient;
+use crate::models::{RealmRepresentation, ClientRepresentation, RoleRepresentation};
+use anyhow::{Result, Context};
+use std::path::PathBuf;
+use std::fs;
+use std::collections::HashMap;
+
+pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
+    // 1. Apply Realm
+    let realm_path = input_dir.join("realm.yaml");
+    if realm_path.exists() {
+        let content = fs::read_to_string(&realm_path)?;
+        let realm_rep: RealmRepresentation = serde_yaml::from_str(&content)?;
+        client.update_realm(&realm_rep).await.context("Failed to update realm")?;
+        println!("Updated realm configuration");
+    }
+
+    // 2. Apply Roles
+    let roles_dir = input_dir.join("roles");
+    if roles_dir.exists() {
+        let existing_roles = client.get_roles().await?;
+        let existing_roles_map: HashMap<String, RoleRepresentation> = existing_roles
+            .into_iter()
+            .map(|r| (r.name.clone(), r))
+            .collect();
+
+        for entry in fs::read_dir(&roles_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "yaml") {
+                let content = fs::read_to_string(&path)?;
+                let role_rep: RoleRepresentation = serde_yaml::from_str(&content)?;
+
+                if let Some(existing) = existing_roles_map.get(&role_rep.name) {
+                    if let Some(id) = &existing.id {
+                        let mut update_rep = role_rep.clone();
+                        update_rep.id = Some(id.clone()); // Use remote ID
+                        client.update_role(id, &update_rep).await.context(format!("Failed to update role {}", role_rep.name))?;
+                        println!("Updated role {}", role_rep.name);
+                    }
+                } else {
+                    let mut create_rep = role_rep.clone();
+                    create_rep.id = None; // Don't send ID on create
+                    client.create_role(&create_rep).await.context(format!("Failed to create role {}", role_rep.name))?;
+                    println!("Created role {}", role_rep.name);
+                }
+            }
+        }
+    }
+
+    // 3. Apply Clients
+    let clients_dir = input_dir.join("clients");
+    if clients_dir.exists() {
+        let existing_clients = client.get_clients().await?;
+        let existing_clients_map: HashMap<String, ClientRepresentation> = existing_clients
+            .into_iter()
+            .filter_map(|c| c.client_id.clone().map(|id| (id, c)))
+            .collect();
+
+        for entry in fs::read_dir(&clients_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "yaml") {
+                let content = fs::read_to_string(&path)?;
+                let client_rep: ClientRepresentation = serde_yaml::from_str(&content)?;
+                let client_id = client_rep.client_id.as_deref().unwrap_or("");
+
+                if client_id.is_empty() {
+                    println!("Skipping client file {:?} due to missing clientId", path);
+                    continue;
+                }
+
+                if let Some(existing) = existing_clients_map.get(client_id) {
+                    if let Some(id) = &existing.id {
+                        let mut update_rep = client_rep.clone();
+                        update_rep.id = Some(id.clone()); // Use remote ID
+                        client.update_client(id, &update_rep).await.context(format!("Failed to update client {}", client_id))?;
+                        println!("Updated client {}", client_id);
+                    }
+                } else {
+                    let mut create_rep = client_rep.clone();
+                    create_rep.id = None; // Don't send ID on create
+                    client.create_client(&create_rep).await.context(format!("Failed to create client {}", client_id))?;
+                    println!("Created client {}", client_id);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
