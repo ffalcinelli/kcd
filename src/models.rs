@@ -80,3 +80,119 @@ pub struct RoleRepresentation {
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ClientScopeRepresentation {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub protocol: Option<String>,
+    pub attributes: Option<HashMap<String, String>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GroupRepresentation {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub path: Option<String>,
+    #[serde(rename = "subGroups")]
+    pub sub_groups: Option<Vec<GroupRepresentation>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CredentialRepresentation {
+    pub id: Option<String>,
+    #[serde(rename = "type")]
+    pub type_: Option<String>,
+    pub value: Option<String>,
+    pub temporary: Option<bool>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserRepresentation {
+    pub id: Option<String>,
+    pub username: Option<String>,
+    pub enabled: Option<bool>,
+    #[serde(rename = "firstName")]
+    pub first_name: Option<String>,
+    #[serde(rename = "lastName")]
+    pub last_name: Option<String>,
+    pub email: Option<String>,
+    #[serde(rename = "emailVerified")]
+    pub email_verified: Option<bool>,
+    pub credentials: Option<Vec<CredentialRepresentation>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AuthenticationExecutionExportRepresentation {
+    pub authenticator: Option<String>,
+    #[serde(rename = "authenticatorConfig")]
+    pub authenticator_config: Option<String>,
+    pub requirement: Option<String>,
+    pub priority: Option<i32>,
+    #[serde(rename = "authenticatorFlow")]
+    pub authenticator_flow: Option<bool>,
+    #[serde(rename = "flowAlias")]
+    pub flow_alias: Option<String>,
+    #[serde(rename = "userSetupAllowed")]
+    pub user_setup_allowed: Option<bool>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AuthenticationFlowRepresentation {
+    pub id: Option<String>,
+    pub alias: Option<String>,
+    pub description: Option<String>,
+    #[serde(rename = "providerId")]
+    pub provider_id: Option<String>,
+    #[serde(rename = "topLevel")]
+    pub top_level: Option<bool>,
+    #[serde(rename = "builtIn")]
+    pub built_in: Option<bool>,
+    #[serde(rename = "authenticationExecutions")]
+    pub authentication_executions: Option<Vec<AuthenticationExecutionExportRepresentation>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RequiredActionProviderRepresentation {
+    pub alias: Option<String>,
+    pub name: Option<String>,
+    #[serde(rename = "providerId")]
+    pub provider_id: Option<String>,
+    pub enabled: Option<bool>,
+    #[serde(rename = "defaultAction")]
+    pub default_action: Option<bool>,
+    pub priority: Option<i32>,
+    pub config: Option<HashMap<String, String>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ComponentRepresentation {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    #[serde(rename = "providerId")]
+    pub provider_id: Option<String>,
+    #[serde(rename = "providerType")]
+    pub provider_type: Option<String>,
+    #[serde(rename = "parentId")]
+    pub parent_id: Option<String>,
+    #[serde(rename = "subType")]
+    pub sub_type: Option<String>,
+    pub config: Option<HashMap<String, Value>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
