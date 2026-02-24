@@ -1,4 +1,4 @@
-use crate::models::{RealmRepresentation, ClientRepresentation, RoleRepresentation};
+use crate::models::{RealmRepresentation, ClientRepresentation, RoleRepresentation, IdentityProviderRepresentation};
 use anyhow::{Result, Context};
 use std::path::PathBuf;
 use std::fs;
@@ -58,6 +58,27 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
         }
     }
     println!("Validated clients");
+
+    // 4. Validate Identity Providers
+    let idps_dir = input_dir.join("identity-providers");
+    if idps_dir.exists() {
+        for entry in fs::read_dir(&idps_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "yaml") {
+                let content = fs::read_to_string(&path).context(format!("Failed to read idp file {:?}", path))?;
+                let idp: IdentityProviderRepresentation = serde_yaml::from_str(&content).context(format!("Failed to parse idp file {:?}", path))?;
+
+                if idp.alias.is_none() || idp.alias.as_deref().unwrap_or("").is_empty() {
+                     anyhow::bail!("Identity Provider alias is missing or empty in {:?}", path);
+                }
+                if idp.provider_id.is_none() || idp.provider_id.as_deref().unwrap_or("").is_empty() {
+                     anyhow::bail!("Identity Provider providerId is missing or empty in {:?}", path);
+                }
+            }
+        }
+    }
+    println!("Validated Identity Providers");
 
     Ok(())
 }

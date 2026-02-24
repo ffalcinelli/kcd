@@ -2,7 +2,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use anyhow::{Result, Context};
 use log::{info, debug};
-use crate::models::{RealmRepresentation, ClientRepresentation, RoleRepresentation};
+use crate::models::{RealmRepresentation, ClientRepresentation, RoleRepresentation, IdentityProviderRepresentation};
 
 #[derive(Clone)]
 pub struct KeycloakClient {
@@ -43,6 +43,11 @@ impl KeycloakClient {
          self.get(&url).await
     }
 
+    pub async fn get_identity_providers(&self) -> Result<Vec<IdentityProviderRepresentation>> {
+        let url = format!("{}/admin/realms/{}/identity-provider/instances", self.base_url, self.target_realm);
+        self.get(&url).await
+    }
+
     pub async fn update_realm(&self, realm_rep: &RealmRepresentation) -> Result<()> {
         let url = format!("{}/admin/realms/{}", self.base_url, self.target_realm);
         self.put(&url, realm_rep).await
@@ -78,6 +83,21 @@ impl KeycloakClient {
          // Keycloak API for deleting role by ID: DELETE /admin/realms/{realm}/roles-by-id/{role-id}
          let url = format!("{}/admin/realms/{}/roles-by-id/{}", self.base_url, self.target_realm, id);
          self.delete(&url).await
+    }
+
+    pub async fn create_identity_provider(&self, idp_rep: &IdentityProviderRepresentation) -> Result<()> {
+        let url = format!("{}/admin/realms/{}/identity-provider/instances", self.base_url, self.target_realm);
+        self.post(&url, idp_rep).await
+    }
+
+    pub async fn update_identity_provider(&self, alias: &str, idp_rep: &IdentityProviderRepresentation) -> Result<()> {
+        let url = format!("{}/admin/realms/{}/identity-provider/instances/{}", self.base_url, self.target_realm, alias);
+        self.put(&url, idp_rep).await
+    }
+
+    pub async fn delete_identity_provider(&self, alias: &str) -> Result<()> {
+        let url = format!("{}/admin/realms/{}/identity-provider/instances/{}", self.base_url, self.target_realm, alias);
+        self.delete(&url).await
     }
 
     async fn get<T: for<'a> Deserialize<'a>>(&self, url: &str) -> Result<T> {

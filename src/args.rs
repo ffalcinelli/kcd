@@ -52,4 +52,10 @@ pub enum Commands {
         #[arg(long, short, default_value = "config")]
         input: PathBuf,
     },
+    /// Plan the application of the local Keycloak configuration
+    Plan {
+        /// Input directory containing configuration files
+        #[arg(long, short, default_value = "config")]
+        input: PathBuf,
+    },
 }
