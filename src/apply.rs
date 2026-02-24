@@ -1,5 +1,9 @@
 use crate::client::KeycloakClient;
-use crate::models::{RealmRepresentation, ClientRepresentation, RoleRepresentation, IdentityProviderRepresentation};
+use crate::models::{
+    RealmRepresentation, ClientRepresentation, RoleRepresentation, IdentityProviderRepresentation,
+    ClientScopeRepresentation, GroupRepresentation, UserRepresentation,
+    AuthenticationFlowRepresentation, RequiredActionProviderRepresentation, ComponentRepresentation
+};
 use anyhow::{Result, Context};
 use std::path::PathBuf;
 use std::fs;
@@ -117,6 +121,208 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
                     let client_id = client_rep.client_id.as_deref().unwrap_or("");
                     client.create_client(&client_rep).await.context(format!("Failed to create client {}", client_id))?;
                     println!("Created client {}", client_id);
+                }
+            }
+        }
+    }
+
+    // 5. Apply Client Scopes
+    let scopes_dir = input_dir.join("client-scopes");
+    if scopes_dir.exists() {
+        let existing_scopes = client.get_client_scopes().await?;
+        let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
+            .into_iter()
+            .filter_map(|s| s.name.clone().map(|n| (n, s)))
+            .collect();
+
+        for entry in fs::read_dir(&scopes_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "yaml") {
+                let content = fs::read_to_string(&path)?;
+                let mut scope_rep: ClientScopeRepresentation = serde_yaml::from_str(&content)?;
+                let name = scope_rep.name.as_deref().unwrap_or("");
+
+                if name.is_empty() { continue; }
+
+                if let Some(existing) = existing_scopes_map.get(name) {
+                    if let Some(id) = &existing.id {
+                        scope_rep.id = Some(id.clone());
+                        client.update_client_scope(id, &scope_rep).await.context(format!("Failed to update client scope {}", name))?;
+                        println!("Updated client scope {}", name);
+                    }
+                } else {
+                    scope_rep.id = None;
+                    client.create_client_scope(&scope_rep).await.context(format!("Failed to create client scope {}", name))?;
+                    println!("Created client scope {}", name);
+                }
+            }
+        }
+    }
+
+    // 6. Apply Groups
+    let groups_dir = input_dir.join("groups");
+    if groups_dir.exists() {
+        let existing_groups = client.get_groups().await?;
+        let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
+            .into_iter()
+            .filter_map(|g| g.name.clone().map(|n| (n, g)))
+            .collect();
+
+        for entry in fs::read_dir(&groups_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "yaml") {
+                let content = fs::read_to_string(&path)?;
+                let mut group_rep: GroupRepresentation = serde_yaml::from_str(&content)?;
+                let name = group_rep.name.as_deref().unwrap_or("");
+
+                if name.is_empty() { continue; }
+
+                if let Some(existing) = existing_groups_map.get(name) {
+                    if let Some(id) = &existing.id {
+                        group_rep.id = Some(id.clone());
+                        client.update_group(id, &group_rep).await.context(format!("Failed to update group {}", name))?;
+                        println!("Updated group {}", name);
+                    }
+                } else {
+                    group_rep.id = None;
+                    client.create_group(&group_rep).await.context(format!("Failed to create group {}", name))?;
+                    println!("Created group {}", name);
+                }
+            }
+        }
+    }
+
+    // 7. Apply Users
+    let users_dir = input_dir.join("users");
+    if users_dir.exists() {
+        let existing_users = client.get_users().await?;
+        let existing_users_map: HashMap<String, UserRepresentation> = existing_users
+            .into_iter()
+            .filter_map(|u| u.username.clone().map(|n| (n, u)))
+            .collect();
+
+        for entry in fs::read_dir(&users_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "yaml") {
+                let content = fs::read_to_string(&path)?;
+                let mut user_rep: UserRepresentation = serde_yaml::from_str(&content)?;
+                let username = user_rep.username.as_deref().unwrap_or("");
+
+                if username.is_empty() { continue; }
+
+                if let Some(existing) = existing_users_map.get(username) {
+                    if let Some(id) = &existing.id {
+                        user_rep.id = Some(id.clone());
+                        client.update_user(id, &user_rep).await.context(format!("Failed to update user {}", username))?;
+                        println!("Updated user {}", username);
+                    }
+                } else {
+                    user_rep.id = None;
+                    client.create_user(&user_rep).await.context(format!("Failed to create user {}", username))?;
+                    println!("Created user {}", username);
+                }
+            }
+        }
+    }
+
+    // 8. Apply Authentication Flows
+    let flows_dir = input_dir.join("authentication-flows");
+    if flows_dir.exists() {
+        let existing_flows = client.get_authentication_flows().await?;
+        let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
+            .into_iter()
+            .filter_map(|f| f.alias.clone().map(|a| (a, f)))
+            .collect();
+
+        for entry in fs::read_dir(&flows_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "yaml") {
+                let content = fs::read_to_string(&path)?;
+                let mut flow_rep: AuthenticationFlowRepresentation = serde_yaml::from_str(&content)?;
+                let alias = flow_rep.alias.as_deref().unwrap_or("");
+
+                if alias.is_empty() { continue; }
+
+                if let Some(existing) = existing_flows_map.get(alias) {
+                    if let Some(id) = &existing.id {
+                        flow_rep.id = Some(id.clone());
+                        client.update_authentication_flow(id, &flow_rep).await.context(format!("Failed to update authentication flow {}", alias))?;
+                        println!("Updated authentication flow {}", alias);
+                    }
+                } else {
+                    flow_rep.id = None;
+                    client.create_authentication_flow(&flow_rep).await.context(format!("Failed to create authentication flow {}", alias))?;
+                    println!("Created authentication flow {}", alias);
+                }
+            }
+        }
+    }
+
+    // 9. Apply Required Actions
+    let actions_dir = input_dir.join("required-actions");
+    if actions_dir.exists() {
+        let existing_actions = client.get_required_actions().await?;
+        let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> = existing_actions
+            .into_iter()
+            .filter_map(|a| a.alias.clone().map(|n| (n, a)))
+            .collect();
+
+        for entry in fs::read_dir(&actions_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "yaml") {
+                let content = fs::read_to_string(&path)?;
+                let action_rep: RequiredActionProviderRepresentation = serde_yaml::from_str(&content)?;
+                let alias = action_rep.alias.as_deref().unwrap_or("");
+
+                if alias.is_empty() { continue; }
+
+                if existing_actions_map.contains_key(alias) {
+                    client.update_required_action(alias, &action_rep).await.context(format!("Failed to update required action {}", alias))?;
+                    println!("Updated required action {}", alias);
+                } else {
+                    // Register
+                    client.register_required_action(&action_rep).await.context(format!("Failed to register required action {}", alias))?;
+                    client.update_required_action(alias, &action_rep).await.context(format!("Failed to configure registered required action {}", alias))?;
+                    println!("Registered required action {}", alias);
+                }
+            }
+        }
+    }
+
+    // 10. Apply Components
+    let components_dir = input_dir.join("components");
+    if components_dir.exists() {
+        let existing_components = client.get_components().await?;
+        let existing_components_map: HashMap<String, ComponentRepresentation> = existing_components
+            .into_iter()
+            .filter_map(|c| c.name.clone().map(|n| (n, c)))
+            .collect();
+
+        for entry in fs::read_dir(&components_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "yaml") {
+                let content = fs::read_to_string(&path)?;
+                let mut component_rep: ComponentRepresentation = serde_yaml::from_str(&content)?;
+                let name = component_rep.name.as_deref().unwrap_or("");
+
+                if name.is_empty() { continue; }
+
+                if let Some(existing) = existing_components_map.get(name) {
+                    if let Some(id) = &existing.id {
+                        component_rep.id = Some(id.clone());
+                        client.update_component(id, &component_rep).await.context(format!("Failed to update component {}", name))?;
+                        println!("Updated component {}", name);
+                    }
+                } else {
+                    component_rep.id = None;
+                    client.create_component(&component_rep).await.context(format!("Failed to create component {}", name))?;
+                    println!("Created component {}", name);
                 }
             }
         }
