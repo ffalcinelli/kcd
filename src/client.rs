@@ -1,4 +1,4 @@
-use reqwest::Client;
+use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
 use anyhow::{Result, Context};
 use log::{info, debug};
@@ -109,11 +109,7 @@ impl KeycloakClient {
             .await
             .context(format!("Failed to send GET request to {}", redact_url(url)))?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let text = response.text().await.unwrap_or_default();
-             anyhow::bail!("GET request failed: {} - {}", status, text);
-        }
+        let response = Self::check_response(response, "GET request failed").await?;
 
         response.json().await.context("Failed to parse response")
     }
@@ -128,11 +124,7 @@ impl KeycloakClient {
             .await
             .context(format!("Failed to send POST request to {}", redact_url(url)))?;
 
-        if !response.status().is_success() {
-             let status = response.status();
-             let text = response.text().await.unwrap_or_default();
-             anyhow::bail!("POST request failed: {} - {}", status, text);
-        }
+        Self::check_response(response, "POST request failed").await?;
         Ok(())
     }
 
@@ -146,11 +138,7 @@ impl KeycloakClient {
             .await
             .context(format!("Failed to send PUT request to {}", redact_url(url)))?;
 
-        if !response.status().is_success() {
-             let status = response.status();
-             let text = response.text().await.unwrap_or_default();
-             anyhow::bail!("PUT request failed: {} - {}", status, text);
-        }
+        Self::check_response(response, "PUT request failed").await?;
         Ok(())
     }
 
@@ -163,11 +151,7 @@ impl KeycloakClient {
             .await
             .context(format!("Failed to send DELETE request to {}", redact_url(url)))?;
 
-        if !response.status().is_success() {
-             let status = response.status();
-             let text = response.text().await.unwrap_or_default();
-             anyhow::bail!("DELETE request failed: {} - {}", status, text);
-        }
+        Self::check_response(response, "DELETE request failed").await?;
         Ok(())
     }
 
@@ -199,11 +183,7 @@ impl KeycloakClient {
             .await
             .context("Failed to send login request")?;
 
-        if !response.status().is_success() {
-             let status = response.status();
-             let text = response.text().await.unwrap_or_default();
-             anyhow::bail!("Login failed: {} - {}", status, text);
-        }
+        let response = Self::check_response(response, "Login failed").await?;
 
         let token_response: TokenResponse = response.json().await.context("Failed to parse token response")?;
         self.token = Some(token_response.access_token);
@@ -214,6 +194,15 @@ impl KeycloakClient {
 
     pub fn get_token(&self) -> Result<&str> {
         self.token.as_deref().context("Not authenticated")
+    }
+
+    async fn check_response(response: Response, context_msg: &str) -> Result<Response> {
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            anyhow::bail!("{}: {} - {}", context_msg, status, text);
+        }
+        Ok(response)
     }
 }
 
