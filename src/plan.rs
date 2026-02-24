@@ -1,19 +1,24 @@
 use crate::client::KeycloakClient;
 use crate::models::{
-    RealmRepresentation, ClientRepresentation, RoleRepresentation, IdentityProviderRepresentation,
-    ClientScopeRepresentation, GroupRepresentation, UserRepresentation,
-    AuthenticationFlowRepresentation, RequiredActionProviderRepresentation, ComponentRepresentation
+    AuthenticationFlowRepresentation, ClientRepresentation, ClientScopeRepresentation,
+    ComponentRepresentation, GroupRepresentation, IdentityProviderRepresentation,
+    RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation,
+    UserRepresentation,
 };
 use anyhow::Result;
-use std::path::PathBuf;
-use std::fs;
-use std::collections::HashMap;
-use similar::{ChangeTag, TextDiff};
-use console::{Style, Emoji};
+use console::{Emoji, Style};
 use serde::Serialize;
+use similar::{ChangeTag, TextDiff};
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
-    println!("{} Planning changes for realm: {}", Emoji("🔮", ""), client.target_realm);
+    println!(
+        "{} Planning changes for realm: {}",
+        Emoji("🔮", ""),
+        client.target_realm
+    );
 
     // 1. Plan Realm
     plan_realm(client, &input_dir).await?;
@@ -69,12 +74,12 @@ fn print_diff<T: Serialize>(name: &str, old: Option<&T>, new: &T) -> Result<()> 
             print!("{}{}", style.apply_to(sign).bold(), style.apply_to(change));
         }
     } else {
-         println!("{} No changes for {}", Emoji("✅", ""), name);
+        println!("{} No changes for {}", Emoji("✅", ""), name);
     }
     Ok(())
 }
 
-async fn plan_client_scopes(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_client_scopes(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let scopes_dir = input_dir.join("client-scopes");
     if scopes_dir.exists() {
         let existing_scopes = client.get_client_scopes().await.unwrap_or_default();
@@ -86,22 +91,32 @@ async fn plan_client_scopes(client: &KeycloakClient, input_dir: &PathBuf) -> Res
         for entry in fs::read_dir(&scopes_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_scope: ClientScopeRepresentation = serde_yaml::from_str(&content)?;
                 let name = local_scope.name.as_deref().unwrap_or("");
 
-                if name.is_empty() { continue; }
+                if name.is_empty() {
+                    continue;
+                }
 
                 if let Some(remote) = existing_scopes_map.get(name) {
-                     let mut remote_clone = remote.clone();
-                     if local_scope.id.is_none() {
-                         remote_clone.id = None;
-                     }
-                     print_diff(&format!("ClientScope {}", name), Some(&remote_clone), &local_scope)?;
+                    let mut remote_clone = remote.clone();
+                    if local_scope.id.is_none() {
+                        remote_clone.id = None;
+                    }
+                    print_diff(
+                        &format!("ClientScope {}", name),
+                        Some(&remote_clone),
+                        &local_scope,
+                    )?;
                 } else {
-                     println!("\n{} Will create ClientScope: {}", Emoji("✨", ""), name);
-                     print_diff(&format!("ClientScope {}", name), None::<&ClientScopeRepresentation>, &local_scope)?;
+                    println!("\n{} Will create ClientScope: {}", Emoji("✨", ""), name);
+                    print_diff(
+                        &format!("ClientScope {}", name),
+                        None::<&ClientScopeRepresentation>,
+                        &local_scope,
+                    )?;
                 }
             }
         }
@@ -109,7 +124,7 @@ async fn plan_client_scopes(client: &KeycloakClient, input_dir: &PathBuf) -> Res
     Ok(())
 }
 
-async fn plan_groups(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_groups(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let groups_dir = input_dir.join("groups");
     if groups_dir.exists() {
         let existing_groups = client.get_groups().await.unwrap_or_default();
@@ -121,22 +136,32 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()>
         for entry in fs::read_dir(&groups_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_group: GroupRepresentation = serde_yaml::from_str(&content)?;
                 let name = local_group.name.as_deref().unwrap_or("");
 
-                if name.is_empty() { continue; }
+                if name.is_empty() {
+                    continue;
+                }
 
                 if let Some(remote) = existing_groups_map.get(name) {
-                     let mut remote_clone = remote.clone();
-                     if local_group.id.is_none() {
-                         remote_clone.id = None;
-                     }
-                     print_diff(&format!("Group {}", name), Some(&remote_clone), &local_group)?;
+                    let mut remote_clone = remote.clone();
+                    if local_group.id.is_none() {
+                        remote_clone.id = None;
+                    }
+                    print_diff(
+                        &format!("Group {}", name),
+                        Some(&remote_clone),
+                        &local_group,
+                    )?;
                 } else {
-                     println!("\n{} Will create Group: {}", Emoji("✨", ""), name);
-                     print_diff(&format!("Group {}", name), None::<&GroupRepresentation>, &local_group)?;
+                    println!("\n{} Will create Group: {}", Emoji("✨", ""), name);
+                    print_diff(
+                        &format!("Group {}", name),
+                        None::<&GroupRepresentation>,
+                        &local_group,
+                    )?;
                 }
             }
         }
@@ -144,7 +169,7 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()>
     Ok(())
 }
 
-async fn plan_users(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_users(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let users_dir = input_dir.join("users");
     if users_dir.exists() {
         let existing_users = client.get_users().await.unwrap_or_default();
@@ -156,22 +181,32 @@ async fn plan_users(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> 
         for entry in fs::read_dir(&users_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_user: UserRepresentation = serde_yaml::from_str(&content)?;
                 let username = local_user.username.as_deref().unwrap_or("");
 
-                if username.is_empty() { continue; }
+                if username.is_empty() {
+                    continue;
+                }
 
                 if let Some(remote) = existing_users_map.get(username) {
-                     let mut remote_clone = remote.clone();
-                     if local_user.id.is_none() {
-                         remote_clone.id = None;
-                     }
-                     print_diff(&format!("User {}", username), Some(&remote_clone), &local_user)?;
+                    let mut remote_clone = remote.clone();
+                    if local_user.id.is_none() {
+                        remote_clone.id = None;
+                    }
+                    print_diff(
+                        &format!("User {}", username),
+                        Some(&remote_clone),
+                        &local_user,
+                    )?;
                 } else {
-                     println!("\n{} Will create User: {}", Emoji("✨", ""), username);
-                     print_diff(&format!("User {}", username), None::<&UserRepresentation>, &local_user)?;
+                    println!("\n{} Will create User: {}", Emoji("✨", ""), username);
+                    print_diff(
+                        &format!("User {}", username),
+                        None::<&UserRepresentation>,
+                        &local_user,
+                    )?;
                 }
             }
         }
@@ -179,7 +214,7 @@ async fn plan_users(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> 
     Ok(())
 }
 
-async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let flows_dir = input_dir.join("authentication-flows");
     if flows_dir.exists() {
         let existing_flows = client.get_authentication_flows().await.unwrap_or_default();
@@ -191,22 +226,36 @@ async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &PathBuf)
         for entry in fs::read_dir(&flows_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_flow: AuthenticationFlowRepresentation = serde_yaml::from_str(&content)?;
                 let alias = local_flow.alias.as_deref().unwrap_or("");
 
-                if alias.is_empty() { continue; }
+                if alias.is_empty() {
+                    continue;
+                }
 
                 if let Some(remote) = existing_flows_map.get(alias) {
-                     let mut remote_clone = remote.clone();
-                     if local_flow.id.is_none() {
-                         remote_clone.id = None;
-                     }
-                     print_diff(&format!("AuthenticationFlow {}", alias), Some(&remote_clone), &local_flow)?;
+                    let mut remote_clone = remote.clone();
+                    if local_flow.id.is_none() {
+                        remote_clone.id = None;
+                    }
+                    print_diff(
+                        &format!("AuthenticationFlow {}", alias),
+                        Some(&remote_clone),
+                        &local_flow,
+                    )?;
                 } else {
-                     println!("\n{} Will create AuthenticationFlow: {}", Emoji("✨", ""), alias);
-                     print_diff(&format!("AuthenticationFlow {}", alias), None::<&AuthenticationFlowRepresentation>, &local_flow)?;
+                    println!(
+                        "\n{} Will create AuthenticationFlow: {}",
+                        Emoji("✨", ""),
+                        alias
+                    );
+                    print_diff(
+                        &format!("AuthenticationFlow {}", alias),
+                        None::<&AuthenticationFlowRepresentation>,
+                        &local_flow,
+                    )?;
                 }
             }
         }
@@ -214,30 +263,46 @@ async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &PathBuf)
     Ok(())
 }
 
-async fn plan_required_actions(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_required_actions(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let actions_dir = input_dir.join("required-actions");
     if actions_dir.exists() {
         let existing_actions = client.get_required_actions().await.unwrap_or_default();
-        let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> = existing_actions
-            .into_iter()
-            .filter_map(|a| a.alias.clone().map(|n| (n, a)))
-            .collect();
+        let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
+            existing_actions
+                .into_iter()
+                .filter_map(|a| a.alias.clone().map(|n| (n, a)))
+                .collect();
 
         for entry in fs::read_dir(&actions_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
-                let local_action: RequiredActionProviderRepresentation = serde_yaml::from_str(&content)?;
+                let local_action: RequiredActionProviderRepresentation =
+                    serde_yaml::from_str(&content)?;
                 let alias = local_action.alias.as_deref().unwrap_or("");
 
-                if alias.is_empty() { continue; }
+                if alias.is_empty() {
+                    continue;
+                }
 
                 if let Some(remote) = existing_actions_map.get(alias) {
-                     print_diff(&format!("RequiredAction {}", alias), Some(remote), &local_action)?;
+                    print_diff(
+                        &format!("RequiredAction {}", alias),
+                        Some(remote),
+                        &local_action,
+                    )?;
                 } else {
-                     println!("\n{} Will register RequiredAction: {}", Emoji("✨", ""), alias);
-                     print_diff(&format!("RequiredAction {}", alias), None::<&RequiredActionProviderRepresentation>, &local_action)?;
+                    println!(
+                        "\n{} Will register RequiredAction: {}",
+                        Emoji("✨", ""),
+                        alias
+                    );
+                    print_diff(
+                        &format!("RequiredAction {}", alias),
+                        None::<&RequiredActionProviderRepresentation>,
+                        &local_action,
+                    )?;
                 }
             }
         }
@@ -245,7 +310,7 @@ async fn plan_required_actions(client: &KeycloakClient, input_dir: &PathBuf) -> 
     Ok(())
 }
 
-async fn plan_components(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_components(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let components_dir = input_dir.join("components");
     if components_dir.exists() {
         let existing_components = client.get_components().await.unwrap_or_default();
@@ -257,22 +322,32 @@ async fn plan_components(client: &KeycloakClient, input_dir: &PathBuf) -> Result
         for entry in fs::read_dir(&components_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_component: ComponentRepresentation = serde_yaml::from_str(&content)?;
                 let name = local_component.name.as_deref().unwrap_or("");
 
-                if name.is_empty() { continue; }
+                if name.is_empty() {
+                    continue;
+                }
 
                 if let Some(remote) = existing_components_map.get(name) {
-                     let mut remote_clone = remote.clone();
-                     if local_component.id.is_none() {
-                         remote_clone.id = None;
-                     }
-                     print_diff(&format!("Component {}", name), Some(&remote_clone), &local_component)?;
+                    let mut remote_clone = remote.clone();
+                    if local_component.id.is_none() {
+                        remote_clone.id = None;
+                    }
+                    print_diff(
+                        &format!("Component {}", name),
+                        Some(&remote_clone),
+                        &local_component,
+                    )?;
                 } else {
-                     println!("\n{} Will create Component: {}", Emoji("✨", ""), name);
-                     print_diff(&format!("Component {}", name), None::<&ComponentRepresentation>, &local_component)?;
+                    println!("\n{} Will create Component: {}", Emoji("✨", ""), name);
+                    print_diff(
+                        &format!("Component {}", name),
+                        None::<&ComponentRepresentation>,
+                        &local_component,
+                    )?;
                 }
             }
         }
@@ -280,7 +355,7 @@ async fn plan_components(client: &KeycloakClient, input_dir: &PathBuf) -> Result
     Ok(())
 }
 
-async fn plan_realm(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_realm(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let realm_path = input_dir.join("realm.yaml");
     if realm_path.exists() {
         let content = fs::read_to_string(&realm_path)?;
@@ -298,7 +373,7 @@ async fn plan_realm(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> 
     Ok(())
 }
 
-async fn plan_roles(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_roles(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let roles_dir = input_dir.join("roles");
     if roles_dir.exists() {
         let existing_roles = client.get_roles().await.unwrap_or_default();
@@ -310,23 +385,35 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> 
         for entry in fs::read_dir(&roles_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_role: RoleRepresentation = serde_yaml::from_str(&content)?;
 
                 let remote_role = existing_roles_map.get(&local_role.name);
 
                 if let Some(remote) = remote_role {
-                     let mut remote_clone = remote.clone();
-                     // Ignore ID differences if local doesn't specify it
-                     if local_role.id.is_none() {
-                         remote_clone.id = None;
-                         remote_clone.container_id = None;
-                     }
-                     print_diff(&format!("Role {}", local_role.name), Some(&remote_clone), &local_role)?;
+                    let mut remote_clone = remote.clone();
+                    // Ignore ID differences if local doesn't specify it
+                    if local_role.id.is_none() {
+                        remote_clone.id = None;
+                        remote_clone.container_id = None;
+                    }
+                    print_diff(
+                        &format!("Role {}", local_role.name),
+                        Some(&remote_clone),
+                        &local_role,
+                    )?;
                 } else {
-                    println!("\n{} Will create Role: {}", Emoji("✨", ""), local_role.name);
-                    print_diff(&format!("Role {}", local_role.name), None::<&RoleRepresentation>, &local_role)?;
+                    println!(
+                        "\n{} Will create Role: {}",
+                        Emoji("✨", ""),
+                        local_role.name
+                    );
+                    print_diff(
+                        &format!("Role {}", local_role.name),
+                        None::<&RoleRepresentation>,
+                        &local_role,
+                    )?;
                 }
             }
         }
@@ -334,7 +421,7 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> 
     Ok(())
 }
 
-async fn plan_clients(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_clients(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let clients_dir = input_dir.join("clients");
     if clients_dir.exists() {
         let existing_clients = client.get_clients().await.unwrap_or_default();
@@ -344,24 +431,34 @@ async fn plan_clients(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()
             .collect();
 
         for entry in fs::read_dir(&clients_dir)? {
-             let entry = entry?;
+            let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_client: ClientRepresentation = serde_yaml::from_str(&content)?;
                 let client_id = local_client.client_id.as_deref().unwrap_or("");
 
-                if client_id.is_empty() { continue; }
+                if client_id.is_empty() {
+                    continue;
+                }
 
                 if let Some(remote) = existing_clients_map.get(client_id) {
-                     let mut remote_clone = remote.clone();
-                     if local_client.id.is_none() {
-                         remote_clone.id = None;
-                     }
-                     print_diff(&format!("Client {}", client_id), Some(&remote_clone), &local_client)?;
+                    let mut remote_clone = remote.clone();
+                    if local_client.id.is_none() {
+                        remote_clone.id = None;
+                    }
+                    print_diff(
+                        &format!("Client {}", client_id),
+                        Some(&remote_clone),
+                        &local_client,
+                    )?;
                 } else {
-                     println!("\n{} Will create Client: {}", Emoji("✨", ""), client_id);
-                     print_diff(&format!("Client {}", client_id), None::<&ClientRepresentation>, &local_client)?;
+                    println!("\n{} Will create Client: {}", Emoji("✨", ""), client_id);
+                    print_diff(
+                        &format!("Client {}", client_id),
+                        None::<&ClientRepresentation>,
+                        &local_client,
+                    )?;
                 }
             }
         }
@@ -369,7 +466,7 @@ async fn plan_clients(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()
     Ok(())
 }
 
-async fn plan_identity_providers(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_identity_providers(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let idps_dir = input_dir.join("identity-providers");
     if idps_dir.exists() {
         let existing_idps = client.get_identity_providers().await.unwrap_or_default();
@@ -381,23 +478,37 @@ async fn plan_identity_providers(client: &KeycloakClient, input_dir: &PathBuf) -
         for entry in fs::read_dir(&idps_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
-                 let content = fs::read_to_string(&path)?;
-                 let local_idp: IdentityProviderRepresentation = serde_yaml::from_str(&content)?;
-                 let alias = local_idp.alias.as_deref().unwrap_or("");
+            if path.extension().is_some_and(|ext| ext == "yaml") {
+                let content = fs::read_to_string(&path)?;
+                let local_idp: IdentityProviderRepresentation = serde_yaml::from_str(&content)?;
+                let alias = local_idp.alias.as_deref().unwrap_or("");
 
-                 if alias.is_empty() { continue; }
+                if alias.is_empty() {
+                    continue;
+                }
 
-                 if let Some(remote) = existing_idps_map.get(alias) {
-                      let mut remote_clone = remote.clone();
-                      if local_idp.internal_id.is_none() {
-                          remote_clone.internal_id = None;
-                      }
-                      print_diff(&format!("IdentityProvider {}", alias), Some(&remote_clone), &local_idp)?;
-                 } else {
-                      println!("\n{} Will create IdentityProvider: {}", Emoji("✨", ""), alias);
-                      print_diff(&format!("IdentityProvider {}", alias), None::<&IdentityProviderRepresentation>, &local_idp)?;
-                 }
+                if let Some(remote) = existing_idps_map.get(alias) {
+                    let mut remote_clone = remote.clone();
+                    if local_idp.internal_id.is_none() {
+                        remote_clone.internal_id = None;
+                    }
+                    print_diff(
+                        &format!("IdentityProvider {}", alias),
+                        Some(&remote_clone),
+                        &local_idp,
+                    )?;
+                } else {
+                    println!(
+                        "\n{} Will create IdentityProvider: {}",
+                        Emoji("✨", ""),
+                        alias
+                    );
+                    print_diff(
+                        &format!("IdentityProvider {}", alias),
+                        None::<&IdentityProviderRepresentation>,
+                        &local_idp,
+                    )?;
+                }
             }
         }
     }
