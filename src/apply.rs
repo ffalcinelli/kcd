@@ -1,5 +1,5 @@
 use crate::client::KeycloakClient;
-use crate::models::{RealmRepresentation, ClientRepresentation, RoleRepresentation};
+use crate::models::{RealmRepresentation, ClientRepresentation, RoleRepresentation, IdentityProviderRepresentation};
 use anyhow::{Result, Context};
 use std::path::PathBuf;
 use std::fs;
@@ -41,6 +41,43 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
                     role_rep.id = None; // Don't send ID on create
                     client.create_role(&role_rep).await.context(format!("Failed to create role {}", role_rep.name))?;
                     println!("Created role {}", role_rep.name);
+                }
+            }
+        }
+    }
+
+    // 4. Apply Identity Providers
+    let idps_dir = input_dir.join("identity-providers");
+    if idps_dir.exists() {
+        let existing_idps = client.get_identity_providers().await?;
+        let existing_idps_map: HashMap<String, IdentityProviderRepresentation> = existing_idps
+            .into_iter()
+            .filter_map(|i| i.alias.clone().map(|alias| (alias, i)))
+            .collect();
+
+        for entry in fs::read_dir(&idps_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "yaml") {
+                let content = fs::read_to_string(&path)?;
+                let mut idp_rep: IdentityProviderRepresentation = serde_yaml::from_str(&content)?;
+                let alias = idp_rep.alias.as_deref().unwrap_or("");
+
+                if alias.is_empty() {
+                    println!("Skipping IDP file {:?} due to missing alias", path);
+                    continue;
+                }
+
+                if let Some(existing) = existing_idps_map.get(alias) {
+                    if let Some(internal_id) = &existing.internal_id {
+                         idp_rep.internal_id = Some(internal_id.clone());
+                         client.update_identity_provider(alias, &idp_rep).await.context(format!("Failed to update identity provider {}", alias))?;
+                         println!("Updated identity provider {}", alias);
+                    }
+                } else {
+                    idp_rep.internal_id = None;
+                    client.create_identity_provider(&idp_rep).await.context(format!("Failed to create identity provider {}", alias))?;
+                    println!("Created identity provider {}", alias);
                 }
             }
         }

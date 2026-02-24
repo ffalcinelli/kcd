@@ -13,6 +13,37 @@ pub struct RealmRepresentation {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IdentityProviderRepresentation {
+    #[serde(rename = "internalId")]
+    pub internal_id: Option<String>,
+    pub alias: Option<String>,
+    #[serde(rename = "providerId")]
+    pub provider_id: Option<String>,
+    pub enabled: Option<bool>,
+    #[serde(rename = "updateProfileFirstLoginMode")]
+    pub update_profile_first_login_mode: Option<String>,
+    #[serde(rename = "trustEmail")]
+    pub trust_email: Option<bool>,
+    #[serde(rename = "storeToken")]
+    pub store_token: Option<bool>,
+    #[serde(rename = "addReadTokenRoleOnCreate")]
+    pub add_read_token_role_on_create: Option<bool>,
+    #[serde(rename = "authenticateByDefault")]
+    pub authenticate_by_default: Option<bool>,
+    #[serde(rename = "linkOnly")]
+    pub link_only: Option<bool>,
+    #[serde(rename = "firstBrokerLoginFlowAlias")]
+    pub first_broker_login_flow_alias: Option<String>,
+    #[serde(rename = "postBrokerLoginFlowAlias")]
+    pub post_broker_login_flow_alias: Option<String>,
+    #[serde(rename = "displayName")]
+    pub display_name: Option<String>,
+    pub config: Option<HashMap<String, String>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClientRepresentation {
     pub id: Option<String>,
     #[serde(rename = "clientId")]

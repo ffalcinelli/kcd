@@ -4,6 +4,7 @@ use app::client::KeycloakClient;
 use app::inspect;
 use app::validate;
 use app::apply;
+use app::plan;
 use anyhow::{Result, Context};
 
 #[tokio::main]
@@ -29,6 +30,12 @@ async fn main() -> Result<()> {
             client.login(&cli.client_id, cli.client_secret.as_deref(), cli.user.as_deref(), cli.password.as_deref()).await.context("Login failed")?;
             println!("Applying Keycloak configuration from {:?}", input);
             apply::run(&client, input.clone()).await?;
+        }
+        Commands::Plan { input } => {
+            let mut client = KeycloakClient::new(cli.server.clone(), cli.realm.clone());
+            client.login(&cli.client_id, cli.client_secret.as_deref(), cli.user.as_deref(), cli.password.as_deref()).await.context("Login failed")?;
+            println!("Planning Keycloak configuration from {:?}", input);
+            plan::run(&client, input.clone()).await?;
         }
     }
 
