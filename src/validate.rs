@@ -55,7 +55,7 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
         if role_names.contains(&role.name) {
             anyhow::bail!("Duplicate role name: {}", role.name);
         }
-        role_names.insert(role.name.clone());
+        role_names.insert(role.name);
     }
     println!("Validated {} roles", role_names.len());
 
