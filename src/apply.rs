@@ -160,18 +160,18 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
 
     // 5. Apply Client Scopes
     let scopes_dir = input_dir.join("client-scopes");
-    if scopes_dir.exists() {
+    if async_fs::try_exists(&scopes_dir).await? {
         let existing_scopes = client.get_client_scopes().await?;
         let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
             .into_iter()
             .filter_map(|s| s.name.clone().map(|n| (n, s)))
             .collect();
 
-        for entry in fs::read_dir(&scopes_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&scopes_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().map_or(false, |ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let mut scope_rep: ClientScopeRepresentation = serde_yaml::from_str(&content)?;
                 let name = scope_rep.name.as_deref().unwrap_or("");
 
@@ -194,18 +194,18 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
 
     // 6. Apply Groups
     let groups_dir = input_dir.join("groups");
-    if groups_dir.exists() {
+    if async_fs::try_exists(&groups_dir).await? {
         let existing_groups = client.get_groups().await?;
         let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
             .into_iter()
             .filter_map(|g| g.name.clone().map(|n| (n, g)))
             .collect();
 
-        for entry in fs::read_dir(&groups_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&groups_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().map_or(false, |ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let mut group_rep: GroupRepresentation = serde_yaml::from_str(&content)?;
                 let name = group_rep.name.as_deref().unwrap_or("");
 
@@ -228,18 +228,18 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
 
     // 7. Apply Users
     let users_dir = input_dir.join("users");
-    if users_dir.exists() {
+    if async_fs::try_exists(&users_dir).await? {
         let existing_users = client.get_users().await?;
         let existing_users_map: HashMap<String, UserRepresentation> = existing_users
             .into_iter()
             .filter_map(|u| u.username.clone().map(|n| (n, u)))
             .collect();
 
-        for entry in fs::read_dir(&users_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&users_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().map_or(false, |ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let mut user_rep: UserRepresentation = serde_yaml::from_str(&content)?;
                 let username = user_rep.username.as_deref().unwrap_or("");
 
@@ -262,18 +262,18 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
 
     // 8. Apply Authentication Flows
     let flows_dir = input_dir.join("authentication-flows");
-    if flows_dir.exists() {
+    if async_fs::try_exists(&flows_dir).await? {
         let existing_flows = client.get_authentication_flows().await?;
         let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
             .into_iter()
             .filter_map(|f| f.alias.clone().map(|a| (a, f)))
             .collect();
 
-        for entry in fs::read_dir(&flows_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&flows_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().map_or(false, |ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let mut flow_rep: AuthenticationFlowRepresentation = serde_yaml::from_str(&content)?;
                 let alias = flow_rep.alias.as_deref().unwrap_or("");
 
@@ -296,18 +296,18 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
 
     // 9. Apply Required Actions
     let actions_dir = input_dir.join("required-actions");
-    if actions_dir.exists() {
+    if async_fs::try_exists(&actions_dir).await? {
         let existing_actions = client.get_required_actions().await?;
         let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> = existing_actions
             .into_iter()
             .filter_map(|a| a.alias.clone().map(|n| (n, a)))
             .collect();
 
-        for entry in fs::read_dir(&actions_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&actions_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().map_or(false, |ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let action_rep: RequiredActionProviderRepresentation = serde_yaml::from_str(&content)?;
                 let alias = action_rep.alias.as_deref().unwrap_or("");
 
@@ -328,18 +328,18 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
 
     // 10. Apply Components
     let components_dir = input_dir.join("components");
-    if components_dir.exists() {
+    if async_fs::try_exists(&components_dir).await? {
         let existing_components = client.get_components().await?;
         let existing_components_map: HashMap<String, ComponentRepresentation> = existing_components
             .into_iter()
             .filter_map(|c| c.name.clone().map(|n| (n, c)))
             .collect();
 
-        for entry in fs::read_dir(&components_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&components_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().map_or(false, |ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let mut component_rep: ComponentRepresentation = serde_yaml::from_str(&content)?;
                 let name = component_rep.name.as_deref().unwrap_or("");
 
