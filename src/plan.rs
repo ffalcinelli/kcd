@@ -11,7 +11,7 @@ use serde::Serialize;
 use similar::{ChangeTag, TextDiff};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
     println!(
@@ -79,7 +79,7 @@ fn print_diff<T: Serialize>(name: &str, old: Option<&T>, new: &T) -> Result<()> 
     Ok(())
 }
 
-async fn plan_client_scopes(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_client_scopes(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let scopes_dir = input_dir.join("client-scopes");
     if scopes_dir.exists() {
         let existing_scopes = client.get_client_scopes().await.unwrap_or_default();
@@ -91,7 +91,7 @@ async fn plan_client_scopes(client: &KeycloakClient, input_dir: &PathBuf) -> Res
         for entry in fs::read_dir(&scopes_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_scope: ClientScopeRepresentation = serde_yaml::from_str(&content)?;
                 let name = local_scope.name.as_deref().unwrap_or("");
@@ -124,7 +124,7 @@ async fn plan_client_scopes(client: &KeycloakClient, input_dir: &PathBuf) -> Res
     Ok(())
 }
 
-async fn plan_groups(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_groups(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let groups_dir = input_dir.join("groups");
     if groups_dir.exists() {
         let existing_groups = client.get_groups().await.unwrap_or_default();
@@ -136,7 +136,7 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()>
         for entry in fs::read_dir(&groups_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_group: GroupRepresentation = serde_yaml::from_str(&content)?;
                 let name = local_group.name.as_deref().unwrap_or("");
@@ -169,7 +169,7 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()>
     Ok(())
 }
 
-async fn plan_users(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_users(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let users_dir = input_dir.join("users");
     if users_dir.exists() {
         let existing_users = client.get_users().await.unwrap_or_default();
@@ -181,7 +181,7 @@ async fn plan_users(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> 
         for entry in fs::read_dir(&users_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_user: UserRepresentation = serde_yaml::from_str(&content)?;
                 let username = local_user.username.as_deref().unwrap_or("");
@@ -214,7 +214,7 @@ async fn plan_users(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> 
     Ok(())
 }
 
-async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let flows_dir = input_dir.join("authentication-flows");
     if flows_dir.exists() {
         let existing_flows = client.get_authentication_flows().await.unwrap_or_default();
@@ -226,7 +226,7 @@ async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &PathBuf)
         for entry in fs::read_dir(&flows_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_flow: AuthenticationFlowRepresentation = serde_yaml::from_str(&content)?;
                 let alias = local_flow.alias.as_deref().unwrap_or("");
@@ -263,7 +263,7 @@ async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &PathBuf)
     Ok(())
 }
 
-async fn plan_required_actions(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_required_actions(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let actions_dir = input_dir.join("required-actions");
     if actions_dir.exists() {
         let existing_actions = client.get_required_actions().await.unwrap_or_default();
@@ -276,7 +276,7 @@ async fn plan_required_actions(client: &KeycloakClient, input_dir: &PathBuf) -> 
         for entry in fs::read_dir(&actions_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_action: RequiredActionProviderRepresentation =
                     serde_yaml::from_str(&content)?;
@@ -310,7 +310,7 @@ async fn plan_required_actions(client: &KeycloakClient, input_dir: &PathBuf) -> 
     Ok(())
 }
 
-async fn plan_components(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_components(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let components_dir = input_dir.join("components");
     if components_dir.exists() {
         let existing_components = client.get_components().await.unwrap_or_default();
@@ -322,7 +322,7 @@ async fn plan_components(client: &KeycloakClient, input_dir: &PathBuf) -> Result
         for entry in fs::read_dir(&components_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_component: ComponentRepresentation = serde_yaml::from_str(&content)?;
                 let name = local_component.name.as_deref().unwrap_or("");
@@ -355,7 +355,7 @@ async fn plan_components(client: &KeycloakClient, input_dir: &PathBuf) -> Result
     Ok(())
 }
 
-async fn plan_realm(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_realm(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let realm_path = input_dir.join("realm.yaml");
     if realm_path.exists() {
         let content = fs::read_to_string(&realm_path)?;
@@ -373,7 +373,7 @@ async fn plan_realm(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> 
     Ok(())
 }
 
-async fn plan_roles(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_roles(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let roles_dir = input_dir.join("roles");
     if roles_dir.exists() {
         let existing_roles = client.get_roles().await.unwrap_or_default();
@@ -385,7 +385,7 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> 
         for entry in fs::read_dir(&roles_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_role: RoleRepresentation = serde_yaml::from_str(&content)?;
 
@@ -421,7 +421,7 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> 
     Ok(())
 }
 
-async fn plan_clients(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_clients(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let clients_dir = input_dir.join("clients");
     if clients_dir.exists() {
         let existing_clients = client.get_clients().await.unwrap_or_default();
@@ -433,7 +433,7 @@ async fn plan_clients(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()
         for entry in fs::read_dir(&clients_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_client: ClientRepresentation = serde_yaml::from_str(&content)?;
                 let client_id = local_client.client_id.as_deref().unwrap_or("");
@@ -466,7 +466,7 @@ async fn plan_clients(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()
     Ok(())
 }
 
-async fn plan_identity_providers(client: &KeycloakClient, input_dir: &PathBuf) -> Result<()> {
+async fn plan_identity_providers(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     let idps_dir = input_dir.join("identity-providers");
     if idps_dir.exists() {
         let existing_idps = client.get_identity_providers().await.unwrap_or_default();
@@ -478,7 +478,7 @@ async fn plan_identity_providers(client: &KeycloakClient, input_dir: &PathBuf) -
         for entry in fs::read_dir(&idps_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)?;
                 let local_idp: IdentityProviderRepresentation = serde_yaml::from_str(&content)?;
                 let alias = local_idp.alias.as_deref().unwrap_or("");

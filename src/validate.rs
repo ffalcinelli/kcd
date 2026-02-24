@@ -16,7 +16,7 @@ fn read_yaml_files<T: DeserializeOwned>(dir: &Path, file_type: &str) -> Result<V
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = fs::read_to_string(&path)
                     .context(format!("Failed to read {} file {:?}", file_type, path))?;
                 let item: T = serde_yaml::from_str(&content)

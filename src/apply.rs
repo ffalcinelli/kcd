@@ -39,7 +39,7 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
 
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let client = client.clone();
                 let existing_roles_map = existing_roles_map.clone();
                 set.spawn(async move {
@@ -87,7 +87,7 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
 
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let client = client.clone();
                 let existing_idps_map = existing_idps_map.clone();
                 set.spawn(async move {
@@ -142,7 +142,7 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
 
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let client = client.clone();
                 let existing_clients_map = existing_clients_map.clone();
                 set.spawn(async move {
@@ -193,7 +193,7 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
         let mut entries = async_fs::read_dir(&scopes_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
                 let mut scope_rep: ClientScopeRepresentation = serde_yaml::from_str(&content)?;
                 let name = scope_rep.name.as_deref().unwrap_or("");
@@ -235,7 +235,7 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
         let mut entries = async_fs::read_dir(&groups_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
                 let mut group_rep: GroupRepresentation = serde_yaml::from_str(&content)?;
                 let name = group_rep.name.as_deref().unwrap_or("");
@@ -277,7 +277,7 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
         let mut entries = async_fs::read_dir(&users_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
                 let mut user_rep: UserRepresentation = serde_yaml::from_str(&content)?;
                 let username = user_rep.username.as_deref().unwrap_or("");
@@ -319,7 +319,7 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
         let mut entries = async_fs::read_dir(&flows_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
                 let mut flow_rep: AuthenticationFlowRepresentation =
                     serde_yaml::from_str(&content)?;
@@ -363,7 +363,7 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
         let mut entries = async_fs::read_dir(&actions_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
                 let action_rep: RequiredActionProviderRepresentation =
                     serde_yaml::from_str(&content)?;
@@ -410,7 +410,7 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
         let mut entries = async_fs::read_dir(&components_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "yaml") {
+            if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
                 let mut component_rep: ComponentRepresentation = serde_yaml::from_str(&content)?;
                 let name = component_rep.name.as_deref().unwrap_or("");
