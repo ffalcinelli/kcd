@@ -82,12 +82,12 @@ impl KeycloakClient {
 
     async fn get<T: for<'a> Deserialize<'a>>(&self, url: &str) -> Result<T> {
         let token = self.get_token()?;
-        debug!("GET {}", url);
+        debug!("GET {}", redact_url(url));
         let response = self.client.get(url)
             .bearer_auth(token)
             .send()
             .await
-            .context(format!("Failed to send GET request to {}", url))?;
+            .context(format!("Failed to send GET request to {}", redact_url(url)))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -100,13 +100,13 @@ impl KeycloakClient {
 
     async fn post<T: Serialize>(&self, url: &str, body: &T) -> Result<()> {
         let token = self.get_token()?;
-        debug!("POST {}", url);
+        debug!("POST {}", redact_url(url));
         let response = self.client.post(url)
             .bearer_auth(token)
             .json(body)
             .send()
             .await
-            .context(format!("Failed to send POST request to {}", url))?;
+            .context(format!("Failed to send POST request to {}", redact_url(url)))?;
 
         if !response.status().is_success() {
              let status = response.status();
@@ -118,13 +118,13 @@ impl KeycloakClient {
 
     async fn put<T: Serialize>(&self, url: &str, body: &T) -> Result<()> {
         let token = self.get_token()?;
-        debug!("PUT {}", url);
+        debug!("PUT {}", redact_url(url));
         let response = self.client.put(url)
             .bearer_auth(token)
             .json(body)
             .send()
             .await
-            .context(format!("Failed to send PUT request to {}", url))?;
+            .context(format!("Failed to send PUT request to {}", redact_url(url)))?;
 
         if !response.status().is_success() {
              let status = response.status();
@@ -136,12 +136,12 @@ impl KeycloakClient {
 
     async fn delete(&self, url: &str) -> Result<()> {
         let token = self.get_token()?;
-        debug!("DELETE {}", url);
+        debug!("DELETE {}", redact_url(url));
         let response = self.client.delete(url)
             .bearer_auth(token)
             .send()
             .await
-            .context(format!("Failed to send DELETE request to {}", url))?;
+            .context(format!("Failed to send DELETE request to {}", redact_url(url)))?;
 
         if !response.status().is_success() {
              let status = response.status();
@@ -171,7 +171,7 @@ impl KeycloakClient {
             anyhow::bail!("Either username/password or client_secret must be provided");
         }
 
-        debug!("Logging in to {}", url);
+        debug!("Logging in to {}", redact_url(&url));
 
         let response = self.client.post(&url)
             .form(&params)
@@ -194,5 +194,31 @@ impl KeycloakClient {
 
     pub fn get_token(&self) -> Result<&str> {
         self.token.as_deref().context("Not authenticated")
+    }
+}
+
+fn redact_url(url_str: &str) -> String {
+    match reqwest::Url::parse(url_str) {
+        Ok(mut url) => {
+            if !url.username().is_empty() || url.password().is_some() {
+                let _ = url.set_username("");
+                let _ = url.set_password(None);
+            }
+            url.to_string()
+        }
+        Err(_) => url_str.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_redact_url() {
+        assert_eq!(redact_url("http://localhost:8080"), "http://localhost:8080/");
+        assert_eq!(redact_url("http://user:pass@localhost:8080/path"), "http://localhost:8080/path");
+        assert_eq!(redact_url("http://user@localhost:8080/path"), "http://localhost:8080/path");
+        assert_eq!(redact_url("invalid-url"), "invalid-url");
     }
 }
