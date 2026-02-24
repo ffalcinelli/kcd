@@ -214,7 +214,10 @@ async fn plan_users(client: &KeycloakClient, input_dir: &std::path::Path) -> Res
     Ok(())
 }
 
-async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
+async fn plan_authentication_flows(
+    client: &KeycloakClient,
+    input_dir: &std::path::Path,
+) -> Result<()> {
     let flows_dir = input_dir.join("authentication-flows");
     if flows_dir.exists() {
         let existing_flows = client.get_authentication_flows().await.unwrap_or_default();
@@ -466,7 +469,10 @@ async fn plan_clients(client: &KeycloakClient, input_dir: &std::path::Path) -> R
     Ok(())
 }
 
-async fn plan_identity_providers(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
+async fn plan_identity_providers(
+    client: &KeycloakClient,
+    input_dir: &std::path::Path,
+) -> Result<()> {
     let idps_dir = input_dir.join("identity-providers");
     if idps_dir.exists() {
         let existing_idps = client.get_identity_providers().await.unwrap_or_default();
