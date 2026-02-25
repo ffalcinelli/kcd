@@ -49,6 +49,21 @@ async fn test_apply() {
     )
     .unwrap();
 
+    let existing_role = RoleRepresentation {
+        id: None,
+        name: "role-1".to_string(), // Matches mock server response
+        description: Some("Updated Role 1".to_string()),
+        container_id: None,
+        composite: false,
+        client_role: false,
+        extra: std::collections::HashMap::new(),
+    };
+    fs::write(
+        roles_dir.join("role-1.yaml"),
+        serde_yaml::to_string(&existing_role).unwrap(),
+    )
+    .unwrap();
+
     // Create clients
     let clients_dir = input_dir.join("clients");
     fs::create_dir(&clients_dir).unwrap();

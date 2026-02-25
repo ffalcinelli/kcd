@@ -28,9 +28,9 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
     let roles_dir = input_dir.join("roles");
     if async_fs::try_exists(&roles_dir).await? {
         let existing_roles = client.get_roles().await?;
-        let existing_roles_map: HashMap<String, RoleRepresentation> = existing_roles
+        let existing_roles_map: HashMap<String, String> = existing_roles
             .into_iter()
-            .map(|r| (r.name.clone(), r))
+            .filter_map(|r| r.id.map(|id| (r.name, id)))
             .collect();
         let existing_roles_map = std::sync::Arc::new(existing_roles_map);
 
@@ -46,15 +46,13 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut role_rep: RoleRepresentation = serde_yaml::from_str(&content)?;
 
-                    if let Some(existing) = existing_roles_map.get(&role_rep.name) {
-                        if let Some(id) = &existing.id {
-                            role_rep.id = Some(id.clone()); // Use remote ID
-                            client
-                                .update_role(id, &role_rep)
-                                .await
-                                .context(format!("Failed to update role {}", role_rep.name))?;
-                            println!("Updated role {}", role_rep.name);
-                        }
+                    if let Some(id) = existing_roles_map.get(&role_rep.name) {
+                        role_rep.id = Some(id.clone()); // Use remote ID
+                        client
+                            .update_role(id, &role_rep)
+                            .await
+                            .context(format!("Failed to update role {}", role_rep.name))?;
+                        println!("Updated role {}", role_rep.name);
                     } else {
                         role_rep.id = None; // Don't send ID on create
                         client
