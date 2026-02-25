@@ -151,3 +151,31 @@ fn test_validate_missing_realm() {
             .contains("realm.yaml not found")
     );
 }
+
+#[test]
+fn test_validate_empty_realm_name() {
+    let dir = tempdir().unwrap();
+    let input_dir = dir.path().to_path_buf();
+
+    // Create realm.yaml with empty name
+    let realm = RealmRepresentation {
+        realm: "".to_string(),
+        enabled: Some(true),
+        display_name: None,
+        extra: std::collections::HashMap::new(),
+    };
+    fs::write(
+        input_dir.join("realm.yaml"),
+        serde_yaml::to_string(&realm).unwrap(),
+    )
+    .unwrap();
+
+    let result = validate::run(input_dir.clone());
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Realm name is empty in realm.yaml")
+    );
+}
