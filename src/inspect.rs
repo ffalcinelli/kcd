@@ -1,4 +1,5 @@
 use crate::client::KeycloakClient;
+use crate::utils::to_sorted_yaml;
 use anyhow::{Context, Result};
 use sanitize_filename::sanitize;
 use std::path::PathBuf;
@@ -16,7 +17,7 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
 
     // Fetch realm
     let realm = client.get_realm().await.context("Failed to fetch realm")?;
-    let realm_yaml = serde_yaml::to_string(&realm).context("Failed to serialize realm")?;
+    let realm_yaml = to_sorted_yaml(&realm).context("Failed to serialize realm")?;
     fs::write(output_dir.join("realm.yaml"), realm_yaml)
         .await
         .context("Failed to write realm.yaml")?;
@@ -40,7 +41,7 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
         let name = client_rep.client_id.as_deref().unwrap_or("unknown");
         let filename = format!("{}.yaml", sanitize(name));
         let path = clients_dir.join(filename);
-        let yaml = serde_yaml::to_string(&client_rep).context("Failed to serialize client")?;
+        let yaml = to_sorted_yaml(&client_rep).context("Failed to serialize client")?;
         fs::write(&path, yaml)
             .await
             .context(format!("Failed to write client {}", name))?;
@@ -62,7 +63,7 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
         let name = &role.name;
         let filename = format!("{}.yaml", sanitize(name));
         let path = roles_dir.join(filename);
-        let yaml = serde_yaml::to_string(&role).context("Failed to serialize role")?;
+        let yaml = to_sorted_yaml(&role).context("Failed to serialize role")?;
         fs::write(&path, yaml)
             .await
             .context(format!("Failed to write role {}", name))?;
@@ -87,7 +88,7 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
         let name = scope.name.as_deref().unwrap_or("unknown");
         let filename = format!("{}.yaml", sanitize(name));
         let path = scopes_dir.join(filename);
-        let yaml = serde_yaml::to_string(&scope).context("Failed to serialize client scope")?;
+        let yaml = to_sorted_yaml(&scope).context("Failed to serialize client scope")?;
         fs::write(&path, yaml)
             .await
             .context(format!("Failed to write client scope {}", name))?;
@@ -112,7 +113,7 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
         let name = group.name.as_deref().unwrap_or("unknown");
         let filename = format!("{}.yaml", sanitize(name));
         let path = groups_dir.join(filename);
-        let yaml = serde_yaml::to_string(&group).context("Failed to serialize group")?;
+        let yaml = to_sorted_yaml(&group).context("Failed to serialize group")?;
         fs::write(&path, yaml)
             .await
             .context(format!("Failed to write group {}", name))?;
@@ -134,7 +135,7 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
         let username = user.username.as_deref().unwrap_or("unknown");
         let filename = format!("{}.yaml", sanitize(username));
         let path = users_dir.join(filename);
-        let yaml = serde_yaml::to_string(&user).context("Failed to serialize user")?;
+        let yaml = to_sorted_yaml(&user).context("Failed to serialize user")?;
         fs::write(&path, yaml)
             .await
             .context(format!("Failed to write user {}", username))?;
@@ -159,8 +160,7 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
         let alias = flow.alias.as_deref().unwrap_or("unknown");
         let filename = format!("{}.yaml", sanitize(alias));
         let path = flows_dir.join(filename);
-        let yaml =
-            serde_yaml::to_string(&flow).context("Failed to serialize authentication flow")?;
+        let yaml = to_sorted_yaml(&flow).context("Failed to serialize authentication flow")?;
         fs::write(&path, yaml)
             .await
             .context(format!("Failed to write authentication flow {}", alias))?;
@@ -185,7 +185,7 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
         let alias = action.alias.as_deref().unwrap_or("unknown");
         let filename = format!("{}.yaml", sanitize(alias));
         let path = actions_dir.join(filename);
-        let yaml = serde_yaml::to_string(&action).context("Failed to serialize required action")?;
+        let yaml = to_sorted_yaml(&action).context("Failed to serialize required action")?;
         fs::write(&path, yaml)
             .await
             .context(format!("Failed to write required action {}", alias))?;
@@ -210,7 +210,7 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
         let name = component.name.as_deref().unwrap_or("unknown");
         let filename = format!("{}.yaml", sanitize(name));
         let path = components_dir.join(filename);
-        let yaml = serde_yaml::to_string(&component).context("Failed to serialize component")?;
+        let yaml = to_sorted_yaml(&component).context("Failed to serialize component")?;
         fs::write(&path, yaml)
             .await
             .context(format!("Failed to write component {}", name))?;

@@ -4,4 +4,5 @@ pub mod client;
 pub mod inspect;
 pub mod models;
 pub mod plan;
+pub mod utils;
 pub mod validate;
