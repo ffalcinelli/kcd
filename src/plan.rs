@@ -5,6 +5,7 @@ use crate::models::{
     RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation,
     UserRepresentation,
 };
+use crate::utils::to_sorted_yaml;
 use anyhow::Result;
 use console::{Emoji, Style};
 use serde::Serialize;
@@ -55,11 +56,11 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
 
 fn print_diff<T: Serialize>(name: &str, old: Option<&T>, new: &T) -> Result<()> {
     let old_yaml = if let Some(o) = old {
-        serde_yaml::to_string(o)?
+        to_sorted_yaml(o)?
     } else {
         String::new()
     };
-    let new_yaml = serde_yaml::to_string(new)?;
+    let new_yaml = to_sorted_yaml(new)?;
 
     let diff = TextDiff::from_lines(&old_yaml, &new_yaml);
 
