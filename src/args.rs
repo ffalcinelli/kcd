@@ -57,5 +57,15 @@ pub enum Commands {
         /// Input directory containing configuration files
         #[arg(long, short, default_value = "config")]
         input: PathBuf,
+
+        /// Show only changes, suppressing "No changes" messages
+        #[arg(long, short = 'c')]
+        changes_only: bool,
+    },
+    /// Check for drift between local configuration and server
+    Drift {
+        /// Input directory containing configuration files
+        #[arg(long, short, default_value = "config")]
+        input: PathBuf,
     },
 }

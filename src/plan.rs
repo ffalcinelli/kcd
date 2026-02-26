@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
+pub async fn run(client: &KeycloakClient, input_dir: PathBuf, changes_only: bool) -> Result<()> {
     println!(
         "{} Planning changes for realm: {}",
         Emoji("🔮", ""),
@@ -22,39 +22,44 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
     );
 
     // 1. Plan Realm
-    plan_realm(client, &input_dir).await?;
+    plan_realm(client, &input_dir, changes_only).await?;
 
     // 2. Plan Roles
-    plan_roles(client, &input_dir).await?;
+    plan_roles(client, &input_dir, changes_only).await?;
 
     // 3. Plan Clients
-    plan_clients(client, &input_dir).await?;
+    plan_clients(client, &input_dir, changes_only).await?;
 
     // 4. Plan Identity Providers
-    plan_identity_providers(client, &input_dir).await?;
+    plan_identity_providers(client, &input_dir, changes_only).await?;
 
     // 5. Plan Client Scopes
-    plan_client_scopes(client, &input_dir).await?;
+    plan_client_scopes(client, &input_dir, changes_only).await?;
 
     // 6. Plan Groups
-    plan_groups(client, &input_dir).await?;
+    plan_groups(client, &input_dir, changes_only).await?;
 
     // 7. Plan Users
-    plan_users(client, &input_dir).await?;
+    plan_users(client, &input_dir, changes_only).await?;
 
     // 8. Plan Authentication Flows
-    plan_authentication_flows(client, &input_dir).await?;
+    plan_authentication_flows(client, &input_dir, changes_only).await?;
 
     // 9. Plan Required Actions
-    plan_required_actions(client, &input_dir).await?;
+    plan_required_actions(client, &input_dir, changes_only).await?;
 
     // 10. Plan Components
-    plan_components(client, &input_dir).await?;
+    plan_components(client, &input_dir, changes_only).await?;
 
     Ok(())
 }
 
-fn print_diff<T: Serialize>(name: &str, old: Option<&T>, new: &T) -> Result<()> {
+fn print_diff<T: Serialize>(
+    name: &str,
+    old: Option<&T>,
+    new: &T,
+    changes_only: bool,
+) -> Result<()> {
     let old_yaml = if let Some(o) = old {
         to_sorted_yaml(o)?
     } else {
@@ -74,13 +79,17 @@ fn print_diff<T: Serialize>(name: &str, old: Option<&T>, new: &T) -> Result<()> 
             };
             print!("{}{}", style.apply_to(sign).bold(), style.apply_to(change));
         }
-    } else {
+    } else if !changes_only {
         println!("{} No changes for {}", Emoji("✅", ""), name);
     }
     Ok(())
 }
 
-async fn plan_client_scopes(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
+async fn plan_client_scopes(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+) -> Result<()> {
     let scopes_dir = input_dir.join("client-scopes");
     if scopes_dir.exists() {
         let existing_scopes = client.get_client_scopes().await.unwrap_or_default();
@@ -110,6 +119,7 @@ async fn plan_client_scopes(client: &KeycloakClient, input_dir: &Path) -> Result
                         &format!("ClientScope {}", name),
                         Some(&remote_clone),
                         &local_scope,
+                        changes_only,
                     )?;
                 } else {
                     println!("\n{} Will create ClientScope: {}", Emoji("✨", ""), name);
@@ -117,6 +127,7 @@ async fn plan_client_scopes(client: &KeycloakClient, input_dir: &Path) -> Result
                         &format!("ClientScope {}", name),
                         None::<&ClientScopeRepresentation>,
                         &local_scope,
+                        changes_only,
                     )?;
                 }
             }
@@ -125,7 +136,11 @@ async fn plan_client_scopes(client: &KeycloakClient, input_dir: &Path) -> Result
     Ok(())
 }
 
-async fn plan_groups(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
+async fn plan_groups(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+) -> Result<()> {
     let groups_dir = input_dir.join("groups");
     if groups_dir.exists() {
         let existing_groups = client.get_groups().await.unwrap_or_default();
@@ -155,6 +170,7 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
                         &format!("Group {}", name),
                         Some(&remote_clone),
                         &local_group,
+                        changes_only,
                     )?;
                 } else {
                     println!("\n{} Will create Group: {}", Emoji("✨", ""), name);
@@ -162,6 +178,7 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
                         &format!("Group {}", name),
                         None::<&GroupRepresentation>,
                         &local_group,
+                        changes_only,
                     )?;
                 }
             }
@@ -170,7 +187,11 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-async fn plan_users(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
+async fn plan_users(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+) -> Result<()> {
     let users_dir = input_dir.join("users");
     if users_dir.exists() {
         let existing_users = client.get_users().await.unwrap_or_default();
@@ -200,6 +221,7 @@ async fn plan_users(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
                         &format!("User {}", username),
                         Some(&remote_clone),
                         &local_user,
+                        changes_only,
                     )?;
                 } else {
                     println!("\n{} Will create User: {}", Emoji("✨", ""), username);
@@ -207,6 +229,7 @@ async fn plan_users(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
                         &format!("User {}", username),
                         None::<&UserRepresentation>,
                         &local_user,
+                        changes_only,
                     )?;
                 }
             }
@@ -215,7 +238,11 @@ async fn plan_users(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
+async fn plan_authentication_flows(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+) -> Result<()> {
     let flows_dir = input_dir.join("authentication-flows");
     if flows_dir.exists() {
         let existing_flows = client.get_authentication_flows().await.unwrap_or_default();
@@ -245,6 +272,7 @@ async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &Path) ->
                         &format!("AuthenticationFlow {}", alias),
                         Some(&remote_clone),
                         &local_flow,
+                        changes_only,
                     )?;
                 } else {
                     println!(
@@ -256,6 +284,7 @@ async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &Path) ->
                         &format!("AuthenticationFlow {}", alias),
                         None::<&AuthenticationFlowRepresentation>,
                         &local_flow,
+                        changes_only,
                     )?;
                 }
             }
@@ -264,7 +293,11 @@ async fn plan_authentication_flows(client: &KeycloakClient, input_dir: &Path) ->
     Ok(())
 }
 
-async fn plan_required_actions(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
+async fn plan_required_actions(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+) -> Result<()> {
     let actions_dir = input_dir.join("required-actions");
     if actions_dir.exists() {
         let existing_actions = client.get_required_actions().await.unwrap_or_default();
@@ -292,6 +325,7 @@ async fn plan_required_actions(client: &KeycloakClient, input_dir: &Path) -> Res
                         &format!("RequiredAction {}", alias),
                         Some(remote),
                         &local_action,
+                        changes_only,
                     )?;
                 } else {
                     println!(
@@ -303,6 +337,7 @@ async fn plan_required_actions(client: &KeycloakClient, input_dir: &Path) -> Res
                         &format!("RequiredAction {}", alias),
                         None::<&RequiredActionProviderRepresentation>,
                         &local_action,
+                        changes_only,
                     )?;
                 }
             }
@@ -311,7 +346,11 @@ async fn plan_required_actions(client: &KeycloakClient, input_dir: &Path) -> Res
     Ok(())
 }
 
-async fn plan_components(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
+async fn plan_components(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+) -> Result<()> {
     let components_dir = input_dir.join("components");
     if components_dir.exists() {
         let existing_components = client.get_components().await.unwrap_or_default();
@@ -341,6 +380,7 @@ async fn plan_components(client: &KeycloakClient, input_dir: &Path) -> Result<()
                         &format!("Component {}", name),
                         Some(&remote_clone),
                         &local_component,
+                        changes_only,
                     )?;
                 } else {
                     println!("\n{} Will create Component: {}", Emoji("✨", ""), name);
@@ -348,6 +388,7 @@ async fn plan_components(client: &KeycloakClient, input_dir: &Path) -> Result<()
                         &format!("Component {}", name),
                         None::<&ComponentRepresentation>,
                         &local_component,
+                        changes_only,
                     )?;
                 }
             }
@@ -356,7 +397,11 @@ async fn plan_components(client: &KeycloakClient, input_dir: &Path) -> Result<()
     Ok(())
 }
 
-async fn plan_realm(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
+async fn plan_realm(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+) -> Result<()> {
     let realm_path = input_dir.join("realm.yaml");
     if realm_path.exists() {
         let content = fs::read_to_string(&realm_path)?;
@@ -369,12 +414,16 @@ async fn plan_realm(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
         // Let's try to fetch it.
         let remote_realm = client.get_realm().await.ok();
 
-        print_diff("Realm", remote_realm.as_ref(), &local_realm)?;
+        print_diff("Realm", remote_realm.as_ref(), &local_realm, changes_only)?;
     }
     Ok(())
 }
 
-async fn plan_roles(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
+async fn plan_roles(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+) -> Result<()> {
     let roles_dir = input_dir.join("roles");
     if roles_dir.exists() {
         let existing_roles = client.get_roles().await.unwrap_or_default();
@@ -403,6 +452,7 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
                         &format!("Role {}", local_role.name),
                         Some(&remote_clone),
                         &local_role,
+                        changes_only,
                     )?;
                 } else {
                     println!(
@@ -414,6 +464,7 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
                         &format!("Role {}", local_role.name),
                         None::<&RoleRepresentation>,
                         &local_role,
+                        changes_only,
                     )?;
                 }
             }
@@ -422,7 +473,11 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-async fn plan_clients(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
+async fn plan_clients(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+) -> Result<()> {
     let clients_dir = input_dir.join("clients");
     if clients_dir.exists() {
         let existing_clients = client.get_clients().await.unwrap_or_default();
@@ -452,6 +507,7 @@ async fn plan_clients(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
                         &format!("Client {}", client_id),
                         Some(&remote_clone),
                         &local_client,
+                        changes_only,
                     )?;
                 } else {
                     println!("\n{} Will create Client: {}", Emoji("✨", ""), client_id);
@@ -459,6 +515,7 @@ async fn plan_clients(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
                         &format!("Client {}", client_id),
                         None::<&ClientRepresentation>,
                         &local_client,
+                        changes_only,
                     )?;
                 }
             }
@@ -467,7 +524,11 @@ async fn plan_clients(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-async fn plan_identity_providers(client: &KeycloakClient, input_dir: &Path) -> Result<()> {
+async fn plan_identity_providers(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+) -> Result<()> {
     let idps_dir = input_dir.join("identity-providers");
     if idps_dir.exists() {
         let existing_idps = client.get_identity_providers().await.unwrap_or_default();
@@ -497,6 +558,7 @@ async fn plan_identity_providers(client: &KeycloakClient, input_dir: &Path) -> R
                         &format!("IdentityProvider {}", alias),
                         Some(&remote_clone),
                         &local_idp,
+                        changes_only,
                     )?;
                 } else {
                     println!(
@@ -508,6 +570,7 @@ async fn plan_identity_providers(client: &KeycloakClient, input_dir: &Path) -> R
                         &format!("IdentityProvider {}", alias),
                         None::<&IdentityProviderRepresentation>,
                         &local_idp,
+                        changes_only,
                     )?;
                 }
             }

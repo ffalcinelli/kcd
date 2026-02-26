@@ -8,6 +8,7 @@ A CLI tool to manage Keycloak configurations using local YAML files. It allows y
 - **Validate**: Validates the structure and content of local configuration files.
 - **Plan**: Shows a detailed diff between local configuration and the server's state, previewing changes before applying them.
 - **Apply**: Applies local configuration changes to the Keycloak server (Create, Update, Delete).
+- **Drift**: Checks for drift between the local configuration and the server's state, showing only the differences.
 
 ## Installation
 
@@ -85,6 +86,17 @@ kcd validate --input config/
 Show the differences between the local configuration and the remote Keycloak server. This is useful to preview changes before applying them.
 ```bash
 kcd plan --input config/
+```
+
+You can also use the `--changes-only` flag to show only the differences and suppress "No changes" messages.
+```bash
+kcd plan --input config/ --changes-only
+```
+
+### Drift
+Check for drift between local configuration and server. This command is equivalent to `plan --changes-only`.
+```bash
+kcd drift --input config/
 ```
 
 ### Apply
