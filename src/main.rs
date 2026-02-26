@@ -54,7 +54,10 @@ async fn main() -> Result<()> {
             println!("Applying Keycloak configuration from {:?}", input);
             apply::run(&client, input.clone()).await?;
         }
-        Commands::Plan { input } => {
+        Commands::Plan {
+            input,
+            changes_only,
+        } => {
             let mut client = KeycloakClient::new(cli.server.clone(), cli.realm.clone());
             client
                 .login(
@@ -66,7 +69,21 @@ async fn main() -> Result<()> {
                 .await
                 .context("Login failed")?;
             println!("Planning Keycloak configuration from {:?}", input);
-            plan::run(&client, input.clone()).await?;
+            plan::run(&client, input.clone(), *changes_only).await?;
+        }
+        Commands::Drift { input } => {
+            let mut client = KeycloakClient::new(cli.server.clone(), cli.realm.clone());
+            client
+                .login(
+                    &cli.client_id,
+                    cli.client_secret.as_deref(),
+                    cli.user.as_deref(),
+                    cli.password.as_deref(),
+                )
+                .await
+                .context("Login failed")?;
+            println!("Checking drift for Keycloak configuration from {:?}", input);
+            plan::run(&client, input.clone(), true).await?;
         }
     }
 
