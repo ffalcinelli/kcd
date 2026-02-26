@@ -19,9 +19,13 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+      - name: Security audit of dependencies
+        run: cargo audit
       - name: Check code formatting
         run: cargo fmt --all -- --check
-      - name: Lint with Clippy
+      - name: Lint and Code Security Check
         run: cargo clippy -- -D warnings
       - name: Run tests
         run: cargo test
