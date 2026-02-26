@@ -136,11 +136,7 @@ async fn plan_client_scopes(
     Ok(())
 }
 
-async fn plan_groups(
-    client: &KeycloakClient,
-    input_dir: &Path,
-    changes_only: bool,
-) -> Result<()> {
+async fn plan_groups(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let groups_dir = input_dir.join("groups");
     if groups_dir.exists() {
         let existing_groups = client.get_groups().await.unwrap_or_default();
@@ -187,11 +183,7 @@ async fn plan_groups(
     Ok(())
 }
 
-async fn plan_users(
-    client: &KeycloakClient,
-    input_dir: &Path,
-    changes_only: bool,
-) -> Result<()> {
+async fn plan_users(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let users_dir = input_dir.join("users");
     if users_dir.exists() {
         let existing_users = client.get_users().await.unwrap_or_default();
@@ -397,11 +389,7 @@ async fn plan_components(
     Ok(())
 }
 
-async fn plan_realm(
-    client: &KeycloakClient,
-    input_dir: &Path,
-    changes_only: bool,
-) -> Result<()> {
+async fn plan_realm(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let realm_path = input_dir.join("realm.yaml");
     if realm_path.exists() {
         let content = fs::read_to_string(&realm_path)?;
@@ -419,11 +407,7 @@ async fn plan_realm(
     Ok(())
 }
 
-async fn plan_roles(
-    client: &KeycloakClient,
-    input_dir: &Path,
-    changes_only: bool,
-) -> Result<()> {
+async fn plan_roles(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let roles_dir = input_dir.join("roles");
     if roles_dir.exists() {
         let existing_roles = client.get_roles().await.unwrap_or_default();
@@ -473,11 +457,7 @@ async fn plan_roles(
     Ok(())
 }
 
-async fn plan_clients(
-    client: &KeycloakClient,
-    input_dir: &Path,
-    changes_only: bool,
-) -> Result<()> {
+async fn plan_clients(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let clients_dir = input_dir.join("clients");
     if clients_dir.exists() {
         let existing_clients = client.get_clients().await.unwrap_or_default();
