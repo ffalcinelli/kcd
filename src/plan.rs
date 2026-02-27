@@ -11,8 +11,8 @@ use console::{Emoji, Style};
 use serde::Serialize;
 use similar::{ChangeTag, TextDiff};
 use std::collections::HashMap;
-use std::fs;
 use std::path::{Path, PathBuf};
+use tokio::fs as async_fs;
 
 pub async fn run(client: &KeycloakClient, input_dir: PathBuf, changes_only: bool) -> Result<()> {
     println!(
@@ -91,18 +91,18 @@ async fn plan_client_scopes(
     changes_only: bool,
 ) -> Result<()> {
     let scopes_dir = input_dir.join("client-scopes");
-    if scopes_dir.exists() {
+    if async_fs::try_exists(&scopes_dir).await? {
         let existing_scopes = client.get_client_scopes().await.unwrap_or_default();
         let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
             .into_iter()
             .filter_map(|s| s.name.clone().map(|n| (n, s)))
             .collect();
 
-        for entry in fs::read_dir(&scopes_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&scopes_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let local_scope: ClientScopeRepresentation = serde_yaml::from_str(&content)?;
                 let name = local_scope.name.as_deref().unwrap_or("");
 
@@ -138,18 +138,18 @@ async fn plan_client_scopes(
 
 async fn plan_groups(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let groups_dir = input_dir.join("groups");
-    if groups_dir.exists() {
+    if async_fs::try_exists(&groups_dir).await? {
         let existing_groups = client.get_groups().await.unwrap_or_default();
         let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
             .into_iter()
             .filter_map(|g| g.name.clone().map(|n| (n, g)))
             .collect();
 
-        for entry in fs::read_dir(&groups_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&groups_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let local_group: GroupRepresentation = serde_yaml::from_str(&content)?;
                 let name = local_group.name.as_deref().unwrap_or("");
 
@@ -185,18 +185,18 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &Path, changes_only: bo
 
 async fn plan_users(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let users_dir = input_dir.join("users");
-    if users_dir.exists() {
+    if async_fs::try_exists(&users_dir).await? {
         let existing_users = client.get_users().await.unwrap_or_default();
         let existing_users_map: HashMap<String, UserRepresentation> = existing_users
             .into_iter()
             .filter_map(|u| u.username.clone().map(|n| (n, u)))
             .collect();
 
-        for entry in fs::read_dir(&users_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&users_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let local_user: UserRepresentation = serde_yaml::from_str(&content)?;
                 let username = local_user.username.as_deref().unwrap_or("");
 
@@ -236,18 +236,18 @@ async fn plan_authentication_flows(
     changes_only: bool,
 ) -> Result<()> {
     let flows_dir = input_dir.join("authentication-flows");
-    if flows_dir.exists() {
+    if async_fs::try_exists(&flows_dir).await? {
         let existing_flows = client.get_authentication_flows().await.unwrap_or_default();
         let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
             .into_iter()
             .filter_map(|f| f.alias.clone().map(|a| (a, f)))
             .collect();
 
-        for entry in fs::read_dir(&flows_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&flows_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let local_flow: AuthenticationFlowRepresentation = serde_yaml::from_str(&content)?;
                 let alias = local_flow.alias.as_deref().unwrap_or("");
 
@@ -291,7 +291,7 @@ async fn plan_required_actions(
     changes_only: bool,
 ) -> Result<()> {
     let actions_dir = input_dir.join("required-actions");
-    if actions_dir.exists() {
+    if async_fs::try_exists(&actions_dir).await? {
         let existing_actions = client.get_required_actions().await.unwrap_or_default();
         let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
             existing_actions
@@ -299,11 +299,11 @@ async fn plan_required_actions(
                 .filter_map(|a| a.alias.clone().map(|n| (n, a)))
                 .collect();
 
-        for entry in fs::read_dir(&actions_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&actions_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let local_action: RequiredActionProviderRepresentation =
                     serde_yaml::from_str(&content)?;
                 let alias = local_action.alias.as_deref().unwrap_or("");
@@ -344,18 +344,18 @@ async fn plan_components(
     changes_only: bool,
 ) -> Result<()> {
     let components_dir = input_dir.join("components");
-    if components_dir.exists() {
+    if async_fs::try_exists(&components_dir).await? {
         let existing_components = client.get_components().await.unwrap_or_default();
         let existing_components_map: HashMap<String, ComponentRepresentation> = existing_components
             .into_iter()
             .filter_map(|c| c.name.clone().map(|n| (n, c)))
             .collect();
 
-        for entry in fs::read_dir(&components_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&components_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let local_component: ComponentRepresentation = serde_yaml::from_str(&content)?;
                 let name = local_component.name.as_deref().unwrap_or("");
 
@@ -391,8 +391,8 @@ async fn plan_components(
 
 async fn plan_realm(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let realm_path = input_dir.join("realm.yaml");
-    if realm_path.exists() {
-        let content = fs::read_to_string(&realm_path)?;
+    if async_fs::try_exists(&realm_path).await? {
+        let content = async_fs::read_to_string(&realm_path).await?;
         let local_realm: RealmRepresentation = serde_yaml::from_str(&content)?;
 
         // We handle the case where remote realm fetch might fail (e.g. if we are creating it)
@@ -409,18 +409,18 @@ async fn plan_realm(client: &KeycloakClient, input_dir: &Path, changes_only: boo
 
 async fn plan_roles(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let roles_dir = input_dir.join("roles");
-    if roles_dir.exists() {
+    if async_fs::try_exists(&roles_dir).await? {
         let existing_roles = client.get_roles().await.unwrap_or_default();
         let existing_roles_map: HashMap<String, RoleRepresentation> = existing_roles
             .into_iter()
             .map(|r| (r.name.clone(), r))
             .collect();
 
-        for entry in fs::read_dir(&roles_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&roles_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let local_role: RoleRepresentation = serde_yaml::from_str(&content)?;
 
                 let remote_role = existing_roles_map.get(&local_role.name);
@@ -459,18 +459,18 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &Path, changes_only: boo
 
 async fn plan_clients(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let clients_dir = input_dir.join("clients");
-    if clients_dir.exists() {
+    if async_fs::try_exists(&clients_dir).await? {
         let existing_clients = client.get_clients().await.unwrap_or_default();
         let existing_clients_map: HashMap<String, ClientRepresentation> = existing_clients
             .into_iter()
             .filter_map(|c| c.client_id.clone().map(|id| (id, c)))
             .collect();
 
-        for entry in fs::read_dir(&clients_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&clients_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let local_client: ClientRepresentation = serde_yaml::from_str(&content)?;
                 let client_id = local_client.client_id.as_deref().unwrap_or("");
 
@@ -510,18 +510,18 @@ async fn plan_identity_providers(
     changes_only: bool,
 ) -> Result<()> {
     let idps_dir = input_dir.join("identity-providers");
-    if idps_dir.exists() {
+    if async_fs::try_exists(&idps_dir).await? {
         let existing_idps = client.get_identity_providers().await.unwrap_or_default();
         let existing_idps_map: HashMap<String, IdentityProviderRepresentation> = existing_idps
             .into_iter()
             .filter_map(|i| i.alias.clone().map(|alias| (alias, i)))
             .collect();
 
-        for entry in fs::read_dir(&idps_dir)? {
-            let entry = entry?;
+        let mut entries = async_fs::read_dir(&idps_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)?;
+                let content = async_fs::read_to_string(&path).await?;
                 let local_idp: IdentityProviderRepresentation = serde_yaml::from_str(&content)?;
                 let alias = local_idp.alias.as_deref().unwrap_or("");
 
