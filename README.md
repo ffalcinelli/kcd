@@ -1,4 +1,4 @@
-# Keycloak Configuration Deployer (kcd)
+# Keycloak Continuous Delivery (kcd)
 
 A CLI tool to manage Keycloak configurations using local YAML files. It allows you to inspect the current state, validate local files, plan changes, and apply them to a Keycloak server.
 
