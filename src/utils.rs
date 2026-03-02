@@ -1,3 +1,4 @@
+pub mod secrets;
 use anyhow::Context;
 use serde::Serialize;
 
@@ -48,14 +49,6 @@ mod tests {
         let yaml = to_sorted_yaml(&s).unwrap();
 
         let lines: Vec<&str> = yaml.lines().collect();
-
-        // Expected Output:
-        // a: val_a
-        // b: val_b
-        // list:
-        // - y: val_y
-        //   z: val_z
-        // x: val_x
 
         assert_eq!(lines[0], "a: val_a");
         assert_eq!(lines[1], "b: val_b");

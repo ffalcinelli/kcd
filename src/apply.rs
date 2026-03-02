@@ -5,6 +5,7 @@ use crate::models::{
     RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation,
     UserRepresentation,
 };
+use crate::utils::secrets::substitute_secrets;
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -16,7 +17,9 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
     let realm_path = input_dir.join("realm.yaml");
     if async_fs::try_exists(&realm_path).await? {
         let content = async_fs::read_to_string(&realm_path).await?;
-        let realm_rep: RealmRepresentation = serde_yaml::from_str(&content)?;
+        let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
+        substitute_secrets(&mut val);
+        let realm_rep: RealmRepresentation = serde_json::from_value(val)?;
         client
             .update_realm(&realm_rep)
             .await
@@ -44,7 +47,9 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
                 let existing_roles_map = existing_roles_map.clone();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
-                    let mut role_rep: RoleRepresentation = serde_yaml::from_str(&content)?;
+                    let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
+                    substitute_secrets(&mut val);
+                    let mut role_rep: RoleRepresentation = serde_json::from_value(val)?;
 
                     if let Some(id) = existing_roles_map.get(&role_rep.name) {
                         role_rep.id = Some(id.clone()); // Use remote ID
@@ -90,8 +95,9 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
                 let existing_idps_map = existing_idps_map.clone();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
-                    let mut idp_rep: IdentityProviderRepresentation =
-                        serde_yaml::from_str(&content)?;
+                    let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
+                    substitute_secrets(&mut val);
+                    let mut idp_rep: IdentityProviderRepresentation = serde_json::from_value(val)?;
                     let alias = idp_rep.alias.clone().unwrap_or_default();
 
                     if alias.is_empty() {
@@ -145,7 +151,9 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
                 let existing_clients_map = existing_clients_map.clone();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
-                    let mut client_rep: ClientRepresentation = serde_yaml::from_str(&content)?;
+                    let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
+                    substitute_secrets(&mut val);
+                    let mut client_rep: ClientRepresentation = serde_json::from_value(val)?;
                     let client_id = client_rep.client_id.clone().unwrap_or_default();
 
                     if client_id.is_empty() {
@@ -193,7 +201,9 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let mut scope_rep: ClientScopeRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
+                substitute_secrets(&mut val);
+                let mut scope_rep: ClientScopeRepresentation = serde_json::from_value(val)?;
                 let name = scope_rep.name.as_deref().unwrap_or("");
 
                 if name.is_empty() {
@@ -235,7 +245,9 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let mut group_rep: GroupRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
+                substitute_secrets(&mut val);
+                let mut group_rep: GroupRepresentation = serde_json::from_value(val)?;
                 let name = group_rep.name.as_deref().unwrap_or("");
 
                 if name.is_empty() {
@@ -277,7 +289,9 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let mut user_rep: UserRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
+                substitute_secrets(&mut val);
+                let mut user_rep: UserRepresentation = serde_json::from_value(val)?;
                 let username = user_rep.username.as_deref().unwrap_or("");
 
                 if username.is_empty() {
@@ -319,8 +333,9 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let mut flow_rep: AuthenticationFlowRepresentation =
-                    serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
+                substitute_secrets(&mut val);
+                let mut flow_rep: AuthenticationFlowRepresentation = serde_json::from_value(val)?;
                 let alias = flow_rep.alias.as_deref().unwrap_or("");
 
                 if alias.is_empty() {
@@ -363,8 +378,9 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let action_rep: RequiredActionProviderRepresentation =
-                    serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
+                substitute_secrets(&mut val);
+                let action_rep: RequiredActionProviderRepresentation = serde_json::from_value(val)?;
                 let alias = action_rep.alias.as_deref().unwrap_or("");
 
                 if alias.is_empty() {
@@ -410,7 +426,9 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let mut component_rep: ComponentRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
+                substitute_secrets(&mut val);
+                let mut component_rep: ComponentRepresentation = serde_json::from_value(val)?;
                 let name = component_rep.name.as_deref().unwrap_or("");
 
                 if name.is_empty() {
