@@ -169,4 +169,30 @@ mod tests {
         obfuscate_secrets(&mut val);
         assert_eq!(val["clientSecret"], "s***t");
     }
+
+    #[test]
+    fn test_is_secret_key() {
+        assert!(is_secret_key("secret"));
+        assert!(is_secret_key("password"));
+        assert!(is_secret_key("value"));
+        assert!(is_secret_key("SECRET"));
+        assert!(is_secret_key("Password"));
+        assert!(is_secret_key("VALUE"));
+        assert!(is_secret_key("clientSecret"));
+        assert!(is_secret_key("db_password"));
+
+        assert!(!is_secret_key(""));
+        assert!(!is_secret_key("username"));
+        assert!(!is_secret_key("id"));
+    }
+
+    #[test]
+    fn test_obfuscate_string() {
+        assert_eq!(obfuscate_string(""), "");
+        assert_eq!(obfuscate_string("a"), "***");
+        assert_eq!(obfuscate_string("ab"), "***");
+        assert_eq!(obfuscate_string("abc"), "***");
+        assert_eq!(obfuscate_string("abcd"), "a***d");
+        assert_eq!(obfuscate_string("secret"), "s***t");
+    }
 }
