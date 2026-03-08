@@ -13,6 +13,21 @@ use tokio::fs as async_fs;
 use tokio::task::JoinSet;
 
 pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
+    apply_realm(client, &input_dir).await?;
+    apply_roles(client, &input_dir).await?;
+    apply_identity_providers(client, &input_dir).await?;
+    apply_clients(client, &input_dir).await?;
+    apply_client_scopes(client, &input_dir).await?;
+    apply_groups(client, &input_dir).await?;
+    apply_users(client, &input_dir).await?;
+    apply_authentication_flows(client, &input_dir).await?;
+    apply_required_actions(client, &input_dir).await?;
+    apply_components(client, &input_dir).await?;
+
+    Ok(())
+}
+
+async fn apply_realm(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
     // 1. Apply Realm
     let realm_path = input_dir.join("realm.yaml");
     if async_fs::try_exists(&realm_path).await? {
@@ -26,7 +41,10 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             .context("Failed to update realm")?;
         println!("Updated realm configuration");
     }
+    Ok(())
+}
 
+async fn apply_roles(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
     // 2. Apply Roles
     let roles_dir = input_dir.join("roles");
     if async_fs::try_exists(&roles_dir).await? {
@@ -74,7 +92,13 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             res??;
         }
     }
+    Ok(())
+}
 
+async fn apply_identity_providers(
+    client: &KeycloakClient,
+    input_dir: &std::path::Path,
+) -> Result<()> {
     // 4. Apply Identity Providers
     let idps_dir = input_dir.join("identity-providers");
     if async_fs::try_exists(&idps_dir).await? {
@@ -130,7 +154,10 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             res??;
         }
     }
+    Ok(())
+}
 
+async fn apply_clients(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
     // 3. Apply Clients
     let clients_dir = input_dir.join("clients");
     if async_fs::try_exists(&clients_dir).await? {
@@ -186,7 +213,10 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             res??;
         }
     }
+    Ok(())
+}
 
+async fn apply_client_scopes(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
     // 5. Apply Client Scopes
     let scopes_dir = input_dir.join("client-scopes");
     if async_fs::try_exists(&scopes_dir).await? {
@@ -230,7 +260,10 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             }
         }
     }
+    Ok(())
+}
 
+async fn apply_groups(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
     // 6. Apply Groups
     let groups_dir = input_dir.join("groups");
     if async_fs::try_exists(&groups_dir).await? {
@@ -274,7 +307,10 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             }
         }
     }
+    Ok(())
+}
 
+async fn apply_users(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
     // 7. Apply Users
     let users_dir = input_dir.join("users");
     if async_fs::try_exists(&users_dir).await? {
@@ -318,7 +354,13 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             }
         }
     }
+    Ok(())
+}
 
+async fn apply_authentication_flows(
+    client: &KeycloakClient,
+    input_dir: &std::path::Path,
+) -> Result<()> {
     // 8. Apply Authentication Flows
     let flows_dir = input_dir.join("authentication-flows");
     if async_fs::try_exists(&flows_dir).await? {
@@ -362,7 +404,13 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             }
         }
     }
+    Ok(())
+}
 
+async fn apply_required_actions(
+    client: &KeycloakClient,
+    input_dir: &std::path::Path,
+) -> Result<()> {
     // 9. Apply Required Actions
     let actions_dir = input_dir.join("required-actions");
     if async_fs::try_exists(&actions_dir).await? {
@@ -411,7 +459,10 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             }
         }
     }
+    Ok(())
+}
 
+async fn apply_components(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
     // 10. Apply Components
     let components_dir = input_dir.join("components");
     if async_fs::try_exists(&components_dir).await? {
@@ -455,6 +506,5 @@ pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
             }
         }
     }
-
     Ok(())
 }
