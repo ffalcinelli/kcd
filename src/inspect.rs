@@ -37,14 +37,25 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
             .await
             .context("Failed to create clients directory")?;
     }
+    let mut set = tokio::task::JoinSet::new();
     for client_rep in clients {
-        let name = client_rep.client_id.as_deref().unwrap_or("unknown");
-        let filename = format!("{}.yaml", sanitize(name));
-        let path = clients_dir.join(filename);
-        let yaml = to_sorted_yaml(&client_rep).context("Failed to serialize client")?;
-        fs::write(&path, yaml)
-            .await
-            .context(format!("Failed to write client {}", name))?;
+        let clients_dir = clients_dir.clone();
+        set.spawn(async move {
+            let name = client_rep
+                .client_id
+                .as_deref()
+                .unwrap_or("unknown")
+                .to_string();
+            let filename = format!("{}.yaml", sanitize(&name));
+            let path = clients_dir.join(filename);
+            let yaml = to_sorted_yaml(&client_rep).context("Failed to serialize client")?;
+            fs::write(&path, yaml)
+                .await
+                .context(format!("Failed to write client {}", name))
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
     }
     println!("Exported clients to clients/");
 
@@ -59,14 +70,21 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
             .await
             .context("Failed to create roles directory")?;
     }
+    let mut set = tokio::task::JoinSet::new();
     for role in roles {
-        let name = &role.name;
-        let filename = format!("{}.yaml", sanitize(name));
-        let path = roles_dir.join(filename);
-        let yaml = to_sorted_yaml(&role).context("Failed to serialize role")?;
-        fs::write(&path, yaml)
-            .await
-            .context(format!("Failed to write role {}", name))?;
+        let roles_dir = roles_dir.clone();
+        set.spawn(async move {
+            let name = &role.name;
+            let filename = format!("{}.yaml", sanitize(name));
+            let path = roles_dir.join(filename);
+            let yaml = to_sorted_yaml(&role).context("Failed to serialize role")?;
+            fs::write(&path, yaml)
+                .await
+                .context(format!("Failed to write role {}", name))
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
     }
     println!("Exported roles to roles/");
 
@@ -84,14 +102,21 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
             .await
             .context("Failed to create client-scopes directory")?;
     }
+    let mut set = tokio::task::JoinSet::new();
     for scope in client_scopes {
-        let name = scope.name.as_deref().unwrap_or("unknown");
-        let filename = format!("{}.yaml", sanitize(name));
-        let path = scopes_dir.join(filename);
-        let yaml = to_sorted_yaml(&scope).context("Failed to serialize client scope")?;
-        fs::write(&path, yaml)
-            .await
-            .context(format!("Failed to write client scope {}", name))?;
+        let scopes_dir = scopes_dir.clone();
+        set.spawn(async move {
+            let name = scope.name.as_deref().unwrap_or("unknown").to_string();
+            let filename = format!("{}.yaml", sanitize(&name));
+            let path = scopes_dir.join(filename);
+            let yaml = to_sorted_yaml(&scope).context("Failed to serialize client scope")?;
+            fs::write(&path, yaml)
+                .await
+                .context(format!("Failed to write client scope {}", name))
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
     }
     println!("Exported client scopes to client-scopes/");
 
@@ -109,14 +134,21 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
             .await
             .context("Failed to create groups directory")?;
     }
+    let mut set = tokio::task::JoinSet::new();
     for group in groups {
-        let name = group.name.as_deref().unwrap_or("unknown");
-        let filename = format!("{}.yaml", sanitize(name));
-        let path = groups_dir.join(filename);
-        let yaml = to_sorted_yaml(&group).context("Failed to serialize group")?;
-        fs::write(&path, yaml)
-            .await
-            .context(format!("Failed to write group {}", name))?;
+        let groups_dir = groups_dir.clone();
+        set.spawn(async move {
+            let name = group.name.as_deref().unwrap_or("unknown").to_string();
+            let filename = format!("{}.yaml", sanitize(&name));
+            let path = groups_dir.join(filename);
+            let yaml = to_sorted_yaml(&group).context("Failed to serialize group")?;
+            fs::write(&path, yaml)
+                .await
+                .context(format!("Failed to write group {}", name))
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
     }
     println!("Exported groups to groups/");
 
@@ -131,14 +163,21 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
             .await
             .context("Failed to create users directory")?;
     }
+    let mut set = tokio::task::JoinSet::new();
     for user in users {
-        let username = user.username.as_deref().unwrap_or("unknown");
-        let filename = format!("{}.yaml", sanitize(username));
-        let path = users_dir.join(filename);
-        let yaml = to_sorted_yaml(&user).context("Failed to serialize user")?;
-        fs::write(&path, yaml)
-            .await
-            .context(format!("Failed to write user {}", username))?;
+        let users_dir = users_dir.clone();
+        set.spawn(async move {
+            let username = user.username.as_deref().unwrap_or("unknown").to_string();
+            let filename = format!("{}.yaml", sanitize(&username));
+            let path = users_dir.join(filename);
+            let yaml = to_sorted_yaml(&user).context("Failed to serialize user")?;
+            fs::write(&path, yaml)
+                .await
+                .context(format!("Failed to write user {}", username))
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
     }
     println!("Exported users to users/");
 
@@ -156,14 +195,21 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
             .await
             .context("Failed to create authentication-flows directory")?;
     }
+    let mut set = tokio::task::JoinSet::new();
     for flow in flows {
-        let alias = flow.alias.as_deref().unwrap_or("unknown");
-        let filename = format!("{}.yaml", sanitize(alias));
-        let path = flows_dir.join(filename);
-        let yaml = to_sorted_yaml(&flow).context("Failed to serialize authentication flow")?;
-        fs::write(&path, yaml)
-            .await
-            .context(format!("Failed to write authentication flow {}", alias))?;
+        let flows_dir = flows_dir.clone();
+        set.spawn(async move {
+            let alias = flow.alias.as_deref().unwrap_or("unknown").to_string();
+            let filename = format!("{}.yaml", sanitize(&alias));
+            let path = flows_dir.join(filename);
+            let yaml = to_sorted_yaml(&flow).context("Failed to serialize authentication flow")?;
+            fs::write(&path, yaml)
+                .await
+                .context(format!("Failed to write authentication flow {}", alias))
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
     }
     println!("Exported authentication flows to authentication-flows/");
 
@@ -181,14 +227,21 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
             .await
             .context("Failed to create required-actions directory")?;
     }
+    let mut set = tokio::task::JoinSet::new();
     for action in actions {
-        let alias = action.alias.as_deref().unwrap_or("unknown");
-        let filename = format!("{}.yaml", sanitize(alias));
-        let path = actions_dir.join(filename);
-        let yaml = to_sorted_yaml(&action).context("Failed to serialize required action")?;
-        fs::write(&path, yaml)
-            .await
-            .context(format!("Failed to write required action {}", alias))?;
+        let actions_dir = actions_dir.clone();
+        set.spawn(async move {
+            let alias = action.alias.as_deref().unwrap_or("unknown").to_string();
+            let filename = format!("{}.yaml", sanitize(&alias));
+            let path = actions_dir.join(filename);
+            let yaml = to_sorted_yaml(&action).context("Failed to serialize required action")?;
+            fs::write(&path, yaml)
+                .await
+                .context(format!("Failed to write required action {}", alias))
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
     }
     println!("Exported required actions to required-actions/");
 
@@ -206,14 +259,21 @@ pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
             .await
             .context("Failed to create components directory")?;
     }
+    let mut set = tokio::task::JoinSet::new();
     for component in components {
-        let name = component.name.as_deref().unwrap_or("unknown");
-        let filename = format!("{}.yaml", sanitize(name));
-        let path = components_dir.join(filename);
-        let yaml = to_sorted_yaml(&component).context("Failed to serialize component")?;
-        fs::write(&path, yaml)
-            .await
-            .context(format!("Failed to write component {}", name))?;
+        let components_dir = components_dir.clone();
+        set.spawn(async move {
+            let name = component.name.as_deref().unwrap_or("unknown").to_string();
+            let filename = format!("{}.yaml", sanitize(&name));
+            let path = components_dir.join(filename);
+            let yaml = to_sorted_yaml(&component).context("Failed to serialize component")?;
+            fs::write(&path, yaml)
+                .await
+                .context(format!("Failed to write component {}", name))
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
     }
     println!("Exported components to components/");
 
