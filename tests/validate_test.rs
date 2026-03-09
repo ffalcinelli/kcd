@@ -1,7 +1,8 @@
 use app::models::{
     AuthenticationFlowRepresentation, ClientRepresentation, ClientScopeRepresentation,
     ComponentRepresentation, GroupRepresentation, IdentityProviderRepresentation,
-    RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation, UserRepresentation,
+    RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation,
+    UserRepresentation,
 };
 use app::validate;
 use std::fs;
