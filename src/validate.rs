@@ -64,7 +64,7 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
     let clients: Vec<(PathBuf, ClientRepresentation)> = read_yaml_files(&clients_dir, "client")?;
 
     for (path, client) in clients {
-        if client.client_id.is_none() || client.client_id.as_deref().unwrap_or("").is_empty() {
+        if !client.client_id.as_deref().is_some_and(|s| !s.is_empty()) {
             anyhow::bail!("Client ID is missing or empty in {:?}", path);
         }
     }
@@ -75,10 +75,10 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
     let idps: Vec<(PathBuf, IdentityProviderRepresentation)> = read_yaml_files(&idps_dir, "idp")?;
 
     for (path, idp) in idps {
-        if idp.alias.is_none() || idp.alias.as_deref().unwrap_or("").is_empty() {
+        if !idp.alias.as_deref().is_some_and(|s| !s.is_empty()) {
             anyhow::bail!("Identity Provider alias is missing or empty in {:?}", path);
         }
-        if idp.provider_id.is_none() || idp.provider_id.as_deref().unwrap_or("").is_empty() {
+        if !idp.provider_id.as_deref().is_some_and(|s| !s.is_empty()) {
             anyhow::bail!(
                 "Identity Provider providerId is missing or empty in {:?}",
                 path
@@ -92,7 +92,7 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
     let scopes: Vec<(PathBuf, ClientScopeRepresentation)> =
         read_yaml_files(&scopes_dir, "client-scope")?;
     for (path, scope) in scopes {
-        if scope.name.as_deref().unwrap_or("").is_empty() {
+        if !scope.name.as_deref().is_some_and(|s| !s.is_empty()) {
             anyhow::bail!("Client Scope name is missing or empty in {:?}", path);
         }
     }
@@ -102,7 +102,7 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
     let groups_dir = input_dir.join("groups");
     let groups: Vec<(PathBuf, GroupRepresentation)> = read_yaml_files(&groups_dir, "group")?;
     for (path, group) in groups {
-        if group.name.as_deref().unwrap_or("").is_empty() {
+        if !group.name.as_deref().is_some_and(|s| !s.is_empty()) {
             anyhow::bail!("Group name is missing or empty in {:?}", path);
         }
     }
@@ -112,7 +112,7 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
     let users_dir = input_dir.join("users");
     let users: Vec<(PathBuf, UserRepresentation)> = read_yaml_files(&users_dir, "user")?;
     for (path, user) in users {
-        if user.username.as_deref().unwrap_or("").is_empty() {
+        if !user.username.as_deref().is_some_and(|s| !s.is_empty()) {
             anyhow::bail!("User username is missing or empty in {:?}", path);
         }
     }
@@ -123,7 +123,7 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
     let flows: Vec<(PathBuf, AuthenticationFlowRepresentation)> =
         read_yaml_files(&flows_dir, "authentication-flow")?;
     for (path, flow) in flows {
-        if flow.alias.as_deref().unwrap_or("").is_empty() {
+        if !flow.alias.as_deref().is_some_and(|s| !s.is_empty()) {
             anyhow::bail!(
                 "Authentication Flow alias is missing or empty in {:?}",
                 path
@@ -137,10 +137,10 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
     let actions: Vec<(PathBuf, RequiredActionProviderRepresentation)> =
         read_yaml_files(&actions_dir, "required-action")?;
     for (path, action) in actions {
-        if action.alias.as_deref().unwrap_or("").is_empty() {
+        if !action.alias.as_deref().is_some_and(|s| !s.is_empty()) {
             anyhow::bail!("Required Action alias is missing or empty in {:?}", path);
         }
-        if action.provider_id.as_deref().unwrap_or("").is_empty() {
+        if !action.provider_id.as_deref().is_some_and(|s| !s.is_empty()) {
             anyhow::bail!(
                 "Required Action providerId is missing or empty in {:?}",
                 path
@@ -154,10 +154,10 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
     let components: Vec<(PathBuf, ComponentRepresentation)> =
         read_yaml_files(&components_dir, "component")?;
     for (path, component) in components {
-        if component.name.as_deref().unwrap_or("").is_empty() {
+        if !component.name.as_deref().is_some_and(|s| !s.is_empty()) {
             anyhow::bail!("Component name is missing or empty in {:?}", path);
         }
-        if component.provider_id.as_deref().unwrap_or("").is_empty() {
+        if !component.provider_id.as_deref().is_some_and(|s| !s.is_empty()) {
             anyhow::bail!("Component providerId is missing or empty in {:?}", path);
         }
     }

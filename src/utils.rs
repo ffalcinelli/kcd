@@ -46,7 +46,7 @@ mod tests {
             list: vec![inner],
         };
 
-        let yaml = to_sorted_yaml(&s).unwrap();
+        let yaml = to_sorted_yaml(&s).expect("Failed to serialize yaml");
 
         let lines: Vec<&str> = yaml.lines().collect();
 
