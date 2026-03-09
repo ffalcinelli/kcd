@@ -157,7 +157,11 @@ pub fn run(input_dir: PathBuf) -> Result<()> {
         if !component.name.as_deref().is_some_and(|s| !s.is_empty()) {
             anyhow::bail!("Component name is missing or empty in {:?}", path);
         }
-        if !component.provider_id.as_deref().is_some_and(|s| !s.is_empty()) {
+        if !component
+            .provider_id
+            .as_deref()
+            .is_some_and(|s| !s.is_empty())
+        {
             anyhow::bail!("Component providerId is missing or empty in {:?}", path);
         }
     }

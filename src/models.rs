@@ -162,10 +162,7 @@ mod tests {
         let deserialized: GroupRepresentation =
             serde_json::from_str(&json_str).expect("Failed to deserialize group");
         assert_eq!(
-            deserialized
-                .sub_groups
-                .expect("Failed to get sub_groups")[0]
-                .name,
+            deserialized.sub_groups.expect("Failed to get sub_groups")[0].name,
             Some("subgroup".to_string())
         );
     }
