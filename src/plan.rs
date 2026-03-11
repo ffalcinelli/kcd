@@ -100,7 +100,7 @@ async fn plan_client_scopes(
 ) -> Result<()> {
     let scopes_dir = input_dir.join("client-scopes");
     if async_fs::try_exists(&scopes_dir).await? {
-        let existing_scopes = client.get_client_scopes().await.unwrap_or_default();
+        let existing_scopes = client.get_client_scopes().await?;
         let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
             .into_iter()
             .filter_map(|s| s.name.clone().map(|n| (n, s)))
@@ -147,7 +147,7 @@ async fn plan_client_scopes(
 async fn plan_groups(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let groups_dir = input_dir.join("groups");
     if async_fs::try_exists(&groups_dir).await? {
-        let existing_groups = client.get_groups().await.unwrap_or_default();
+        let existing_groups = client.get_groups().await?;
         let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
             .into_iter()
             .filter_map(|g| g.name.clone().map(|n| (n, g)))
@@ -194,7 +194,7 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &Path, changes_only: bo
 async fn plan_users(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let users_dir = input_dir.join("users");
     if async_fs::try_exists(&users_dir).await? {
-        let existing_users = client.get_users().await.unwrap_or_default();
+        let existing_users = client.get_users().await?;
         let existing_users_map: HashMap<String, UserRepresentation> = existing_users
             .into_iter()
             .filter_map(|u| u.username.clone().map(|n| (n, u)))
@@ -245,7 +245,7 @@ async fn plan_authentication_flows(
 ) -> Result<()> {
     let flows_dir = input_dir.join("authentication-flows");
     if async_fs::try_exists(&flows_dir).await? {
-        let existing_flows = client.get_authentication_flows().await.unwrap_or_default();
+        let existing_flows = client.get_authentication_flows().await?;
         let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
             .into_iter()
             .filter_map(|f| f.alias.clone().map(|a| (a, f)))
@@ -300,7 +300,7 @@ async fn plan_required_actions(
 ) -> Result<()> {
     let actions_dir = input_dir.join("required-actions");
     if async_fs::try_exists(&actions_dir).await? {
-        let existing_actions = client.get_required_actions().await.unwrap_or_default();
+        let existing_actions = client.get_required_actions().await?;
         let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
             existing_actions
                 .into_iter()
@@ -353,7 +353,7 @@ async fn plan_components(
 ) -> Result<()> {
     let components_dir = input_dir.join("components");
     if async_fs::try_exists(&components_dir).await? {
-        let existing_components = client.get_components().await.unwrap_or_default();
+        let existing_components = client.get_components().await?;
         let existing_components_map: HashMap<String, ComponentRepresentation> = existing_components
             .into_iter()
             .filter_map(|c| c.name.clone().map(|n| (n, c)))
@@ -418,7 +418,7 @@ async fn plan_realm(client: &KeycloakClient, input_dir: &Path, changes_only: boo
 async fn plan_roles(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let roles_dir = input_dir.join("roles");
     if async_fs::try_exists(&roles_dir).await? {
-        let existing_roles = client.get_roles().await.unwrap_or_default();
+        let existing_roles = client.get_roles().await?;
         let existing_roles_map: HashMap<String, RoleRepresentation> = existing_roles
             .into_iter()
             .map(|r| (r.name.clone(), r))
@@ -468,7 +468,7 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &Path, changes_only: boo
 async fn plan_clients(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
     let clients_dir = input_dir.join("clients");
     if async_fs::try_exists(&clients_dir).await? {
-        let existing_clients = client.get_clients().await.unwrap_or_default();
+        let existing_clients = client.get_clients().await?;
         let existing_clients_map: HashMap<String, ClientRepresentation> = existing_clients
             .into_iter()
             .filter_map(|c| c.client_id.clone().map(|id| (id, c)))
@@ -519,7 +519,7 @@ async fn plan_identity_providers(
 ) -> Result<()> {
     let idps_dir = input_dir.join("identity-providers");
     if async_fs::try_exists(&idps_dir).await? {
-        let existing_idps = client.get_identity_providers().await.unwrap_or_default();
+        let existing_idps = client.get_identity_providers().await?;
         let existing_idps_map: HashMap<String, IdentityProviderRepresentation> = existing_idps
             .into_iter()
             .filter_map(|i| i.alias.clone().map(|alias| (alias, i)))
