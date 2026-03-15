@@ -12,7 +12,44 @@ use std::path::PathBuf;
 use tokio::fs as async_fs;
 use tokio::task::JoinSet;
 
-pub async fn run(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
+pub async fn run(
+    client: &KeycloakClient,
+    input_dir: PathBuf,
+    realms_to_apply: &[String],
+) -> Result<()> {
+    if !input_dir.exists() {
+        anyhow::bail!("Input directory {:?} does not exist", input_dir);
+    }
+
+    let realms = if realms_to_apply.is_empty() {
+        let mut dirs = Vec::new();
+        let mut entries = async_fs::read_dir(&input_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            if entry.file_type().await?.is_dir() {
+                dirs.push(entry.file_name().to_string_lossy().to_string());
+            }
+        }
+        dirs
+    } else {
+        realms_to_apply.to_vec()
+    };
+
+    if realms.is_empty() {
+        println!("No realms found to apply in {:?}", input_dir);
+        return Ok(());
+    }
+
+    for realm_name in realms {
+        println!("Applying realm: {}", realm_name);
+        let mut realm_client = client.clone();
+        realm_client.set_target_realm(realm_name.clone());
+        let realm_dir = input_dir.join(&realm_name);
+        apply_single_realm(&realm_client, realm_dir).await?;
+    }
+    Ok(())
+}
+
+async fn apply_single_realm(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
     apply_realm(client, &input_dir).await?;
     apply_roles(client, &input_dir).await?;
     apply_identity_providers(client, &input_dir).await?;

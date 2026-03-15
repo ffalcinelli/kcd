@@ -14,13 +14,53 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::fs as async_fs;
 
-pub async fn run(client: &KeycloakClient, input_dir: PathBuf, changes_only: bool) -> Result<()> {
-    println!(
-        "{} Planning changes for realm: {}",
-        Emoji("🔮", ""),
-        client.target_realm
-    );
+pub async fn run(
+    client: &KeycloakClient,
+    input_dir: PathBuf,
+    changes_only: bool,
+    realms_to_plan: &[String],
+) -> Result<()> {
+    if !input_dir.exists() {
+        anyhow::bail!("Input directory {:?} does not exist", input_dir);
+    }
 
+    let realms = if realms_to_plan.is_empty() {
+        let mut dirs = Vec::new();
+        let mut entries = async_fs::read_dir(&input_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            if entry.file_type().await?.is_dir() {
+                dirs.push(entry.file_name().to_string_lossy().to_string());
+            }
+        }
+        dirs
+    } else {
+        realms_to_plan.to_vec()
+    };
+
+    if realms.is_empty() {
+        println!("No realms found to plan in {:?}", input_dir);
+        return Ok(());
+    }
+
+    for realm_name in realms {
+        let mut realm_client = client.clone();
+        realm_client.set_target_realm(realm_name.clone());
+        let realm_dir = input_dir.join(&realm_name);
+        println!(
+            "{} Planning changes for realm: {}",
+            Emoji("🔮", ""),
+            realm_name
+        );
+        plan_single_realm(&realm_client, realm_dir, changes_only).await?;
+    }
+    Ok(())
+}
+
+async fn plan_single_realm(
+    client: &KeycloakClient,
+    input_dir: PathBuf,
+    changes_only: bool,
+) -> Result<()> {
     // 1. Plan Realm
     plan_realm(client, &input_dir, changes_only).await?;
 

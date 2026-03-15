@@ -7,7 +7,8 @@ use tokio;
 #[tokio::test]
 async fn test_login_password_grant() {
     let mock_url = start_mock_server().await;
-    let mut client = KeycloakClient::new(mock_url, "test-realm".to_string());
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
 
     let result = client
         .login("admin-cli", None, Some("admin"), Some("admin"))
@@ -19,7 +20,8 @@ async fn test_login_password_grant() {
 #[tokio::test]
 async fn test_login_client_credentials_grant() {
     let mock_url = start_mock_server().await;
-    let mut client = KeycloakClient::new(mock_url, "test-realm".to_string());
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
 
     let result = client.login("admin-cli", Some("secret"), None, None).await;
     assert!(result.is_ok(), "Login failed: {:?}", result.err());
@@ -29,7 +31,8 @@ async fn test_login_client_credentials_grant() {
 #[tokio::test]
 async fn test_login_fail() {
     let mock_url = start_mock_server().await;
-    let mut client = KeycloakClient::new(mock_url, "test-realm".to_string());
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
 
     let result = client
         .login("admin-cli", None, Some("admin"), Some("wrong"))
@@ -40,7 +43,8 @@ async fn test_login_fail() {
 #[tokio::test]
 async fn test_get_realm() {
     let mock_url = start_mock_server().await;
-    let mut client = KeycloakClient::new(mock_url, "test-realm".to_string());
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
     client
         .login("admin-cli", Some("secret"), None, None)
         .await
@@ -54,7 +58,8 @@ async fn test_get_realm() {
 #[tokio::test]
 async fn test_get_clients() {
     let mock_url = start_mock_server().await;
-    let mut client = KeycloakClient::new(mock_url, "test-realm".to_string());
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
     client
         .login("admin-cli", Some("secret"), None, None)
         .await
@@ -68,7 +73,8 @@ async fn test_get_clients() {
 #[tokio::test]
 async fn test_get_roles() {
     let mock_url = start_mock_server().await;
-    let mut client = KeycloakClient::new(mock_url, "test-realm".to_string());
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
     client
         .login("admin-cli", Some("secret"), None, None)
         .await
@@ -82,7 +88,8 @@ async fn test_get_roles() {
 #[tokio::test]
 async fn test_create_client() {
     let mock_url = start_mock_server().await;
-    let mut client = KeycloakClient::new(mock_url, "test-realm".to_string());
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
     client
         .login("admin-cli", Some("secret"), None, None)
         .await
@@ -110,7 +117,8 @@ async fn test_create_client() {
 #[tokio::test]
 async fn test_update_client() {
     let mock_url = start_mock_server().await;
-    let mut client = KeycloakClient::new(mock_url, "test-realm".to_string());
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
     client
         .login("admin-cli", Some("secret"), None, None)
         .await
@@ -138,7 +146,8 @@ async fn test_update_client() {
 #[tokio::test]
 async fn test_delete_client() {
     let mock_url = start_mock_server().await;
-    let mut client = KeycloakClient::new(mock_url, "test-realm".to_string());
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
     client
         .login("admin-cli", Some("secret"), None, None)
         .await
