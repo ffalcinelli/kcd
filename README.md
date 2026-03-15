@@ -1,5 +1,7 @@
 # Keycloak Continuous Delivery (kcd)
 
+**Disclaimer**: This project is experimentally written almost entirely by AI, so any usage should keep this in mind and that the execution of this software is at your own risk.
+
 A CLI tool to manage Keycloak configurations using local YAML files. It allows you to inspect the current state, validate local files, plan changes, and apply them to a Keycloak server.
 
 ## Features
