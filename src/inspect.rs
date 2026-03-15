@@ -5,7 +5,41 @@ use sanitize_filename::sanitize;
 use std::path::PathBuf;
 use tokio::fs;
 
-pub async fn run(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
+pub async fn run(
+    client: &KeycloakClient,
+    output_dir: PathBuf,
+    realms_to_inspect: &[String],
+) -> Result<()> {
+    if !fs::try_exists(&output_dir)
+        .await
+        .context("Failed to check output directory")?
+    {
+        fs::create_dir_all(&output_dir)
+            .await
+            .context("Failed to create output directory")?;
+    }
+
+    let realms = if realms_to_inspect.is_empty() {
+        let all_realms = client
+            .get_realms()
+            .await
+            .context("Failed to fetch realms")?;
+        all_realms.into_iter().map(|r| r.realm).collect()
+    } else {
+        realms_to_inspect.to_vec()
+    };
+
+    for realm_name in realms {
+        let mut realm_client = client.clone();
+        realm_client.set_target_realm(realm_name.clone());
+        let realm_dir = output_dir.join(&realm_name);
+        println!("Inspecting realm: {}", realm_name);
+        inspect_realm(&realm_client, realm_dir).await?;
+    }
+    Ok(())
+}
+
+async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
     if !fs::try_exists(&output_dir)
         .await
         .context("Failed to check output directory")?

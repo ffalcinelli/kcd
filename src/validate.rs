@@ -28,7 +28,38 @@ fn read_yaml_files<T: DeserializeOwned>(dir: &Path, file_type: &str) -> Result<V
     Ok(results)
 }
 
-pub fn run(input_dir: PathBuf) -> Result<()> {
+pub fn run(input_dir: PathBuf, realms_to_validate: &[String]) -> Result<()> {
+    if !input_dir.exists() {
+        anyhow::bail!("Input directory {:?} does not exist", input_dir);
+    }
+
+    let realms = if realms_to_validate.is_empty() {
+        let mut dirs = Vec::new();
+        for entry in fs::read_dir(&input_dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                dirs.push(entry.file_name().to_string_lossy().to_string());
+            }
+        }
+        dirs
+    } else {
+        realms_to_validate.to_vec()
+    };
+
+    if realms.is_empty() {
+        println!("No realms found to validate in {:?}", input_dir);
+        return Ok(());
+    }
+
+    for realm_name in realms {
+        println!("Validating realm: {}", realm_name);
+        let realm_dir = input_dir.join(&realm_name);
+        validate_realm(realm_dir)?;
+    }
+    Ok(())
+}
+
+fn validate_realm(input_dir: PathBuf) -> Result<()> {
     // 1. Validate Realm
     let realm_path = input_dir.join("realm.yaml");
     if !realm_path.exists() {

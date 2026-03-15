@@ -23,7 +23,8 @@ struct TokenResponse {
 }
 
 impl KeycloakClient {
-    pub fn new(base_url: String, target_realm: String) -> Self {
+    pub fn new(base_url: String) -> Self {
+        let target_realm = "".to_string();
         let base_url = base_url.trim_end_matches('/').to_string();
         Self {
             client: Client::new(),
@@ -31,6 +32,15 @@ impl KeycloakClient {
             target_realm,
             token: None,
         }
+    }
+
+    pub fn set_target_realm(&mut self, target_realm: String) {
+        self.target_realm = target_realm;
+    }
+
+    pub async fn get_realms(&self) -> Result<Vec<RealmRepresentation>> {
+        let url = format!("{}/admin/realms", self.base_url);
+        self.get(&url).await
     }
 
     pub async fn get_realm(&self) -> Result<RealmRepresentation> {

@@ -8,7 +8,7 @@ use app::validate;
 use clap::Parser;
 
 async fn init_client(cli: &Cli) -> Result<KeycloakClient> {
-    let mut client = KeycloakClient::new(cli.server.clone(), cli.realm.clone());
+    let mut client = KeycloakClient::new(cli.server.clone());
     client
         .login(
             &cli.client_id,
@@ -39,16 +39,16 @@ async fn main() -> Result<()> {
         Commands::Inspect { output } => {
             let client = init_client(&cli).await?;
             println!("Inspecting Keycloak configuration into {:?}", output);
-            inspect::run(&client, output.clone()).await?;
+            inspect::run(&client, output.clone(), &cli.realms).await?;
         }
         Commands::Validate { input } => {
             println!("Validating Keycloak configuration from {:?}", input);
-            validate::run(input.clone())?;
+            validate::run(input.clone(), &cli.realms)?;
         }
         Commands::Apply { input } => {
             let client = init_client(&cli).await?;
             println!("Applying Keycloak configuration from {:?}", input);
-            apply::run(&client, input.clone()).await?;
+            apply::run(&client, input.clone(), &cli.realms).await?;
         }
         Commands::Plan {
             input,
@@ -56,12 +56,12 @@ async fn main() -> Result<()> {
         } => {
             let client = init_client(&cli).await?;
             println!("Planning Keycloak configuration from {:?}", input);
-            plan::run(&client, input.clone(), *changes_only).await?;
+            plan::run(&client, input.clone(), *changes_only, &cli.realms).await?;
         }
         Commands::Drift { input } => {
             let client = init_client(&cli).await?;
             println!("Checking drift for Keycloak configuration from {:?}", input);
-            plan::run(&client, input.clone(), true).await?;
+            plan::run(&client, input.clone(), true, &cli.realms).await?;
         }
     }
 

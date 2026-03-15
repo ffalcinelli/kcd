@@ -9,7 +9,8 @@ use tempfile::tempdir;
 #[tokio::test]
 async fn test_apply() {
     let mock_url = start_mock_server().await;
-    let mut client = KeycloakClient::new(mock_url, "test-realm".to_string());
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
     client
         .login("admin-cli", Some("secret"), None, None)
         .await
@@ -17,6 +18,8 @@ async fn test_apply() {
 
     let dir = tempdir().unwrap();
     let input_dir = dir.path().to_path_buf();
+    let realm_dir = input_dir.join("test-realm");
+    std::fs::create_dir_all(&realm_dir).unwrap();
 
     // Create realm.yaml
     let realm = RealmRepresentation {
@@ -26,13 +29,13 @@ async fn test_apply() {
         extra: std::collections::HashMap::new(),
     };
     fs::write(
-        input_dir.join("realm.yaml"),
+        realm_dir.join("realm.yaml"),
         serde_yaml::to_string(&realm).unwrap(),
     )
     .unwrap();
 
     // Create roles
-    let roles_dir = input_dir.join("roles");
+    let roles_dir = realm_dir.join("roles");
     fs::create_dir(&roles_dir).unwrap();
     let role = RoleRepresentation {
         id: None,
@@ -65,7 +68,7 @@ async fn test_apply() {
     .unwrap();
 
     // Create clients
-    let clients_dir = input_dir.join("clients");
+    let clients_dir = realm_dir.join("clients");
     fs::create_dir(&clients_dir).unwrap();
     let client_rep = ClientRepresentation {
         id: None,
@@ -88,7 +91,7 @@ async fn test_apply() {
     .unwrap();
 
     // Run apply
-    apply::run(&client, input_dir.clone())
+    apply::run(&client, input_dir.clone(), &["test-realm".to_string()])
         .await
         .expect("Apply failed");
 }
