@@ -70,6 +70,29 @@ config/
     └── ...
 ```
 
+### Example Configurations
+
+The CLI expects YAML files matching Keycloak's JSON export format. Here is a small example of how files are structured:
+
+**`realm.yaml`**:
+```yaml
+realm: my-realm
+enabled: true
+```
+
+**`clients/my-client.yaml`**:
+```yaml
+clientId: my-client
+enabled: true
+publicClient: true
+```
+
+**`roles/my-role.yaml`**:
+```yaml
+name: my-role
+description: "A custom role"
+```
+
 ## Usage
 
 ### Inspect
