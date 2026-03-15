@@ -26,3 +26,4 @@ target
 /target
 perf_test/
 .env
+config
