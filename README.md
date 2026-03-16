@@ -11,6 +11,7 @@ A CLI tool to manage Keycloak configurations using local YAML files. It allows y
 - **Plan**: Shows a detailed diff between local configuration and the server's state, previewing changes before applying them.
 - **Apply**: Applies local configuration changes to the Keycloak server (Create, Update, Delete).
 - **Drift**: Checks for drift between the local configuration and the server's state, showing only the differences.
+- **Rotate Keys**: Rotates realm keys by creating new key provider components with incremented priority.
 - **Supported Resources**: Realm, Roles, Identity Providers, Clients, Client Scopes, Groups, Users, Authentication Flows, Required Actions, and Components.
 
 ## Installation
@@ -111,6 +112,17 @@ kcd drift --input config/
 Apply the local configuration to the Keycloak server. This will create new resources, update existing ones, and delete resources that are not present in the local configuration.
 ```bash
 kcd apply --input config/
+```
+
+### Rotate Keys
+Rotate realm keys by creating new key provider components with incremented priority. It includes an interactive prompt to delete expired or disabled keys.
+```bash
+kcd rotate-keys
+```
+
+You can use the `--yes` (or `-y`) flag to bypass the interactive prompt and automatically delete expired or disabled keys.
+```bash
+kcd rotate-keys --yes
 ```
 
 ## License
