@@ -59,7 +59,8 @@ async fn apply_single_realm(client: &KeycloakClient, input_dir: PathBuf) -> Resu
     apply_users(client, &input_dir).await?;
     apply_authentication_flows(client, &input_dir).await?;
     apply_required_actions(client, &input_dir).await?;
-    apply_components(client, &input_dir).await?;
+    apply_components_or_keys(client, &input_dir, "components").await?;
+    apply_components_or_keys(client, &input_dir, "keys").await?;
 
     Ok(())
 }
@@ -499,9 +500,12 @@ async fn apply_required_actions(
     Ok(())
 }
 
-async fn apply_components(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
-    // 10. Apply Components
-    let components_dir = input_dir.join("components");
+async fn apply_components_or_keys(
+    client: &KeycloakClient,
+    input_dir: &std::path::Path,
+    dir_name: &str,
+) -> Result<()> {
+    let components_dir = input_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
         let existing_components = client.get_components().await?;
         let existing_components_map: HashMap<String, ComponentRepresentation> = existing_components

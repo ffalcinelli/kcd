@@ -546,3 +546,10 @@ mod tests {
         assert_eq!(redact_url("invalid-url"), "invalid-url");
     }
 }
+
+impl KeycloakClient {
+    pub async fn get_keys(&self) -> Result<crate::models::KeysMetadataRepresentation> {
+        let url = format!("{}/admin/realms/{}/keys", self.base_url, self.target_realm);
+        self.get(&url).await
+    }
+}

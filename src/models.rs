@@ -378,3 +378,28 @@ pub struct ComponentRepresentation {
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct KeyMetadataRepresentation {
+    #[serde(rename = "providerId")]
+    pub provider_id: Option<String>,
+    #[serde(rename = "providerPriority")]
+    pub provider_priority: Option<i64>,
+    pub kid: Option<String>,
+    pub status: Option<String>,
+    #[serde(rename = "type")]
+    pub key_type: Option<String>,
+    pub algorithm: Option<String>,
+    #[serde(rename = "publicKey")]
+    pub public_key: Option<String>,
+    pub certificate: Option<String>,
+    pub use_: Option<String>,
+    #[serde(rename = "validTo")]
+    pub valid_to: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct KeysMetadataRepresentation {
+    pub active: Option<HashMap<String, String>>,
+    pub keys: Option<Vec<KeyMetadataRepresentation>>,
+}

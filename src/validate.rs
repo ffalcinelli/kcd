@@ -180,19 +180,23 @@ fn validate_realm(input_dir: PathBuf) -> Result<()> {
     }
     println!("Validated required actions");
 
-    // 10. Validate Components
-    let components_dir = input_dir.join("components");
-    let components: Vec<(PathBuf, ComponentRepresentation)> =
-        read_yaml_files(&components_dir, "component")?;
-    for (path, component) in components {
-        if component.name.as_deref().unwrap_or("").is_empty() {
-            anyhow::bail!("Component name is missing or empty in {:?}", path);
-        }
-        if component.provider_id.as_deref().unwrap_or("").is_empty() {
-            anyhow::bail!("Component providerId is missing or empty in {:?}", path);
+    // 10. Validate Components and Keys
+    for dir_name in ["components", "keys"].iter() {
+        let dir = input_dir.join(dir_name);
+        if fs::exists(&dir)? {
+            let components: Vec<(PathBuf, ComponentRepresentation)> =
+                read_yaml_files(&dir, dir_name)?;
+            for (path, component) in components {
+                if component.name.as_deref().unwrap_or("").is_empty() {
+                    anyhow::bail!("Component name is missing or empty in {:?}", path);
+                }
+                if component.provider_id.as_deref().unwrap_or("").is_empty() {
+                    anyhow::bail!("Component providerId is missing or empty in {:?}", path);
+                }
+            }
+            println!("Validated {}", dir_name);
         }
     }
-    println!("Validated components");
 
     Ok(())
 }

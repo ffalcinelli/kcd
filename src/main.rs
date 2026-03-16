@@ -63,6 +63,11 @@ async fn main() -> Result<()> {
             println!("Checking drift for Keycloak configuration from {:?}", input);
             plan::run(&client, input.clone(), true, &cli.realms).await?;
         }
+        Commands::RotateKeys { yes } => {
+            let client = init_client(&cli).await?;
+            println!("Rotating keys...");
+            app::rotate_keys::run(&client, *yes, &cli.realms).await?;
+        }
     }
 
     Ok(())
