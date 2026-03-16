@@ -279,11 +279,12 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
     }
     println!("Exported required actions to required-actions/");
 
-    // Fetch components
-    let components = client
+    // Fetch components and keys
+    let all_components = client
         .get_components()
         .await
         .context("Failed to fetch components")?;
+
     let components_dir = output_dir.join("components");
     if !fs::try_exists(&components_dir)
         .await
@@ -293,13 +294,33 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
             .await
             .context("Failed to create components directory")?;
     }
+
+    let keys_dir = output_dir.join("keys");
+    if !fs::try_exists(&keys_dir)
+        .await
+        .context("Failed to check keys directory")?
+    {
+        fs::create_dir_all(&keys_dir)
+            .await
+            .context("Failed to create keys directory")?;
+    }
+
     let mut set = tokio::task::JoinSet::new();
-    for component in components {
-        let components_dir = components_dir.clone();
+    for component in all_components {
+        let is_key = component
+            .provider_type
+            .as_deref()
+            .is_some_and(|pt| pt == "org.keycloak.keys.KeyProvider");
+        let target_dir = if is_key {
+            keys_dir.clone()
+        } else {
+            components_dir.clone()
+        };
+
         set.spawn(async move {
             let name = component.name.as_deref().unwrap_or("unknown").to_string();
             let filename = format!("{}.yaml", sanitize(&name));
-            let path = components_dir.join(filename);
+            let path = target_dir.join(filename);
             let yaml = to_sorted_yaml(&component).context("Failed to serialize component")?;
             fs::write(&path, yaml)
                 .await
@@ -309,7 +330,7 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported components to components/");
+    println!("Exported components to components/ and keys to keys/");
 
     Ok(())
 }
