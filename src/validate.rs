@@ -235,22 +235,27 @@ fn validate_realm(input_dir: PathBuf) -> Result<()> {
         },
     )?;
 
-    // 10. Validate Components
-    validate_resources(
-        &input_dir,
-        "components",
-        "component",
-        "Validated components",
-        |path, component: &ComponentRepresentation| {
-            if component.name.is_missing_or_empty() {
-                anyhow::bail!("Component name is missing or empty in {:?}", path);
-            }
-            if component.provider_id.is_missing_or_empty() {
-                anyhow::bail!("Component providerId is missing or empty in {:?}", path);
-            }
-            Ok(())
-        },
-    )?;
+    // 10. Validate Components and Keys
+    for dir_name in ["components", "keys"].iter() {
+        if fs::exists(input_dir.join(dir_name))? {
+            let singular = if *dir_name == "keys" { "key" } else { "component" };
+            validate_resources(
+                &input_dir,
+                dir_name,
+                singular,
+                &format!("Validated {}", dir_name),
+                |path, component: &ComponentRepresentation| {
+                    if component.name.is_missing_or_empty() {
+                        anyhow::bail!("Component name is missing or empty in {:?}", path);
+                    }
+                    if component.provider_id.is_missing_or_empty() {
+                        anyhow::bail!("Component providerId is missing or empty in {:?}", path);
+                    }
+                    Ok(())
+                },
+            )?;
+        }
+    }
 
     Ok(())
 }

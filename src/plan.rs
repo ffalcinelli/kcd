@@ -89,7 +89,9 @@ async fn plan_single_realm(
     plan_required_actions(client, &input_dir, changes_only).await?;
 
     // 10. Plan Components
-    plan_components(client, &input_dir, changes_only).await?;
+    plan_components_or_keys(client, &input_dir, changes_only, "components").await?;
+    plan_components_or_keys(client, &input_dir, changes_only, "keys").await?;
+    check_keys_drift(client, changes_only).await?;
 
     Ok(())
 }
@@ -386,12 +388,13 @@ async fn plan_required_actions(
     Ok(())
 }
 
-async fn plan_components(
+async fn plan_components_or_keys(
     client: &KeycloakClient,
     input_dir: &Path,
     changes_only: bool,
+    dir_name: &str,
 ) -> Result<()> {
-    let components_dir = input_dir.join("components");
+    let components_dir = input_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
         let existing_components = client.get_components().await?;
         let existing_components_map: HashMap<String, ComponentRepresentation> = existing_components
@@ -611,5 +614,46 @@ async fn plan_identity_providers(
             }
         }
     }
+    Ok(())
+}
+
+use console::style;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+async fn check_keys_drift(client: &KeycloakClient, changes_only: bool) -> Result<()> {
+    if !changes_only {
+        return Ok(());
+    }
+
+    let keys_metadata = match client.get_keys().await {
+        Ok(km) => km,
+        Err(_) => return Ok(()), // Ignore if not available
+    };
+
+    if let Some(keys) = keys_metadata.keys {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+        let thirty_days = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
+
+        for key in keys {
+            #[allow(clippy::collapsible_if)]
+            if key.status.as_deref() == Some("ACTIVE") {
+                if let Some(valid_to) = key.valid_to {
+                    #[allow(clippy::collapsible_if)]
+                    if valid_to > 0 && valid_to - now < thirty_days {
+                        let provider_id = key.provider_id.as_deref().unwrap_or("unknown");
+                        println!(
+                            "{} Warning: Active key (providerId: {}) is near expiration or expired! Consider rotating keys.",
+                            Emoji("⚠️", ""),
+                            style(provider_id).yellow()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     Ok(())
 }

@@ -6,11 +6,13 @@ A CLI tool to manage Keycloak configurations using local YAML files. It allows y
 
 ## Features
 
-- **Inspect**: Fetches current Keycloak configuration (Realm, Clients, Roles, Identity Providers) and dumps it to local YAML files.
+- **Inspect**: Fetches current Keycloak configuration and dumps it to local YAML files.
 - **Validate**: Validates the structure and content of local configuration files.
 - **Plan**: Shows a detailed diff between local configuration and the server's state, previewing changes before applying them.
 - **Apply**: Applies local configuration changes to the Keycloak server (Create, Update, Delete).
 - **Drift**: Checks for drift between the local configuration and the server's state, showing only the differences.
+- **Rotate Keys**: Rotates realm keys by creating new key provider components with incremented priority.
+- **Supported Resources**: Realm, Roles, Identity Providers, Clients, Client Scopes, Groups, Users, Authentication Flows, Required Actions, and Components.
 
 ## Installation
 
@@ -31,7 +33,7 @@ A CLI tool to manage Keycloak configurations using local YAML files. It allows y
    cargo build --release
    ```
 
-3. The binary will be available at `target/release/app`. You can also install it directly:
+3. The binary will be available at `target/release/kcd`. You can also install it directly:
    ```bash
    cargo install --path .
    ```
@@ -43,11 +45,12 @@ The tool uses environment variables for authentication and connection details. Y
 | Variable | Description | Default |
 | :--- | :--- | :--- |
 | `KEYCLOAK_URL` | The base URL of your Keycloak server (e.g., `http://localhost:8080`). | |
-| `KEYCLOAK_REALM` | The name of the realm to manage. | |
 | `KEYCLOAK_USER` | Admin username for authentication. | |
 | `KEYCLOAK_PASSWORD` | Admin password for authentication. | |
 | `KEYCLOAK_CLIENT_ID` | Client ID for authentication. | `admin-cli` |
 | `KEYCLOAK_CLIENT_SECRET` | Client Secret for authentication (if using client credentials). | |
+
+**Note:** The target realms are specified using the `--realms` CLI argument (comma-separated). If omitted, the tool auto-detects realms based on existing directories in the input/output path or queries the server for all realms during inspection.
 
 ## Project Structure
 
@@ -55,19 +58,23 @@ The configuration files are organized in a specific directory structure. By defa
 
 ```
 config/
-├── realm.yaml             # Realm configuration
-├── clients/               # Client configurations
-│   ├── client-1.yaml
-│   ├── client-2.yaml
-│   └── ...
-├── roles/                 # Role configurations
-│   ├── role-1.yaml
-│   ├── role-2.yaml
-│   └── ...
-└── identity-providers/    # Identity Provider configurations
-    ├── google.yaml
-    ├── github.yaml
-    └── ...
+└── my-realm/                  # Target realm directory
+    ├── realm.yaml             # Realm configuration
+    ├── clients/               # Client configurations
+    │   ├── client-1.yaml
+    │   └── ...
+    ├── roles/                 # Role configurations
+    │   ├── role-1.yaml
+    │   └── ...
+    ├── identity-providers/    # Identity Provider configurations
+    │   ├── google.yaml
+    │   └── ...
+    ├── client-scopes/         # Client Scopes configurations
+    ├── groups/                # Group configurations
+    ├── users/                 # User configurations
+    ├── authentication-flows/  # Authentication Flow configurations
+    ├── required-actions/      # Required Action configurations
+    └── components/            # Component configurations
 ```
 
 ### Example Configurations
@@ -128,6 +135,17 @@ kcd drift --input config/
 Apply the local configuration to the Keycloak server. This will create new resources, update existing ones, and delete resources that are not present in the local configuration.
 ```bash
 kcd apply --input config/
+```
+
+### Rotate Keys
+Rotate realm keys by creating new key provider components with incremented priority. It includes an interactive prompt to delete expired or disabled keys.
+```bash
+kcd rotate-keys
+```
+
+You can use the `--yes` (or `-y`) flag to bypass the interactive prompt and automatically delete expired or disabled keys.
+```bash
+kcd rotate-keys --yes
 ```
 
 ## License
