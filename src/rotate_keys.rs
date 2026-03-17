@@ -42,7 +42,7 @@ async fn rotate_keys_for_realm(client: &KeycloakClient, yes: bool) -> Result<()>
 
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .context("System clock is before UNIX EPOCH")?
         .as_millis() as i64;
     let thirty_days = 30 * 24 * 60 * 60 * 1000;
 
@@ -81,7 +81,7 @@ async fn rotate_keys_for_realm(client: &KeycloakClient, yes: bool) -> Result<()>
                         .unwrap_or_else(|| "key".to_string());
                     let timestamp = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
-                        .unwrap()
+                        .context("System clock is before UNIX EPOCH")?
                         .as_secs();
                     new_component.name = Some(format!("{}-rotated-{}", old_name, timestamp));
 
@@ -108,7 +108,7 @@ async fn rotate_keys_for_realm(client: &KeycloakClient, yes: bool) -> Result<()>
                     } else {
                         println!(
                             "Successfully created rotated key component: {}",
-                            new_component.name.as_ref().unwrap()
+                            new_component.name.as_deref().unwrap_or("unknown")
                         );
                     }
                 } else {
