@@ -150,6 +150,89 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_secrets_non_string() {
+        let mut val = json!({
+            "secret": 123
+        });
+        let mut secrets = HashMap::new();
+        extract_secrets(&mut val, "prefix", &mut secrets);
+
+        assert_eq!(val["secret"], 123);
+        assert!(secrets.is_empty());
+    }
+
+    #[test]
+    fn test_extract_secrets_no_prefix() {
+        let mut val = json!({
+            "clientSecret": "s1"
+        });
+        let mut secrets = HashMap::new();
+        extract_secrets(&mut val, "", &mut secrets);
+
+        assert_eq!(val["clientSecret"], "${KEYCLOAK_CLIENTSECRET}");
+        assert_eq!(
+            secrets.get("KEYCLOAK_CLIENTSECRET"),
+            Some(&"s1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_secrets_sanitization() {
+        let mut val = json!({
+            "client-secret": "s1",
+            "db.password": "p1"
+        });
+        let mut secrets = HashMap::new();
+        extract_secrets(&mut val, "app", &mut secrets);
+
+        assert_eq!(val["client-secret"], "${KEYCLOAK_APP_CLIENT_SECRET}");
+        assert_eq!(val["db.password"], "${KEYCLOAK_APP_DB_PASSWORD}");
+
+        assert_eq!(
+            secrets.get("KEYCLOAK_APP_CLIENT_SECRET"),
+            Some(&"s1".to_string())
+        );
+        assert_eq!(
+            secrets.get("KEYCLOAK_APP_DB_PASSWORD"),
+            Some(&"p1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_secrets_nested() {
+        let mut val = json!({
+            "level1": {
+                "password": "p1",
+                "level2": [
+                    { "secret": "s1" },
+                    { "other": "v1" }
+                ]
+            }
+        });
+        let mut secrets = HashMap::new();
+        extract_secrets(&mut val, "root", &mut secrets);
+
+        assert_eq!(
+            val["level1"]["password"],
+            "${KEYCLOAK_ROOT_LEVEL1_PASSWORD}"
+        );
+        assert_eq!(
+            val["level1"]["level2"][0]["secret"],
+            "${KEYCLOAK_ROOT_LEVEL1_LEVEL2_0_SECRET}"
+        );
+        assert_eq!(val["level1"]["level2"][1]["other"], "v1");
+
+        assert_eq!(
+            secrets.get("KEYCLOAK_ROOT_LEVEL1_PASSWORD"),
+            Some(&"p1".to_string())
+        );
+        assert_eq!(
+            secrets.get("KEYCLOAK_ROOT_LEVEL1_LEVEL2_0_SECRET"),
+            Some(&"s1".to_string())
+        );
+    }
+
+    #[test]
     fn test_substitute_secrets() {
         unsafe {
             std::env::set_var("MY_TEST_SECRET", "actual_value");
