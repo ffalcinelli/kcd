@@ -108,7 +108,10 @@ async fn rotate_keys_for_realm(client: &KeycloakClient, yes: bool) -> Result<()>
                     } else {
                         println!(
                             "Successfully created rotated key component: {}",
-                            new_component.name.as_deref().unwrap_or("<missing component name>")
+                            new_component
+                                .name
+                                .as_deref()
+                                .unwrap_or("<missing component name>")
                         );
                     }
                 } else {
