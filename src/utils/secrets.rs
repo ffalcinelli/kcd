@@ -1,6 +1,5 @@
 use serde_json::Value;
 use std::collections::HashMap;
-use std::env;
 
 /// Heuristics to identify a secret key based on its name.
 fn is_secret_key(key: &str) -> bool {
@@ -60,28 +59,37 @@ pub fn extract_secrets(value: &mut Value, prefix: &str, secrets: &mut HashMap<St
 }
 
 /// Recursively substitute ${ENV_VAR} with actual values
-pub fn substitute_secrets(value: &mut Value) {
+pub fn substitute_secrets(
+    value: &mut Value,
+    env_vars: &HashMap<String, String>,
+) -> Result<(), String> {
     match value {
         Value::Object(map) => {
             for (_, v) in map.iter_mut() {
-                substitute_secrets(v);
+                substitute_secrets(v, env_vars)?;
             }
         }
         Value::Array(arr) => {
             for v in arr.iter_mut() {
-                substitute_secrets(v);
+                substitute_secrets(v, env_vars)?;
             }
         }
         Value::String(s) => {
             if s.starts_with("${") && s.ends_with("}") {
                 let var_name = &s[2..s.len() - 1];
-                if let Ok(env_val) = env::var(var_name) {
-                    *s = env_val;
+                if let Some(env_val) = env_vars.get(var_name) {
+                    *s = env_val.clone();
+                } else {
+                    return Err(format!(
+                        "Missing required environment variable: {}",
+                        var_name
+                    ));
                 }
             }
         }
         _ => {}
     }
+    Ok(())
 }
 
 /// Helper to obfuscate a single string
@@ -234,14 +242,28 @@ mod tests {
 
     #[test]
     fn test_substitute_secrets() {
-        unsafe {
-            std::env::set_var("MY_TEST_SECRET", "actual_value");
-        }
+        let mut env_vars = HashMap::new();
+        env_vars.insert("MY_TEST_SECRET".to_string(), "actual_value".to_string());
+
         let mut val = json!({
             "clientSecret": "${MY_TEST_SECRET}"
         });
-        substitute_secrets(&mut val);
+        substitute_secrets(&mut val, &env_vars).unwrap();
         assert_eq!(val["clientSecret"], "actual_value");
+    }
+
+    #[test]
+    fn test_substitute_secrets_missing() {
+        let env_vars = HashMap::new();
+        let mut val = json!({
+            "clientSecret": "${MISSING_VAR}"
+        });
+        let res = substitute_secrets(&mut val, &env_vars);
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err(),
+            "Missing required environment variable: MISSING_VAR"
+        );
     }
 
     #[test]
