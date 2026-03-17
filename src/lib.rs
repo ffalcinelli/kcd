@@ -1,9 +1,9 @@
 pub mod apply;
 pub mod args;
+pub mod cli;
 pub mod client;
 pub mod inspect;
 pub mod models;
 pub mod plan;
-pub mod rotate_keys;
 pub mod utils;
 pub mod validate;
