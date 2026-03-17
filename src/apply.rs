@@ -9,6 +9,7 @@ use crate::utils::secrets::substitute_secrets;
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::fs as async_fs;
 use tokio::task::JoinSet;
 
@@ -17,6 +18,7 @@ pub async fn run(
     input_dir: PathBuf,
     realms_to_apply: &[String],
 ) -> Result<()> {
+    let env_vars = Arc::new(std::env::vars().collect::<HashMap<String, String>>());
     if !input_dir.exists() {
         anyhow::bail!("Input directory {:?} does not exist", input_dir);
     }
@@ -44,34 +46,42 @@ pub async fn run(
         let mut realm_client = client.clone();
         realm_client.set_target_realm(realm_name.clone());
         let realm_dir = input_dir.join(&realm_name);
-        apply_single_realm(&realm_client, realm_dir).await?;
+        apply_single_realm(&realm_client, realm_dir, Arc::clone(&env_vars)).await?;
     }
     Ok(())
 }
 
-async fn apply_single_realm(client: &KeycloakClient, input_dir: PathBuf) -> Result<()> {
-    apply_realm(client, &input_dir).await?;
-    apply_roles(client, &input_dir).await?;
-    apply_identity_providers(client, &input_dir).await?;
-    apply_clients(client, &input_dir).await?;
-    apply_client_scopes(client, &input_dir).await?;
-    apply_groups(client, &input_dir).await?;
-    apply_users(client, &input_dir).await?;
-    apply_authentication_flows(client, &input_dir).await?;
-    apply_required_actions(client, &input_dir).await?;
-    apply_components_or_keys(client, &input_dir, "components").await?;
-    apply_components_or_keys(client, &input_dir, "keys").await?;
+async fn apply_single_realm(
+    client: &KeycloakClient,
+    input_dir: PathBuf,
+    env_vars: Arc<HashMap<String, String>>,
+) -> Result<()> {
+    apply_realm(client, &input_dir, Arc::clone(&env_vars)).await?;
+    apply_roles(client, &input_dir, Arc::clone(&env_vars)).await?;
+    apply_identity_providers(client, &input_dir, Arc::clone(&env_vars)).await?;
+    apply_clients(client, &input_dir, Arc::clone(&env_vars)).await?;
+    apply_client_scopes(client, &input_dir, Arc::clone(&env_vars)).await?;
+    apply_groups(client, &input_dir, Arc::clone(&env_vars)).await?;
+    apply_users(client, &input_dir, Arc::clone(&env_vars)).await?;
+    apply_authentication_flows(client, &input_dir, Arc::clone(&env_vars)).await?;
+    apply_required_actions(client, &input_dir, Arc::clone(&env_vars)).await?;
+    apply_components_or_keys(client, &input_dir, "components", Arc::clone(&env_vars)).await?;
+    apply_components_or_keys(client, &input_dir, "keys", Arc::clone(&env_vars)).await?;
 
     Ok(())
 }
 
-async fn apply_realm(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
+async fn apply_realm(
+    client: &KeycloakClient,
+    input_dir: &std::path::Path,
+    env_vars: Arc<HashMap<String, String>>,
+) -> Result<()> {
     // 1. Apply Realm
     let realm_path = input_dir.join("realm.yaml");
     if async_fs::try_exists(&realm_path).await? {
         let content = async_fs::read_to_string(&realm_path).await?;
         let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
-        substitute_secrets(&mut val);
+        substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
         let realm_rep: RealmRepresentation = serde_json::from_value(val)?;
         client
             .update_realm(&realm_rep)
@@ -82,7 +92,11 @@ async fn apply_realm(client: &KeycloakClient, input_dir: &std::path::Path) -> Re
     Ok(())
 }
 
-async fn apply_roles(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
+async fn apply_roles(
+    client: &KeycloakClient,
+    input_dir: &std::path::Path,
+    env_vars: Arc<HashMap<String, String>>,
+) -> Result<()> {
     // 2. Apply Roles
     let roles_dir = input_dir.join("roles");
     if async_fs::try_exists(&roles_dir).await? {
@@ -101,10 +115,11 @@ async fn apply_roles(client: &KeycloakClient, input_dir: &std::path::Path) -> Re
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let client = client.clone();
                 let existing_roles_map = existing_roles_map.clone();
+                let env_vars = Arc::clone(&env_vars);
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
-                    substitute_secrets(&mut val);
+                    substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                     let mut role_rep: RoleRepresentation = serde_json::from_value(val)?;
 
                     if let Some(id) = existing_roles_map.get(&role_rep.name) {
@@ -136,6 +151,7 @@ async fn apply_roles(client: &KeycloakClient, input_dir: &std::path::Path) -> Re
 async fn apply_identity_providers(
     client: &KeycloakClient,
     input_dir: &std::path::Path,
+    env_vars: Arc<HashMap<String, String>>,
 ) -> Result<()> {
     // 4. Apply Identity Providers
     let idps_dir = input_dir.join("identity-providers");
@@ -155,10 +171,11 @@ async fn apply_identity_providers(
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let client = client.clone();
                 let existing_idps_map = existing_idps_map.clone();
+                let env_vars = Arc::clone(&env_vars);
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
-                    substitute_secrets(&mut val);
+                    substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                     let mut idp_rep: IdentityProviderRepresentation = serde_json::from_value(val)?;
                     let alias = idp_rep.alias.clone().unwrap_or_default();
 
@@ -195,7 +212,11 @@ async fn apply_identity_providers(
     Ok(())
 }
 
-async fn apply_clients(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
+async fn apply_clients(
+    client: &KeycloakClient,
+    input_dir: &std::path::Path,
+    env_vars: Arc<HashMap<String, String>>,
+) -> Result<()> {
     // 3. Apply Clients
     let clients_dir = input_dir.join("clients");
     if async_fs::try_exists(&clients_dir).await? {
@@ -214,10 +235,11 @@ async fn apply_clients(client: &KeycloakClient, input_dir: &std::path::Path) -> 
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let client = client.clone();
                 let existing_clients_map = existing_clients_map.clone();
+                let env_vars = Arc::clone(&env_vars);
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
-                    substitute_secrets(&mut val);
+                    substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                     let mut client_rep: ClientRepresentation = serde_json::from_value(val)?;
                     let client_id = client_rep.client_id.clone().unwrap_or_default();
 
@@ -254,7 +276,11 @@ async fn apply_clients(client: &KeycloakClient, input_dir: &std::path::Path) -> 
     Ok(())
 }
 
-async fn apply_client_scopes(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
+async fn apply_client_scopes(
+    client: &KeycloakClient,
+    input_dir: &std::path::Path,
+    env_vars: Arc<HashMap<String, String>>,
+) -> Result<()> {
     // 5. Apply Client Scopes
     let scopes_dir = input_dir.join("client-scopes");
     if async_fs::try_exists(&scopes_dir).await? {
@@ -270,7 +296,7 @@ async fn apply_client_scopes(client: &KeycloakClient, input_dir: &std::path::Pat
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
                 let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
-                substitute_secrets(&mut val);
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let mut scope_rep: ClientScopeRepresentation = serde_json::from_value(val)?;
                 let name = scope_rep.name.as_deref().unwrap_or("");
 
@@ -301,7 +327,11 @@ async fn apply_client_scopes(client: &KeycloakClient, input_dir: &std::path::Pat
     Ok(())
 }
 
-async fn apply_groups(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
+async fn apply_groups(
+    client: &KeycloakClient,
+    input_dir: &std::path::Path,
+    env_vars: Arc<HashMap<String, String>>,
+) -> Result<()> {
     // 6. Apply Groups
     let groups_dir = input_dir.join("groups");
     if async_fs::try_exists(&groups_dir).await? {
@@ -317,7 +347,7 @@ async fn apply_groups(client: &KeycloakClient, input_dir: &std::path::Path) -> R
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
                 let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
-                substitute_secrets(&mut val);
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let mut group_rep: GroupRepresentation = serde_json::from_value(val)?;
                 let name = group_rep.name.as_deref().unwrap_or("");
 
@@ -348,7 +378,11 @@ async fn apply_groups(client: &KeycloakClient, input_dir: &std::path::Path) -> R
     Ok(())
 }
 
-async fn apply_users(client: &KeycloakClient, input_dir: &std::path::Path) -> Result<()> {
+async fn apply_users(
+    client: &KeycloakClient,
+    input_dir: &std::path::Path,
+    env_vars: Arc<HashMap<String, String>>,
+) -> Result<()> {
     // 7. Apply Users
     let users_dir = input_dir.join("users");
     if async_fs::try_exists(&users_dir).await? {
@@ -364,7 +398,7 @@ async fn apply_users(client: &KeycloakClient, input_dir: &std::path::Path) -> Re
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
                 let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
-                substitute_secrets(&mut val);
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let mut user_rep: UserRepresentation = serde_json::from_value(val)?;
                 let username = user_rep.username.as_deref().unwrap_or("");
 
@@ -398,6 +432,7 @@ async fn apply_users(client: &KeycloakClient, input_dir: &std::path::Path) -> Re
 async fn apply_authentication_flows(
     client: &KeycloakClient,
     input_dir: &std::path::Path,
+    env_vars: Arc<HashMap<String, String>>,
 ) -> Result<()> {
     // 8. Apply Authentication Flows
     let flows_dir = input_dir.join("authentication-flows");
@@ -414,7 +449,7 @@ async fn apply_authentication_flows(
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
                 let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
-                substitute_secrets(&mut val);
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let mut flow_rep: AuthenticationFlowRepresentation = serde_json::from_value(val)?;
                 let alias = flow_rep.alias.as_deref().unwrap_or("");
 
@@ -448,6 +483,7 @@ async fn apply_authentication_flows(
 async fn apply_required_actions(
     client: &KeycloakClient,
     input_dir: &std::path::Path,
+    env_vars: Arc<HashMap<String, String>>,
 ) -> Result<()> {
     // 9. Apply Required Actions
     let actions_dir = input_dir.join("required-actions");
@@ -465,7 +501,7 @@ async fn apply_required_actions(
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
                 let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
-                substitute_secrets(&mut val);
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let action_rep: RequiredActionProviderRepresentation = serde_json::from_value(val)?;
                 let alias = action_rep.alias.as_deref().unwrap_or("");
 
@@ -504,6 +540,7 @@ async fn apply_components_or_keys(
     client: &KeycloakClient,
     input_dir: &std::path::Path,
     dir_name: &str,
+    env_vars: Arc<HashMap<String, String>>,
 ) -> Result<()> {
     let components_dir = input_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
@@ -519,7 +556,7 @@ async fn apply_components_or_keys(
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
                 let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
-                substitute_secrets(&mut val);
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let mut component_rep: ComponentRepresentation = serde_json::from_value(val)?;
                 let name = component_rep.name.as_deref().unwrap_or("");
 

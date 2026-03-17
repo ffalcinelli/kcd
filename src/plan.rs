@@ -11,7 +11,9 @@ use console::{Emoji, Style};
 use serde::Serialize;
 use similar::{ChangeTag, TextDiff};
 use std::collections::HashMap;
+use std::env;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tokio::fs as async_fs;
 
 pub async fn run(
@@ -20,6 +22,7 @@ pub async fn run(
     changes_only: bool,
     realms_to_plan: &[String],
 ) -> Result<()> {
+    let env_vars = Arc::new(env::vars().collect::<HashMap<String, String>>());
     if !input_dir.exists() {
         anyhow::bail!("Input directory {:?} does not exist", input_dir);
     }
@@ -51,7 +54,13 @@ pub async fn run(
             Emoji("🔮", ""),
             realm_name
         );
-        plan_single_realm(&realm_client, realm_dir, changes_only).await?;
+        plan_single_realm(
+            &realm_client,
+            realm_dir,
+            changes_only,
+            Arc::clone(&env_vars),
+        )
+        .await?;
     }
     Ok(())
 }
@@ -60,37 +69,52 @@ async fn plan_single_realm(
     client: &KeycloakClient,
     input_dir: PathBuf,
     changes_only: bool,
+    env_vars: Arc<HashMap<String, String>>,
 ) -> Result<()> {
     // 1. Plan Realm
-    plan_realm(client, &input_dir, changes_only).await?;
+    plan_realm(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
 
     // 2. Plan Roles
-    plan_roles(client, &input_dir, changes_only).await?;
+    plan_roles(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
 
     // 3. Plan Clients
-    plan_clients(client, &input_dir, changes_only).await?;
+    plan_clients(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
 
     // 4. Plan Identity Providers
-    plan_identity_providers(client, &input_dir, changes_only).await?;
+    plan_identity_providers(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
 
     // 5. Plan Client Scopes
-    plan_client_scopes(client, &input_dir, changes_only).await?;
+    plan_client_scopes(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
 
     // 6. Plan Groups
-    plan_groups(client, &input_dir, changes_only).await?;
+    plan_groups(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
 
     // 7. Plan Users
-    plan_users(client, &input_dir, changes_only).await?;
+    plan_users(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
 
     // 8. Plan Authentication Flows
-    plan_authentication_flows(client, &input_dir, changes_only).await?;
+    plan_authentication_flows(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
 
     // 9. Plan Required Actions
-    plan_required_actions(client, &input_dir, changes_only).await?;
+    plan_required_actions(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
 
     // 10. Plan Components
-    plan_components_or_keys(client, &input_dir, changes_only, "components").await?;
-    plan_components_or_keys(client, &input_dir, changes_only, "keys").await?;
+    plan_components_or_keys(
+        client,
+        &input_dir,
+        changes_only,
+        "components",
+        Arc::clone(&env_vars),
+    )
+    .await?;
+    plan_components_or_keys(
+        client,
+        &input_dir,
+        changes_only,
+        "keys",
+        Arc::clone(&env_vars),
+    )
+    .await?;
     check_keys_drift(client, changes_only).await?;
 
     Ok(())
@@ -103,6 +127,7 @@ fn print_diff<T: Serialize>(
     old: Option<&T>,
     new: &T,
     changes_only: bool,
+    env_vars: Arc<HashMap<String, String>>,
 ) -> Result<()> {
     let old_yaml = if let Some(o) = old {
         let mut val = serde_json::to_value(o)?;
@@ -113,7 +138,7 @@ fn print_diff<T: Serialize>(
     };
 
     let mut new_val = serde_json::to_value(new)?;
-    substitute_secrets(&mut new_val);
+    substitute_secrets(&mut new_val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
     obfuscate_secrets(&mut new_val);
     let new_yaml = crate::utils::to_sorted_yaml(&new_val)?;
 
@@ -139,6 +164,7 @@ async fn plan_client_scopes(
     client: &KeycloakClient,
     input_dir: &Path,
     changes_only: bool,
+    env_vars: Arc<HashMap<String, String>>,
 ) -> Result<()> {
     let scopes_dir = input_dir.join("client-scopes");
     if async_fs::try_exists(&scopes_dir).await? {
@@ -171,6 +197,7 @@ async fn plan_client_scopes(
                         Some(&remote_clone),
                         &local_scope,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 } else {
                     println!("\n{} Will create ClientScope: {}", Emoji("✨", ""), name);
@@ -179,6 +206,7 @@ async fn plan_client_scopes(
                         None::<&ClientScopeRepresentation>,
                         &local_scope,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 }
             }
@@ -187,7 +215,12 @@ async fn plan_client_scopes(
     Ok(())
 }
 
-async fn plan_groups(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
+async fn plan_groups(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+    env_vars: Arc<HashMap<String, String>>,
+) -> Result<()> {
     let groups_dir = input_dir.join("groups");
     if async_fs::try_exists(&groups_dir).await? {
         let existing_groups = client.get_groups().await?;
@@ -219,6 +252,7 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &Path, changes_only: bo
                         Some(&remote_clone),
                         &local_group,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 } else {
                     println!("\n{} Will create Group: {}", Emoji("✨", ""), name);
@@ -227,6 +261,7 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &Path, changes_only: bo
                         None::<&GroupRepresentation>,
                         &local_group,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 }
             }
@@ -235,7 +270,12 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &Path, changes_only: bo
     Ok(())
 }
 
-async fn plan_users(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
+async fn plan_users(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+    env_vars: Arc<HashMap<String, String>>,
+) -> Result<()> {
     let users_dir = input_dir.join("users");
     if async_fs::try_exists(&users_dir).await? {
         let existing_users = client.get_users().await?;
@@ -267,6 +307,7 @@ async fn plan_users(client: &KeycloakClient, input_dir: &Path, changes_only: boo
                         Some(&remote_clone),
                         &local_user,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 } else {
                     println!("\n{} Will create User: {}", Emoji("✨", ""), username);
@@ -275,6 +316,7 @@ async fn plan_users(client: &KeycloakClient, input_dir: &Path, changes_only: boo
                         None::<&UserRepresentation>,
                         &local_user,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 }
             }
@@ -287,6 +329,7 @@ async fn plan_authentication_flows(
     client: &KeycloakClient,
     input_dir: &Path,
     changes_only: bool,
+    env_vars: Arc<HashMap<String, String>>,
 ) -> Result<()> {
     let flows_dir = input_dir.join("authentication-flows");
     if async_fs::try_exists(&flows_dir).await? {
@@ -319,6 +362,7 @@ async fn plan_authentication_flows(
                         Some(&remote_clone),
                         &local_flow,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 } else {
                     println!(
@@ -331,6 +375,7 @@ async fn plan_authentication_flows(
                         None::<&AuthenticationFlowRepresentation>,
                         &local_flow,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 }
             }
@@ -343,6 +388,7 @@ async fn plan_required_actions(
     client: &KeycloakClient,
     input_dir: &Path,
     changes_only: bool,
+    env_vars: Arc<HashMap<String, String>>,
 ) -> Result<()> {
     let actions_dir = input_dir.join("required-actions");
     if async_fs::try_exists(&actions_dir).await? {
@@ -374,6 +420,7 @@ async fn plan_required_actions(
                         Some(&remote_clone),
                         &local_action,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 } else {
                     println!(
@@ -386,6 +433,7 @@ async fn plan_required_actions(
                         None::<&RequiredActionProviderRepresentation>,
                         &local_action,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 }
             }
@@ -399,6 +447,7 @@ async fn plan_components_or_keys(
     input_dir: &Path,
     changes_only: bool,
     dir_name: &str,
+    env_vars: Arc<HashMap<String, String>>,
 ) -> Result<()> {
     let components_dir = input_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
@@ -431,6 +480,7 @@ async fn plan_components_or_keys(
                         Some(&remote_clone),
                         &local_component,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 } else {
                     println!("\n{} Will create Component: {}", Emoji("✨", ""), name);
@@ -439,6 +489,7 @@ async fn plan_components_or_keys(
                         None::<&ComponentRepresentation>,
                         &local_component,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 }
             }
@@ -447,7 +498,12 @@ async fn plan_components_or_keys(
     Ok(())
 }
 
-async fn plan_realm(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
+async fn plan_realm(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+    env_vars: Arc<HashMap<String, String>>,
+) -> Result<()> {
     let realm_path = input_dir.join("realm.yaml");
     if async_fs::try_exists(&realm_path).await? {
         let content = async_fs::read_to_string(&realm_path).await?;
@@ -467,12 +523,23 @@ async fn plan_realm(client: &KeycloakClient, input_dir: &Path, changes_only: boo
             }
         };
 
-        print_diff("Realm", remote_realm.as_ref(), &local_realm, changes_only)?;
+        print_diff(
+            "Realm",
+            remote_realm.as_ref(),
+            &local_realm,
+            changes_only,
+            Arc::clone(&env_vars),
+        )?;
     }
     Ok(())
 }
 
-async fn plan_roles(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
+async fn plan_roles(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+    env_vars: Arc<HashMap<String, String>>,
+) -> Result<()> {
     let roles_dir = input_dir.join("roles");
     if async_fs::try_exists(&roles_dir).await? {
         let existing_roles = client.get_roles().await?;
@@ -503,6 +570,7 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &Path, changes_only: boo
                         Some(&remote_clone),
                         &local_role,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 } else {
                     println!(
@@ -515,6 +583,7 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &Path, changes_only: boo
                         None::<&RoleRepresentation>,
                         &local_role,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 }
             }
@@ -523,7 +592,12 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &Path, changes_only: boo
     Ok(())
 }
 
-async fn plan_clients(client: &KeycloakClient, input_dir: &Path, changes_only: bool) -> Result<()> {
+async fn plan_clients(
+    client: &KeycloakClient,
+    input_dir: &Path,
+    changes_only: bool,
+    env_vars: Arc<HashMap<String, String>>,
+) -> Result<()> {
     let clients_dir = input_dir.join("clients");
     if async_fs::try_exists(&clients_dir).await? {
         let existing_clients = client.get_clients().await?;
@@ -555,6 +629,7 @@ async fn plan_clients(client: &KeycloakClient, input_dir: &Path, changes_only: b
                         Some(&remote_clone),
                         &local_client,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 } else {
                     println!("\n{} Will create Client: {}", Emoji("✨", ""), client_id);
@@ -563,6 +638,7 @@ async fn plan_clients(client: &KeycloakClient, input_dir: &Path, changes_only: b
                         None::<&ClientRepresentation>,
                         &local_client,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 }
             }
@@ -575,6 +651,7 @@ async fn plan_identity_providers(
     client: &KeycloakClient,
     input_dir: &Path,
     changes_only: bool,
+    env_vars: Arc<HashMap<String, String>>,
 ) -> Result<()> {
     let idps_dir = input_dir.join("identity-providers");
     if async_fs::try_exists(&idps_dir).await? {
@@ -607,6 +684,7 @@ async fn plan_identity_providers(
                         Some(&remote_clone),
                         &local_idp,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 } else {
                     println!(
@@ -619,6 +697,7 @@ async fn plan_identity_providers(
                         None::<&IdentityProviderRepresentation>,
                         &local_idp,
                         changes_only,
+                        Arc::clone(&env_vars),
                     )?;
                 }
             }

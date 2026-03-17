@@ -1,9 +1,12 @@
 use crate::client::KeycloakClient;
-use crate::utils::to_sorted_yaml;
+use crate::utils::to_sorted_yaml_with_secrets;
 use anyhow::{Context, Result};
 use sanitize_filename::sanitize;
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::fs;
+use tokio::sync::Mutex;
 
 pub async fn run(
     client: &KeycloakClient,
@@ -29,17 +32,51 @@ pub async fn run(
         realms_to_inspect.to_vec()
     };
 
+    let all_secrets = Arc::new(Mutex::new(HashMap::new()));
+
     for realm_name in realms {
         let mut realm_client = client.clone();
         realm_client.set_target_realm(realm_name.clone());
         let realm_dir = output_dir.join(&realm_name);
         println!("Inspecting realm: {}", realm_name);
-        inspect_realm(&realm_client, realm_dir).await?;
+        inspect_realm(&realm_client, realm_dir, Arc::clone(&all_secrets)).await?;
     }
+
+    let secrets_lock = all_secrets.lock().await;
+    if !secrets_lock.is_empty() {
+        let env_path = output_dir.join(".env");
+        let mut env_content = String::new();
+        let mut keys: Vec<&String> = secrets_lock.keys().collect();
+        keys.sort();
+        for key in keys {
+            env_content.push_str(&format!("{}={}\n", key, secrets_lock[key]));
+        }
+
+        let mut existing_env = String::new();
+        if fs::try_exists(&env_path).await.unwrap_or(false) {
+            #[allow(clippy::collapsible_if)]
+            if let Ok(content) = fs::read_to_string(&env_path).await {
+                existing_env = content;
+                if !existing_env.ends_with('\n') && !existing_env.is_empty() {
+                    existing_env.push('\n');
+                }
+            }
+        }
+
+        fs::write(&env_path, format!("{}{}", existing_env, env_content))
+            .await
+            .context("Failed to write .env file")?;
+        println!("Exported secrets to .env");
+    }
+
     Ok(())
 }
 
-async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<()> {
+async fn inspect_realm(
+    client: &KeycloakClient,
+    output_dir: PathBuf,
+    all_secrets: Arc<Mutex<HashMap<String, String>>>,
+) -> Result<()> {
     if !fs::try_exists(&output_dir)
         .await
         .context("Failed to check output directory")?
@@ -51,7 +88,10 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
 
     // Fetch realm
     let realm = client.get_realm().await.context("Failed to fetch realm")?;
-    let realm_yaml = to_sorted_yaml(&realm).context("Failed to serialize realm")?;
+    let mut local_secrets = HashMap::new();
+    let realm_yaml = to_sorted_yaml_with_secrets(&realm, "realm", &mut local_secrets)
+        .context("Failed to serialize realm")?;
+    all_secrets.lock().await.extend(local_secrets);
     fs::write(output_dir.join("realm.yaml"), realm_yaml)
         .await
         .context("Failed to write realm.yaml")?;
@@ -74,6 +114,7 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
     let mut set = tokio::task::JoinSet::new();
     for client_rep in clients {
         let clients_dir = clients_dir.clone();
+        let all_secrets = Arc::clone(&all_secrets);
         set.spawn(async move {
             let name = client_rep
                 .client_id
@@ -82,7 +123,10 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
                 .to_string();
             let filename = format!("{}.yaml", sanitize(&name));
             let path = clients_dir.join(filename);
-            let yaml = to_sorted_yaml(&client_rep).context("Failed to serialize client")?;
+            let mut local_secrets = HashMap::new();
+            let yaml = to_sorted_yaml_with_secrets(&client_rep, "client", &mut local_secrets)
+                .context("Failed to serialize client")?;
+            all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
                 .await
                 .context(format!("Failed to write client {}", name))
@@ -107,11 +151,15 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
     let mut set = tokio::task::JoinSet::new();
     for role in roles {
         let roles_dir = roles_dir.clone();
+        let all_secrets = Arc::clone(&all_secrets);
         set.spawn(async move {
             let name = &role.name;
             let filename = format!("{}.yaml", sanitize(name));
             let path = roles_dir.join(filename);
-            let yaml = to_sorted_yaml(&role).context("Failed to serialize role")?;
+            let mut local_secrets = HashMap::new();
+            let yaml = to_sorted_yaml_with_secrets(&role, "role", &mut local_secrets)
+                .context("Failed to serialize role")?;
+            all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
                 .await
                 .context(format!("Failed to write role {}", name))
@@ -139,11 +187,15 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
     let mut set = tokio::task::JoinSet::new();
     for scope in client_scopes {
         let scopes_dir = scopes_dir.clone();
+        let all_secrets = Arc::clone(&all_secrets);
         set.spawn(async move {
             let name = scope.name.as_deref().unwrap_or("unknown").to_string();
             let filename = format!("{}.yaml", sanitize(&name));
             let path = scopes_dir.join(filename);
-            let yaml = to_sorted_yaml(&scope).context("Failed to serialize client scope")?;
+            let mut local_secrets = HashMap::new();
+            let yaml = to_sorted_yaml_with_secrets(&scope, "client_scope", &mut local_secrets)
+                .context("Failed to serialize client scope")?;
+            all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
                 .await
                 .context(format!("Failed to write client scope {}", name))
@@ -171,11 +223,15 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
     let mut set = tokio::task::JoinSet::new();
     for group in groups {
         let groups_dir = groups_dir.clone();
+        let all_secrets = Arc::clone(&all_secrets);
         set.spawn(async move {
             let name = group.name.as_deref().unwrap_or("unknown").to_string();
             let filename = format!("{}.yaml", sanitize(&name));
             let path = groups_dir.join(filename);
-            let yaml = to_sorted_yaml(&group).context("Failed to serialize group")?;
+            let mut local_secrets = HashMap::new();
+            let yaml = to_sorted_yaml_with_secrets(&group, "group", &mut local_secrets)
+                .context("Failed to serialize group")?;
+            all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
                 .await
                 .context(format!("Failed to write group {}", name))
@@ -200,11 +256,15 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
     let mut set = tokio::task::JoinSet::new();
     for user in users {
         let users_dir = users_dir.clone();
+        let all_secrets = Arc::clone(&all_secrets);
         set.spawn(async move {
             let username = user.username.as_deref().unwrap_or("unknown").to_string();
             let filename = format!("{}.yaml", sanitize(&username));
             let path = users_dir.join(filename);
-            let yaml = to_sorted_yaml(&user).context("Failed to serialize user")?;
+            let mut local_secrets = HashMap::new();
+            let yaml = to_sorted_yaml_with_secrets(&user, "user", &mut local_secrets)
+                .context("Failed to serialize user")?;
+            all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
                 .await
                 .context(format!("Failed to write user {}", username))
@@ -232,11 +292,15 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
     let mut set = tokio::task::JoinSet::new();
     for flow in flows {
         let flows_dir = flows_dir.clone();
+        let all_secrets = Arc::clone(&all_secrets);
         set.spawn(async move {
             let alias = flow.alias.as_deref().unwrap_or("unknown").to_string();
             let filename = format!("{}.yaml", sanitize(&alias));
             let path = flows_dir.join(filename);
-            let yaml = to_sorted_yaml(&flow).context("Failed to serialize authentication flow")?;
+            let mut local_secrets = HashMap::new();
+            let yaml = to_sorted_yaml_with_secrets(&flow, "flow", &mut local_secrets)
+                .context("Failed to serialize authentication flow")?;
+            all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
                 .await
                 .context(format!("Failed to write authentication flow {}", alias))
@@ -264,11 +328,15 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
     let mut set = tokio::task::JoinSet::new();
     for action in actions {
         let actions_dir = actions_dir.clone();
+        let all_secrets = Arc::clone(&all_secrets);
         set.spawn(async move {
             let alias = action.alias.as_deref().unwrap_or("unknown").to_string();
             let filename = format!("{}.yaml", sanitize(&alias));
             let path = actions_dir.join(filename);
-            let yaml = to_sorted_yaml(&action).context("Failed to serialize required action")?;
+            let mut local_secrets = HashMap::new();
+            let yaml = to_sorted_yaml_with_secrets(&action, "action", &mut local_secrets)
+                .context("Failed to serialize required action")?;
+            all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
                 .await
                 .context(format!("Failed to write required action {}", alias))
@@ -317,11 +385,16 @@ async fn inspect_realm(client: &KeycloakClient, output_dir: PathBuf) -> Result<(
             components_dir.clone()
         };
 
+        let all_secrets = Arc::clone(&all_secrets);
         set.spawn(async move {
             let name = component.name.as_deref().unwrap_or("unknown").to_string();
             let filename = format!("{}.yaml", sanitize(&name));
             let path = target_dir.join(filename);
-            let yaml = to_sorted_yaml(&component).context("Failed to serialize component")?;
+            let mut local_secrets = HashMap::new();
+            let prefix = if is_key { "key" } else { "component" };
+            let yaml = to_sorted_yaml_with_secrets(&component, prefix, &mut local_secrets)
+                .context("Failed to serialize component")?;
+            all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
                 .await
                 .context(format!("Failed to write component {}", name))

@@ -2,6 +2,17 @@ pub mod secrets;
 use anyhow::Context;
 use serde::Serialize;
 
+pub fn to_sorted_yaml_with_secrets<T: Serialize>(
+    value: &T,
+    prefix: &str,
+    secrets: &mut std::collections::HashMap<String, String>,
+) -> anyhow::Result<String> {
+    let mut json_value =
+        serde_json::to_value(value).context("Failed to serialize to JSON value")?;
+    crate::utils::secrets::extract_secrets(&mut json_value, prefix, secrets);
+    serde_yaml::to_string(&json_value).context("Failed to serialize to sorted YAML")
+}
+
 pub fn to_sorted_yaml<T: Serialize>(value: &T) -> anyhow::Result<String> {
     let json_value = serde_json::to_value(value).context("Failed to serialize to JSON value")?;
     serde_yaml::to_string(&json_value).context("Failed to serialize to sorted YAML")

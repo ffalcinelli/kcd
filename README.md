@@ -128,3 +128,34 @@ kcd rotate-keys --yes
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Secret Management
+
+kcd helps securely manage Keycloak secrets (such as client secrets, passwords, or SMTP bind credentials) so they are never stored in plain text in your version-controlled YAML files.
+
+When you run `kcd inspect`, the tool will automatically detect known secret fields using heuristics (`clientSecret`, `password`, `value`, etc.) and replace their plain-text values in the resulting YAML files with environment variable placeholders like `${KEYCLOAK_CLIENT_CLIENTSECRET}`.
+
+Simultaneously, `kcd inspect` aggregates the actual secret values into a single `.env` file located in the output directory. It's recommended to add `.env` to your `.gitignore`.
+
+When executing `kcd plan` or `kcd apply`, kcd parses these placeholders from your YAML files and resolves them by reading your local environment variables. If a required environment variable is missing during execution, the command fails gracefully with a descriptive error.
+
+### Example Secret Workflow
+
+1. Inspect the realm to export the configuration:
+   ```bash
+   kcd inspect --output config/
+   ```
+   This generates your configuration files in `config/` along with a `config/.env` file containing your real secrets.
+
+2. Source the `.env` file to load secrets into your environment:
+   ```bash
+   set -a; source config/.env; set +a
+   ```
+
+3. Make your desired changes to the YAML files. Since the secrets are masked with placeholders (e.g., `${KEYCLOAK_IDP_GOOGLE_CLIENTSECRET}`), it is safe to commit your `config/` directory to source control.
+
+4. Plan and apply your changes (with the secrets loaded in your shell):
+   ```bash
+   kcd plan --input config/
+   kcd apply --input config/
+   ```
