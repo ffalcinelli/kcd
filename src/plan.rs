@@ -145,7 +145,7 @@ async fn plan_client_scopes(
         let existing_scopes = client.get_client_scopes().await?;
         let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
             .into_iter()
-            .filter_map(|s| s.name.clone().map(|n| (n, s)))
+            .filter_map(|mut s| s.name.take().map(|n| (n, s)))
             .collect();
 
         let mut entries = async_fs::read_dir(&scopes_dir).await?;
@@ -162,6 +162,7 @@ async fn plan_client_scopes(
 
                 if let Some(remote) = existing_scopes_map.get(name) {
                     let mut remote_clone = remote.clone();
+                    remote_clone.name = Some(name.to_string());
                     if local_scope.id.is_none() {
                         remote_clone.id = None;
                     }
@@ -192,7 +193,7 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &Path, changes_only: bo
         let existing_groups = client.get_groups().await?;
         let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
             .into_iter()
-            .filter_map(|g| g.name.clone().map(|n| (n, g)))
+            .filter_map(|mut g| g.name.take().map(|n| (n, g)))
             .collect();
 
         let mut entries = async_fs::read_dir(&groups_dir).await?;
@@ -209,6 +210,7 @@ async fn plan_groups(client: &KeycloakClient, input_dir: &Path, changes_only: bo
 
                 if let Some(remote) = existing_groups_map.get(name) {
                     let mut remote_clone = remote.clone();
+                    remote_clone.name = Some(name.to_string());
                     if local_group.id.is_none() {
                         remote_clone.id = None;
                     }
@@ -239,7 +241,7 @@ async fn plan_users(client: &KeycloakClient, input_dir: &Path, changes_only: boo
         let existing_users = client.get_users().await?;
         let existing_users_map: HashMap<String, UserRepresentation> = existing_users
             .into_iter()
-            .filter_map(|u| u.username.clone().map(|n| (n, u)))
+            .filter_map(|mut u| u.username.take().map(|n| (n, u)))
             .collect();
 
         let mut entries = async_fs::read_dir(&users_dir).await?;
@@ -256,6 +258,7 @@ async fn plan_users(client: &KeycloakClient, input_dir: &Path, changes_only: boo
 
                 if let Some(remote) = existing_users_map.get(username) {
                     let mut remote_clone = remote.clone();
+                    remote_clone.username = Some(username.to_string());
                     if local_user.id.is_none() {
                         remote_clone.id = None;
                     }
@@ -290,7 +293,7 @@ async fn plan_authentication_flows(
         let existing_flows = client.get_authentication_flows().await?;
         let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
             .into_iter()
-            .filter_map(|f| f.alias.clone().map(|a| (a, f)))
+            .filter_map(|mut f| f.alias.take().map(|a| (a, f)))
             .collect();
 
         let mut entries = async_fs::read_dir(&flows_dir).await?;
@@ -307,6 +310,7 @@ async fn plan_authentication_flows(
 
                 if let Some(remote) = existing_flows_map.get(alias) {
                     let mut remote_clone = remote.clone();
+                    remote_clone.alias = Some(alias.to_string());
                     if local_flow.id.is_none() {
                         remote_clone.id = None;
                     }
@@ -346,7 +350,7 @@ async fn plan_required_actions(
         let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
             existing_actions
                 .into_iter()
-                .filter_map(|a| a.alias.clone().map(|n| (n, a)))
+                .filter_map(|mut a| a.alias.take().map(|n| (n, a)))
                 .collect();
 
         let mut entries = async_fs::read_dir(&actions_dir).await?;
@@ -363,9 +367,11 @@ async fn plan_required_actions(
                 }
 
                 if let Some(remote) = existing_actions_map.get(alias) {
+                    let mut remote_clone = remote.clone();
+                    remote_clone.alias = Some(alias.to_string());
                     print_diff(
                         &format!("RequiredAction {}", alias),
-                        Some(remote),
+                        Some(&remote_clone),
                         &local_action,
                         changes_only,
                     )?;
@@ -399,7 +405,7 @@ async fn plan_components_or_keys(
         let existing_components = client.get_components().await?;
         let existing_components_map: HashMap<String, ComponentRepresentation> = existing_components
             .into_iter()
-            .filter_map(|c| c.name.clone().map(|n| (n, c)))
+            .filter_map(|mut c| c.name.take().map(|n| (n, c)))
             .collect();
 
         let mut entries = async_fs::read_dir(&components_dir).await?;
@@ -416,6 +422,7 @@ async fn plan_components_or_keys(
 
                 if let Some(remote) = existing_components_map.get(name) {
                     let mut remote_clone = remote.clone();
+                    remote_clone.name = Some(name.to_string());
                     if local_component.id.is_none() {
                         remote_clone.id = None;
                     }
@@ -471,7 +478,7 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &Path, changes_only: boo
         let existing_roles = client.get_roles().await?;
         let existing_roles_map: HashMap<String, RoleRepresentation> = existing_roles
             .into_iter()
-            .map(|r| (r.name.clone(), r))
+            .map(|mut r| (std::mem::take(&mut r.name), r))
             .collect();
 
         let mut entries = async_fs::read_dir(&roles_dir).await?;
@@ -485,6 +492,7 @@ async fn plan_roles(client: &KeycloakClient, input_dir: &Path, changes_only: boo
 
                 if let Some(remote) = remote_role {
                     let mut remote_clone = remote.clone();
+                    remote_clone.name = local_role.name.clone();
                     // Ignore ID differences if local doesn't specify it
                     if local_role.id.is_none() {
                         remote_clone.id = None;
@@ -521,7 +529,7 @@ async fn plan_clients(client: &KeycloakClient, input_dir: &Path, changes_only: b
         let existing_clients = client.get_clients().await?;
         let existing_clients_map: HashMap<String, ClientRepresentation> = existing_clients
             .into_iter()
-            .filter_map(|c| c.client_id.clone().map(|id| (id, c)))
+            .filter_map(|mut c| c.client_id.take().map(|id| (id, c)))
             .collect();
 
         let mut entries = async_fs::read_dir(&clients_dir).await?;
@@ -538,6 +546,7 @@ async fn plan_clients(client: &KeycloakClient, input_dir: &Path, changes_only: b
 
                 if let Some(remote) = existing_clients_map.get(client_id) {
                     let mut remote_clone = remote.clone();
+                    remote_clone.client_id = Some(client_id.to_string());
                     if local_client.id.is_none() {
                         remote_clone.id = None;
                     }
@@ -572,7 +581,7 @@ async fn plan_identity_providers(
         let existing_idps = client.get_identity_providers().await?;
         let existing_idps_map: HashMap<String, IdentityProviderRepresentation> = existing_idps
             .into_iter()
-            .filter_map(|i| i.alias.clone().map(|alias| (alias, i)))
+            .filter_map(|mut i| i.alias.take().map(|alias| (alias, i)))
             .collect();
 
         let mut entries = async_fs::read_dir(&idps_dir).await?;
@@ -589,6 +598,7 @@ async fn plan_identity_providers(
 
                 if let Some(remote) = existing_idps_map.get(alias) {
                     let mut remote_clone = remote.clone();
+                    remote_clone.alias = Some(alias.to_string());
                     if local_idp.internal_id.is_none() {
                         remote_clone.internal_id = None;
                     }
