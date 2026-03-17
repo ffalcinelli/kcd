@@ -42,7 +42,7 @@ async fn rotate_keys_for_realm(client: &KeycloakClient, yes: bool) -> Result<()>
 
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .context("System clock is before UNIX EPOCH")?
         .as_millis() as i64;
     let thirty_days = 30 * 24 * 60 * 60 * 1000;
 
@@ -51,7 +51,7 @@ async fn rotate_keys_for_realm(client: &KeycloakClient, yes: bool) -> Result<()>
     // Rotate keys that are currently ACTIVE
     for key in &keys {
         if key.status.as_deref() == Some("ACTIVE") {
-            let provider_id = key.provider_id.as_deref().unwrap_or("unknown");
+            let provider_id = key.provider_id.as_deref().unwrap_or("<missing providerId>");
 
             // Check if it's near expiration
             let mut should_rotate = false;
@@ -81,7 +81,7 @@ async fn rotate_keys_for_realm(client: &KeycloakClient, yes: bool) -> Result<()>
                         .unwrap_or_else(|| "key".to_string());
                     let timestamp = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
-                        .unwrap()
+                        .context("System clock is before UNIX EPOCH")?
                         .as_secs();
                     new_component.name = Some(format!("{}-rotated-{}", old_name, timestamp));
 
@@ -108,7 +108,10 @@ async fn rotate_keys_for_realm(client: &KeycloakClient, yes: bool) -> Result<()>
                     } else {
                         println!(
                             "Successfully created rotated key component: {}",
-                            new_component.name.as_ref().unwrap()
+                            new_component
+                                .name
+                                .as_deref()
+                                .unwrap_or("<missing component name>")
                         );
                     }
                 } else {
@@ -127,11 +130,11 @@ async fn rotate_keys_for_realm(client: &KeycloakClient, yes: bool) -> Result<()>
         let is_disabled = key.status.as_deref() == Some("DISABLED");
 
         if is_expired || is_disabled {
-            let provider_id = key.provider_id.as_deref().unwrap_or("unknown");
+            let provider_id = key.provider_id.as_deref().unwrap_or("<missing providerId>");
             println!(
                 "Found old key (providerId: {}, status: {}, expired: {})",
                 provider_id,
-                key.status.as_deref().unwrap_or("unknown"),
+                key.status.as_deref().unwrap_or("<missing status>"),
                 is_expired
             );
 
