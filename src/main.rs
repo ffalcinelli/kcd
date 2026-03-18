@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use app::apply;
 use app::args::{Cli, Commands};
+use app::cli as interactive_cli;
 use app::client::KeycloakClient;
 use app::inspect;
 use app::plan;
@@ -63,10 +64,8 @@ async fn main() -> Result<()> {
             println!("Checking drift for Keycloak configuration from {:?}", input);
             plan::run(&client, input.clone(), true, &cli.realms).await?;
         }
-        Commands::RotateKeys { yes } => {
-            let client = init_client(&cli).await?;
-            println!("Rotating keys...");
-            app::rotate_keys::run(&client, *yes, &cli.realms).await?;
+        Commands::Cli { config_dir } => {
+            interactive_cli::run(config_dir.clone()).await?;
         }
     }
 

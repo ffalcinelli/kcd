@@ -68,10 +68,10 @@ pub enum Commands {
         #[arg(long, short, default_value = "config")]
         input: PathBuf,
     },
-    /// Rotate realm keys
-    RotateKeys {
-        /// By pass the question to delete or keep old keys
-        #[arg(long, short)]
-        yes: bool,
+    /// Interactive CLI mode to generate local configuration
+    Cli {
+        /// Base directory for configuration files
+        #[arg(long, short, default_value = "config")]
+        config_dir: PathBuf,
     },
 }

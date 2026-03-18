@@ -114,16 +114,18 @@ Apply the local configuration to the Keycloak server. This will create new resou
 kcd apply --input config/
 ```
 
-### Rotate Keys
-Rotate realm keys by creating new key provider components with incremented priority. It includes an interactive prompt to delete expired or disabled keys.
+### Interactive CLI
+Launch an interactive terminal menu where you can easily perform common Keycloak management tasks. The CLI strictly honors the declarative approach and modifies local YAML configuration files (acting as scaffolding generators), preparing them for `kcd apply`.
 ```bash
-kcd rotate-keys
+kcd cli --config-dir config/
 ```
 
-You can use the `--yes` (or `-y`) flag to bypass the interactive prompt and automatically delete expired or disabled keys.
-```bash
-kcd rotate-keys --yes
-```
+Available Actions:
+- **Create User**: Prompts for user details and generates a `UserRepresentation` YAML file in `config/<realm>/users/`.
+- **Change User Password**: Appends or updates a password credential within a user's local YAML file.
+- **Create Client**: Prompts for Client ID and Public vs. Confidential type, generating the YAML in `config/<realm>/clients/`.
+- **Rotate Keys**: Locally reads Keycloak key components in `config/<realm>/components/`, increments the priority of active key providers, and writes the new YAML files back to disk.
+
 
 ## License
 
