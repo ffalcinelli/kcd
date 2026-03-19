@@ -39,12 +39,18 @@ pub async fn run(
         realm_client.set_target_realm(realm_name.clone());
         let realm_dir = output_dir.join(&realm_name);
         println!("Inspecting realm: {}", realm_name);
-        inspect_realm(&realm_client, realm_dir, Arc::clone(&all_secrets)).await?;
+        inspect_realm(
+            &realm_client,
+            &realm_name,
+            realm_dir,
+            Arc::clone(&all_secrets),
+        )
+        .await?;
     }
 
     let secrets_lock = all_secrets.lock().await;
     if !secrets_lock.is_empty() {
-        let env_path = output_dir.join(".env");
+        let env_path = output_dir.join(".secrets");
         let mut env_content = String::new();
         let mut keys: Vec<&String> = secrets_lock.keys().collect();
         keys.sort();
@@ -65,8 +71,8 @@ pub async fn run(
 
         fs::write(&env_path, format!("{}{}", existing_env, env_content))
             .await
-            .context("Failed to write .env file")?;
-        println!("Exported secrets to .env");
+            .context("Failed to write .secrets file")?;
+        println!("Exported secrets to .secrets");
     }
 
     Ok(())
@@ -74,6 +80,7 @@ pub async fn run(
 
 async fn inspect_realm(
     client: &KeycloakClient,
+    realm_name: &str,
     output_dir: PathBuf,
     all_secrets: Arc<Mutex<HashMap<String, String>>>,
 ) -> Result<()> {
@@ -89,7 +96,8 @@ async fn inspect_realm(
     // Fetch realm
     let realm = client.get_realm().await.context("Failed to fetch realm")?;
     let mut local_secrets = HashMap::new();
-    let realm_yaml = to_sorted_yaml_with_secrets(&realm, "realm", &mut local_secrets)
+    let realm_prefix = format!("realm_{}", realm_name);
+    let realm_yaml = to_sorted_yaml_with_secrets(&realm, &realm_prefix, &mut local_secrets)
         .context("Failed to serialize realm")?;
     all_secrets.lock().await.extend(local_secrets);
     fs::write(output_dir.join("realm.yaml"), realm_yaml)
@@ -115,6 +123,7 @@ async fn inspect_realm(
     for client_rep in clients {
         let clients_dir = clients_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
         set.spawn(async move {
             let name = client_rep
                 .client_id
@@ -124,7 +133,8 @@ async fn inspect_realm(
             let filename = format!("{}.yaml", sanitize(&name));
             let path = clients_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&client_rep, "client", &mut local_secrets)
+            let prefix = format!("realm_{}_client", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&client_rep, &prefix, &mut local_secrets)
                 .context("Failed to serialize client")?;
             all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
@@ -152,12 +162,14 @@ async fn inspect_realm(
     for role in roles {
         let roles_dir = roles_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
         set.spawn(async move {
             let name = &role.name;
             let filename = format!("{}.yaml", sanitize(name));
             let path = roles_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&role, "role", &mut local_secrets)
+            let prefix = format!("realm_{}_role", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&role, &prefix, &mut local_secrets)
                 .context("Failed to serialize role")?;
             all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
@@ -188,12 +200,14 @@ async fn inspect_realm(
     for scope in client_scopes {
         let scopes_dir = scopes_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
         set.spawn(async move {
             let name = scope.name.as_deref().unwrap_or("unknown").to_string();
             let filename = format!("{}.yaml", sanitize(&name));
             let path = scopes_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&scope, "client_scope", &mut local_secrets)
+            let prefix = format!("realm_{}_client_scope", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&scope, &prefix, &mut local_secrets)
                 .context("Failed to serialize client scope")?;
             all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
@@ -205,6 +219,44 @@ async fn inspect_realm(
         res.context("Task panicked")??;
     }
     println!("Exported client scopes to client-scopes/");
+
+    // Fetch identity providers
+    let idps = client
+        .get_identity_providers()
+        .await
+        .context("Failed to fetch identity providers")?;
+    let idps_dir = output_dir.join("identity-providers");
+    if !fs::try_exists(&idps_dir)
+        .await
+        .context("Failed to check identity-providers directory")?
+    {
+        fs::create_dir_all(&idps_dir)
+            .await
+            .context("Failed to create identity-providers directory")?;
+    }
+    let mut set = tokio::task::JoinSet::new();
+    for idp in idps {
+        let idps_dir = idps_dir.clone();
+        let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            let alias = idp.alias.as_deref().unwrap_or("unknown").to_string();
+            let filename = format!("{}.yaml", sanitize(&alias));
+            let path = idps_dir.join(filename);
+            let mut local_secrets = HashMap::new();
+            let prefix = format!("realm_{}_idp", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&idp, &prefix, &mut local_secrets)
+                .context("Failed to serialize identity provider")?;
+            all_secrets.lock().await.extend(local_secrets);
+            fs::write(&path, yaml)
+                .await
+                .context(format!("Failed to write identity provider {}", alias))
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
+    }
+    println!("Exported identity providers to identity-providers/");
 
     // Fetch groups
     let groups = client
@@ -224,12 +276,15 @@ async fn inspect_realm(
     for group in groups {
         let groups_dir = groups_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
         set.spawn(async move {
             let name = group.name.as_deref().unwrap_or("unknown").to_string();
-            let filename = format!("{}.yaml", sanitize(&name));
+            let id = group.id.as_deref().unwrap_or("unknown");
+            let filename = format!("{}-{}.yaml", sanitize(&name), id);
             let path = groups_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&group, "group", &mut local_secrets)
+            let prefix = format!("realm_{}_group", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&group, &prefix, &mut local_secrets)
                 .context("Failed to serialize group")?;
             all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
@@ -257,12 +312,14 @@ async fn inspect_realm(
     for user in users {
         let users_dir = users_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
         set.spawn(async move {
             let username = user.username.as_deref().unwrap_or("unknown").to_string();
             let filename = format!("{}.yaml", sanitize(&username));
             let path = users_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&user, "user", &mut local_secrets)
+            let prefix = format!("realm_{}_user", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&user, &prefix, &mut local_secrets)
                 .context("Failed to serialize user")?;
             all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
@@ -293,12 +350,14 @@ async fn inspect_realm(
     for flow in flows {
         let flows_dir = flows_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
         set.spawn(async move {
             let alias = flow.alias.as_deref().unwrap_or("unknown").to_string();
             let filename = format!("{}.yaml", sanitize(&alias));
             let path = flows_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&flow, "flow", &mut local_secrets)
+            let prefix = format!("realm_{}_flow", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&flow, &prefix, &mut local_secrets)
                 .context("Failed to serialize authentication flow")?;
             all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
@@ -329,12 +388,14 @@ async fn inspect_realm(
     for action in actions {
         let actions_dir = actions_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
         set.spawn(async move {
             let alias = action.alias.as_deref().unwrap_or("unknown").to_string();
             let filename = format!("{}.yaml", sanitize(&alias));
             let path = actions_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&action, "action", &mut local_secrets)
+            let prefix = format!("realm_{}_action", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&action, &prefix, &mut local_secrets)
                 .context("Failed to serialize required action")?;
             all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)
@@ -386,13 +447,16 @@ async fn inspect_realm(
         };
 
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
         set.spawn(async move {
             let name = component.name.as_deref().unwrap_or("unknown").to_string();
-            let filename = format!("{}.yaml", sanitize(&name));
+            let id = component.id.as_deref().unwrap_or("unknown");
+            let filename = format!("{}-{}.yaml", sanitize(&name), id);
             let path = target_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let prefix = if is_key { "key" } else { "component" };
-            let yaml = to_sorted_yaml_with_secrets(&component, prefix, &mut local_secrets)
+            let sub_prefix = if is_key { "key" } else { "component" };
+            let prefix = format!("realm_{}_{}", realm_name, sub_prefix);
+            let yaml = to_sorted_yaml_with_secrets(&component, &prefix, &mut local_secrets)
                 .context("Failed to serialize component")?;
             all_secrets.lock().await.extend(local_secrets);
             fs::write(&path, yaml)

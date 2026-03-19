@@ -49,6 +49,10 @@ pub async fn start_mock_server() -> String {
             axum::routing::get(get_client_scopes_handler).post(generic_handler),
         )
         .route(
+            "/admin/realms/{realm}/identity-provider/instances",
+            axum::routing::get(get_idps_handler).post(generic_handler),
+        )
+        .route(
             "/admin/realms/{realm}/groups",
             axum::routing::get(get_groups_handler).post(generic_handler),
         )
@@ -188,6 +192,21 @@ async fn get_client_scopes_handler(
             StatusCode::OK,
             Json(serde_json::json!([
                 { "id": "scope1", "name": "scope-1", "protocol": "openid-connect" }
+            ])),
+        )
+    } else {
+        (StatusCode::NOT_FOUND, Json(serde_json::json!([])))
+    }
+}
+
+async fn get_idps_handler(
+    axum::extract::Path(realm): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    if realm == "test-realm" {
+        (
+            StatusCode::OK,
+            Json(serde_json::json!([
+                { "alias": "google", "providerId": "google", "enabled": true }
             ])),
         )
     } else {

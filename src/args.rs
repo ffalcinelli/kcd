@@ -74,4 +74,14 @@ pub enum Commands {
         #[arg(long, short, default_value = "config")]
         config_dir: PathBuf,
     },
+    /// Clean the local configuration files
+    Clean {
+        /// Output directory containing configuration files
+        #[arg(long, short, default_value = "config")]
+        output: PathBuf,
+
+        /// Skip confirmation prompt
+        #[arg(long, short = 'y', default_value = "false")]
+        yes: bool,
+    },
 }

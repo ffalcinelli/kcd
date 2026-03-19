@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use app::apply;
 use app::args::{Cli, Commands};
+use app::clean;
 use app::cli as interactive_cli;
 use app::client::KeycloakClient;
 use app::inspect;
@@ -25,6 +26,7 @@ async fn init_client(cli: &Cli) -> Result<KeycloakClient> {
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
+    dotenvy::from_filename(".secrets").ok();
     env_logger::init();
 
     let mut cli = Cli::parse();
@@ -66,6 +68,9 @@ async fn main() -> Result<()> {
         }
         Commands::Cli { config_dir } => {
             interactive_cli::run(config_dir.clone()).await?;
+        }
+        Commands::Clean { output, yes } => {
+            clean::run(output.clone(), *yes, &cli.realms).await?;
         }
     }
 

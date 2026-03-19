@@ -1,8 +1,10 @@
 use crate::models::{
-    ClientRepresentation, ComponentRepresentation, CredentialRepresentation, UserRepresentation,
+    ClientRepresentation, ClientScopeRepresentation, ComponentRepresentation,
+    CredentialRepresentation, GroupRepresentation, IdentityProviderRepresentation,
+    RoleRepresentation, UserRepresentation,
 };
 use anyhow::{Context, Result};
-use dialoguer::{Confirm, Input, Password, Select, theme::ColorfulTheme};
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -15,6 +17,10 @@ pub async fn run(config_dir: PathBuf) -> Result<()> {
         "Create User",
         "Change User Password",
         "Create Client",
+        "Create Role",
+        "Create Group",
+        "Create Identity Provider",
+        "Create Client Scope",
         "Rotate Keys",
         "Exit",
     ];
@@ -43,17 +49,283 @@ pub async fn run(config_dir: PathBuf) -> Result<()> {
                 }
             }
             3 => {
+                if let Err(e) = create_role_interactive(&config_dir).await {
+                    println!("Error creating role: {}", e);
+                }
+            }
+            4 => {
+                if let Err(e) = create_group_interactive(&config_dir).await {
+                    println!("Error creating group: {}", e);
+                }
+            }
+            5 => {
+                if let Err(e) = create_idp_interactive(&config_dir).await {
+                    println!("Error creating IDP: {}", e);
+                }
+            }
+            6 => {
+                if let Err(e) = create_client_scope_interactive(&config_dir).await {
+                    println!("Error creating client scope: {}", e);
+                }
+            }
+            7 => {
                 if let Err(e) = rotate_keys_interactive(&config_dir).await {
                     println!("Error rotating keys: {}", e);
                 }
             }
-            4 => {
+            8 => {
                 println!("Exiting...");
                 break;
             }
             _ => unreachable!(),
         }
     }
+
+    Ok(())
+}
+
+async fn create_role_interactive(config_dir: &Path) -> Result<()> {
+    let theme = ColorfulTheme::default();
+
+    let realm: String = Input::with_theme(&theme)
+        .with_prompt("Target Realm")
+        .interact_text()?;
+
+    let name: String = Input::with_theme(&theme)
+        .with_prompt("Role Name")
+        .interact_text()?;
+
+    let description: String = Input::with_theme(&theme)
+        .with_prompt("Description")
+        .allow_empty(true)
+        .interact_text()?;
+
+    let is_client_role = Confirm::with_theme(&theme)
+        .with_prompt("Is this a client role?")
+        .default(false)
+        .interact()?;
+
+    let client_id = if is_client_role {
+        let id: String = Input::with_theme(&theme)
+            .with_prompt("Client ID")
+            .interact_text()?;
+        Some(id)
+    } else {
+        None
+    };
+
+    let description_opt = if description.is_empty() {
+        None
+    } else {
+        Some(description)
+    };
+
+    create_role_yaml(config_dir, &realm, &name, description_opt, client_id).await?;
+
+    println!(
+        "Successfully generated YAML for role '{}' in realm '{}'.",
+        name, realm
+    );
+    Ok(())
+}
+
+pub async fn create_role_yaml(
+    config_dir: &Path,
+    realm: &str,
+    name: &str,
+    description: Option<String>,
+    client_id: Option<String>,
+) -> Result<()> {
+    let role = RoleRepresentation {
+        id: None,
+        name: name.to_string(),
+        description,
+        container_id: None,
+        composite: false,
+        client_role: client_id.is_some(),
+        extra: HashMap::new(),
+    };
+
+    let realm_dir = config_dir.join(realm);
+    let roles_dir = if let Some(cid) = &client_id {
+        realm_dir.join("clients").join(cid).join("roles")
+    } else {
+        realm_dir.join("roles")
+    };
+
+    fs::create_dir_all(&roles_dir)
+        .await
+        .context("Failed to create roles directory")?;
+
+    let file_path = roles_dir.join(format!("{}.yaml", name));
+    let yaml = serde_yaml::to_string(&role).context("Failed to serialize role to YAML")?;
+
+    fs::write(&file_path, yaml)
+        .await
+        .context("Failed to write role YAML file")?;
+
+    Ok(())
+}
+
+async fn create_group_interactive(config_dir: &Path) -> Result<()> {
+    let theme = ColorfulTheme::default();
+
+    let realm: String = Input::with_theme(&theme)
+        .with_prompt("Target Realm")
+        .interact_text()?;
+
+    let name: String = Input::with_theme(&theme)
+        .with_prompt("Group Name")
+        .interact_text()?;
+
+    create_group_yaml(config_dir, &realm, &name).await?;
+
+    println!(
+        "Successfully generated YAML for group '{}' in realm '{}'.",
+        name, realm
+    );
+    Ok(())
+}
+
+pub async fn create_group_yaml(config_dir: &Path, realm: &str, name: &str) -> Result<()> {
+    let group = GroupRepresentation {
+        id: None,
+        name: Some(name.to_string()),
+        path: None,
+        sub_groups: None,
+        extra: HashMap::new(),
+    };
+
+    let groups_dir = config_dir.join(realm).join("groups");
+    fs::create_dir_all(&groups_dir)
+        .await
+        .context("Failed to create groups directory")?;
+
+    let file_path = groups_dir.join(format!("{}.yaml", name));
+    let yaml = serde_yaml::to_string(&group).context("Failed to serialize group to YAML")?;
+
+    fs::write(&file_path, yaml)
+        .await
+        .context("Failed to write group YAML file")?;
+
+    Ok(())
+}
+
+async fn create_idp_interactive(config_dir: &Path) -> Result<()> {
+    let theme = ColorfulTheme::default();
+
+    let realm: String = Input::with_theme(&theme)
+        .with_prompt("Target Realm")
+        .interact_text()?;
+
+    let alias: String = Input::with_theme(&theme)
+        .with_prompt("Alias (e.g., google)")
+        .interact_text()?;
+
+    let provider_id: String = Input::with_theme(&theme)
+        .with_prompt("Provider ID (e.g., google, github, oidc)")
+        .default(alias.clone())
+        .interact_text()?;
+
+    create_idp_yaml(config_dir, &realm, &alias, &provider_id).await?;
+
+    println!(
+        "Successfully generated YAML for Identity Provider '{}' in realm '{}'.",
+        alias, realm
+    );
+    Ok(())
+}
+
+pub async fn create_idp_yaml(
+    config_dir: &Path,
+    realm: &str,
+    alias: &str,
+    provider_id: &str,
+) -> Result<()> {
+    let idp = IdentityProviderRepresentation {
+        internal_id: None,
+        alias: Some(alias.to_string()),
+        provider_id: Some(provider_id.to_string()),
+        enabled: Some(true),
+        update_profile_first_login_mode: Some("on".to_string()),
+        trust_email: Some(false),
+        store_token: Some(false),
+        add_read_token_role_on_create: Some(false),
+        authenticate_by_default: Some(false),
+        link_only: Some(false),
+        first_broker_login_flow_alias: Some("first broker login".to_string()),
+        post_broker_login_flow_alias: None,
+        display_name: Some(alias.to_string()),
+        config: Some(HashMap::new()),
+        extra: HashMap::new(),
+    };
+
+    let idp_dir = config_dir.join(realm).join("identity-providers");
+    fs::create_dir_all(&idp_dir)
+        .await
+        .context("Failed to create identity-providers directory")?;
+
+    let file_path = idp_dir.join(format!("{}.yaml", alias));
+    let yaml = serde_yaml::to_string(&idp).context("Failed to serialize IDP to YAML")?;
+
+    fs::write(&file_path, yaml)
+        .await
+        .context("Failed to write IDP YAML file")?;
+
+    Ok(())
+}
+
+async fn create_client_scope_interactive(config_dir: &Path) -> Result<()> {
+    let theme = ColorfulTheme::default();
+
+    let realm: String = Input::with_theme(&theme)
+        .with_prompt("Target Realm")
+        .interact_text()?;
+
+    let name: String = Input::with_theme(&theme)
+        .with_prompt("Scope Name")
+        .interact_text()?;
+
+    let protocol: String = Input::with_theme(&theme)
+        .with_prompt("Protocol")
+        .default("openid-connect".to_string())
+        .interact_text()?;
+
+    create_client_scope_yaml(config_dir, &realm, &name, &protocol).await?;
+
+    println!(
+        "Successfully generated YAML for client scope '{}' in realm '{}'.",
+        name, realm
+    );
+    Ok(())
+}
+
+pub async fn create_client_scope_yaml(
+    config_dir: &Path,
+    realm: &str,
+    name: &str,
+    protocol: &str,
+) -> Result<()> {
+    let scope = ClientScopeRepresentation {
+        id: None,
+        name: Some(name.to_string()),
+        description: None,
+        protocol: Some(protocol.to_string()),
+        attributes: Some(HashMap::new()),
+        extra: HashMap::new(),
+    };
+
+    let scopes_dir = config_dir.join(realm).join("client-scopes");
+    fs::create_dir_all(&scopes_dir)
+        .await
+        .context("Failed to create client-scopes directory")?;
+
+    let file_path = scopes_dir.join(format!("{}.yaml", name));
+    let yaml = serde_yaml::to_string(&scope).context("Failed to serialize client scope to YAML")?;
+
+    fs::write(&file_path, yaml)
+        .await
+        .context("Failed to write client scope YAML file")?;
 
     Ok(())
 }
@@ -239,6 +511,83 @@ mod tests {
         assert_eq!(client.client_id.as_deref(), Some("testclient"));
         assert_eq!(client.public_client, Some(true));
         assert_eq!(client.service_accounts_enabled, Some(false));
+    }
+
+    #[tokio::test]
+    async fn test_create_role_yaml() {
+        let dir = tempdir().unwrap();
+        let config_dir = dir.path();
+
+        // Realm role
+        create_role_yaml(config_dir, "master", "admin", Some("desc".to_string()), None)
+            .await
+            .unwrap();
+        let realm_role_path = config_dir.join("master").join("roles").join("admin.yaml");
+        assert!(realm_role_path.exists());
+        let content = fs::read_to_string(&realm_role_path).await.unwrap();
+        let role: RoleRepresentation = serde_yaml::from_str(&content).unwrap();
+        assert_eq!(role.name, "admin");
+        assert_eq!(role.client_role, false);
+
+        // Client role
+        create_role_yaml(
+            config_dir,
+            "master",
+            "editor",
+            None,
+            Some("my-client".to_string()),
+        )
+        .await
+        .unwrap();
+        let client_role_path = config_dir
+            .join("master")
+            .join("clients")
+            .join("my-client")
+            .join("roles")
+            .join("editor.yaml");
+        assert!(client_role_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_create_group_yaml() {
+        let dir = tempdir().unwrap();
+        let config_dir = dir.path();
+
+        create_group_yaml(config_dir, "master", "my-group")
+            .await
+            .unwrap();
+        let file_path = config_dir.join("master").join("groups").join("my-group.yaml");
+        assert!(file_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_create_idp_yaml() {
+        let dir = tempdir().unwrap();
+        let config_dir = dir.path();
+
+        create_idp_yaml(config_dir, "master", "google", "google")
+            .await
+            .unwrap();
+        let file_path = config_dir
+            .join("master")
+            .join("identity-providers")
+            .join("google.yaml");
+        assert!(file_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_create_client_scope_yaml() {
+        let dir = tempdir().unwrap();
+        let config_dir = dir.path();
+
+        create_client_scope_yaml(config_dir, "master", "my-scope", "openid-connect")
+            .await
+            .unwrap();
+        let file_path = config_dir
+            .join("master")
+            .join("client-scopes")
+            .join("my-scope.yaml");
+        assert!(file_path.exists());
     }
 
     #[tokio::test]

@@ -6,7 +6,7 @@ use crate::models::{
     UserRepresentation,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use console::{Emoji, Style};
 use serde::Serialize;
 use similar::{ChangeTag, TextDiff};
@@ -22,10 +22,17 @@ pub async fn run(
     changes_only: bool,
     realms_to_plan: &[String],
 ) -> Result<()> {
-    let env_vars = Arc::new(env::vars().collect::<HashMap<String, String>>());
     if !input_dir.exists() {
         anyhow::bail!("Input directory {:?} does not exist", input_dir);
     }
+
+    // Load .secrets from input directory if it exists
+    let env_path = input_dir.join(".secrets");
+    if env_path.exists() {
+        dotenvy::from_path(&env_path).ok();
+    }
+
+    let env_vars = Arc::new(env::vars().collect::<HashMap<String, String>>());
 
     let realms = if realms_to_plan.is_empty() {
         let mut dirs = Vec::new();
@@ -127,19 +134,18 @@ fn print_diff<T: Serialize>(
     old: Option<&T>,
     new: &T,
     changes_only: bool,
-    env_vars: Arc<HashMap<String, String>>,
+    prefix: &str,
 ) -> Result<()> {
     let old_yaml = if let Some(o) = old {
         let mut val = serde_json::to_value(o)?;
-        obfuscate_secrets(&mut val);
+        obfuscate_secrets(&mut val, prefix);
         crate::utils::to_sorted_yaml(&val)?
     } else {
         String::new()
     };
 
     let mut new_val = serde_json::to_value(new)?;
-    substitute_secrets(&mut new_val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
-    obfuscate_secrets(&mut new_val);
+    obfuscate_secrets(&mut new_val, prefix);
     let new_yaml = crate::utils::to_sorted_yaml(&new_val)?;
 
     let diff = TextDiff::from_lines(&old_yaml, &new_yaml);
@@ -179,7 +185,11 @@ async fn plan_client_scopes(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_scope: ClientScopeRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_scope: ClientScopeRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
                 let name = local_scope.name.as_deref().unwrap_or("");
 
                 if name.is_empty() {
@@ -197,7 +207,7 @@ async fn plan_client_scopes(
                         Some(&remote_clone),
                         &local_scope,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "client_scope",
                     )?;
                 } else {
                     println!("\n{} Will create ClientScope: {}", Emoji("✨", ""), name);
@@ -206,7 +216,7 @@ async fn plan_client_scopes(
                         None::<&ClientScopeRepresentation>,
                         &local_scope,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "client_scope",
                     )?;
                 }
             }
@@ -234,7 +244,11 @@ async fn plan_groups(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_group: GroupRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_group: GroupRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
                 let name = local_group.name.as_deref().unwrap_or("");
 
                 if name.is_empty() {
@@ -252,7 +266,7 @@ async fn plan_groups(
                         Some(&remote_clone),
                         &local_group,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "group",
                     )?;
                 } else {
                     println!("\n{} Will create Group: {}", Emoji("✨", ""), name);
@@ -261,7 +275,7 @@ async fn plan_groups(
                         None::<&GroupRepresentation>,
                         &local_group,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "group",
                     )?;
                 }
             }
@@ -289,7 +303,11 @@ async fn plan_users(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_user: UserRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_user: UserRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
                 let username = local_user.username.as_deref().unwrap_or("");
 
                 if username.is_empty() {
@@ -307,7 +325,7 @@ async fn plan_users(
                         Some(&remote_clone),
                         &local_user,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "user",
                     )?;
                 } else {
                     println!("\n{} Will create User: {}", Emoji("✨", ""), username);
@@ -316,7 +334,7 @@ async fn plan_users(
                         None::<&UserRepresentation>,
                         &local_user,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "user",
                     )?;
                 }
             }
@@ -344,7 +362,11 @@ async fn plan_authentication_flows(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_flow: AuthenticationFlowRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_flow: AuthenticationFlowRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
                 let alias = local_flow.alias.as_deref().unwrap_or("");
 
                 if alias.is_empty() {
@@ -362,7 +384,7 @@ async fn plan_authentication_flows(
                         Some(&remote_clone),
                         &local_flow,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "flow",
                     )?;
                 } else {
                     println!(
@@ -375,7 +397,7 @@ async fn plan_authentication_flows(
                         None::<&AuthenticationFlowRepresentation>,
                         &local_flow,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "flow",
                     )?;
                 }
             }
@@ -404,8 +426,11 @@ async fn plan_required_actions(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_action: RequiredActionProviderRepresentation =
-                    serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_action: RequiredActionProviderRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
                 let alias = local_action.alias.as_deref().unwrap_or("");
 
                 if alias.is_empty() {
@@ -420,7 +445,7 @@ async fn plan_required_actions(
                         Some(&remote_clone),
                         &local_action,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "action",
                     )?;
                 } else {
                     println!(
@@ -433,7 +458,7 @@ async fn plan_required_actions(
                         None::<&RequiredActionProviderRepresentation>,
                         &local_action,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "action",
                     )?;
                 }
             }
@@ -462,7 +487,11 @@ async fn plan_components_or_keys(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_component: ComponentRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_component: ComponentRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
                 let name = local_component.name.as_deref().unwrap_or("");
 
                 if name.is_empty() {
@@ -475,21 +504,23 @@ async fn plan_components_or_keys(
                     if local_component.id.is_none() {
                         remote_clone.id = None;
                     }
+                    let prefix = if dir_name == "keys" { "key" } else { "component" };
                     print_diff(
                         &format!("Component {}", name),
                         Some(&remote_clone),
                         &local_component,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        prefix,
                     )?;
                 } else {
                     println!("\n{} Will create Component: {}", Emoji("✨", ""), name);
+                    let prefix = if dir_name == "keys" { "key" } else { "component" };
                     print_diff(
                         &format!("Component {}", name),
                         None::<&ComponentRepresentation>,
                         &local_component,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        prefix,
                     )?;
                 }
             }
@@ -507,7 +538,11 @@ async fn plan_realm(
     let realm_path = input_dir.join("realm.yaml");
     if async_fs::try_exists(&realm_path).await? {
         let content = async_fs::read_to_string(&realm_path).await?;
-        let local_realm: RealmRepresentation = serde_yaml::from_str(&content)?;
+        let mut val: serde_json::Value = serde_yaml::from_str(&content)
+            .with_context(|| format!("Failed to parse YAML file: {:?}", realm_path))?;
+        substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+        let local_realm: RealmRepresentation = serde_json::from_value(val)
+            .with_context(|| format!("Failed to deserialize YAML file: {:?}", realm_path))?;
 
         // We handle the case where remote realm fetch might fail (e.g. if we are creating it)
         // by treating it as None (creation). However, usually plan is run against existing realm.
@@ -528,7 +563,7 @@ async fn plan_realm(
             remote_realm.as_ref(),
             &local_realm,
             changes_only,
-            Arc::clone(&env_vars),
+            "realm",
         )?;
     }
     Ok(())
@@ -553,7 +588,11 @@ async fn plan_roles(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_role: RoleRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_role: RoleRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
 
                 let remote_role = existing_roles_map.get(&local_role.name);
 
@@ -570,7 +609,7 @@ async fn plan_roles(
                         Some(&remote_clone),
                         &local_role,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "role",
                     )?;
                 } else {
                     println!(
@@ -583,7 +622,7 @@ async fn plan_roles(
                         None::<&RoleRepresentation>,
                         &local_role,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "role",
                     )?;
                 }
             }
@@ -611,7 +650,11 @@ async fn plan_clients(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_client: ClientRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_client: ClientRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
                 let client_id = local_client.client_id.as_deref().unwrap_or("");
 
                 if client_id.is_empty() {
@@ -629,7 +672,7 @@ async fn plan_clients(
                         Some(&remote_clone),
                         &local_client,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "client",
                     )?;
                 } else {
                     println!("\n{} Will create Client: {}", Emoji("✨", ""), client_id);
@@ -638,7 +681,7 @@ async fn plan_clients(
                         None::<&ClientRepresentation>,
                         &local_client,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "client",
                     )?;
                 }
             }
@@ -666,7 +709,11 @@ async fn plan_identity_providers(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_idp: IdentityProviderRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_idp: IdentityProviderRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
                 let alias = local_idp.alias.as_deref().unwrap_or("");
 
                 if alias.is_empty() {
@@ -684,7 +731,7 @@ async fn plan_identity_providers(
                         Some(&remote_clone),
                         &local_idp,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "idp",
                     )?;
                 } else {
                     println!(
@@ -697,7 +744,7 @@ async fn plan_identity_providers(
                         None::<&IdentityProviderRepresentation>,
                         &local_idp,
                         changes_only,
-                        Arc::clone(&env_vars),
+                        "idp",
                     )?;
                 }
             }

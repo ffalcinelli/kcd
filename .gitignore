@@ -26,4 +26,6 @@ target
 /target
 perf_test/
 .env
+.secrets
 config
+config/.secrets

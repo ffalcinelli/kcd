@@ -40,7 +40,7 @@ A CLI tool to manage Keycloak configurations using local YAML files. It allows y
 
 ## Configuration
 
-The tool uses environment variables for authentication and connection details. You can set these in your shell or use a `.env` file in the project root.
+The tool uses environment variables for authentication and connection details. You can set these in your shell or use a `.secrets` file in the project root.
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
@@ -137,7 +137,7 @@ kcd helps securely manage Keycloak secrets (such as client secrets, passwords, o
 
 When you run `kcd inspect`, the tool will automatically detect known secret fields using heuristics (`clientSecret`, `password`, `value`, etc.) and replace their plain-text values in the resulting YAML files with environment variable placeholders like `${KEYCLOAK_CLIENT_CLIENTSECRET}`.
 
-Simultaneously, `kcd inspect` aggregates the actual secret values into a single `.env` file located in the output directory. It's recommended to add `.env` to your `.gitignore`.
+Simultaneously, `kcd inspect` aggregates the actual secret values into a single `.secrets` file located in the output directory. It's recommended to add `.secrets` to your `.gitignore`.
 
 When executing `kcd plan` or `kcd apply`, kcd parses these placeholders from your YAML files and resolves them by reading your local environment variables. If a required environment variable is missing during execution, the command fails gracefully with a descriptive error.
 
@@ -147,11 +147,11 @@ When executing `kcd plan` or `kcd apply`, kcd parses these placeholders from you
    ```bash
    kcd inspect --output config/
    ```
-   This generates your configuration files in `config/` along with a `config/.env` file containing your real secrets.
+   This generates your configuration files in `config/` along with a `config/.secrets` file containing your real secrets.
 
-2. Source the `.env` file to load secrets into your environment:
+2. Source the `.secrets` file to load secrets into your environment:
    ```bash
-   set -a; source config/.env; set +a
+   set -a; source config/.secrets; set +a
    ```
 
 3. Make your desired changes to the YAML files. Since the secrets are masked with placeholders (e.g., `${KEYCLOAK_IDP_GOOGLE_CLIENTSECRET}`), it is safe to commit your `config/` directory to source control.

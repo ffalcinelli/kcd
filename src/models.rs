@@ -5,8 +5,9 @@ use std::collections::HashMap;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RealmRepresentation {
     pub realm: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
-    #[serde(rename = "displayName")]
+    #[serde(rename = "displayName", skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -196,30 +197,45 @@ mod tests {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IdentityProviderRepresentation {
-    #[serde(rename = "internalId")]
+    #[serde(rename = "internalId", skip_serializing_if = "Option::is_none")]
     pub internal_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
-    #[serde(rename = "providerId")]
+    #[serde(rename = "providerId", skip_serializing_if = "Option::is_none")]
     pub provider_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
-    #[serde(rename = "updateProfileFirstLoginMode")]
+    #[serde(
+        rename = "updateProfileFirstLoginMode",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub update_profile_first_login_mode: Option<String>,
-    #[serde(rename = "trustEmail")]
+    #[serde(rename = "trustEmail", skip_serializing_if = "Option::is_none")]
     pub trust_email: Option<bool>,
-    #[serde(rename = "storeToken")]
+    #[serde(rename = "storeToken", skip_serializing_if = "Option::is_none")]
     pub store_token: Option<bool>,
-    #[serde(rename = "addReadTokenRoleOnCreate")]
+    #[serde(
+        rename = "addReadTokenRoleOnCreate",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub add_read_token_role_on_create: Option<bool>,
-    #[serde(rename = "authenticateByDefault")]
+    #[serde(rename = "authenticateByDefault", skip_serializing_if = "Option::is_none")]
     pub authenticate_by_default: Option<bool>,
-    #[serde(rename = "linkOnly")]
+    #[serde(rename = "linkOnly", skip_serializing_if = "Option::is_none")]
     pub link_only: Option<bool>,
-    #[serde(rename = "firstBrokerLoginFlowAlias")]
+    #[serde(
+        rename = "firstBrokerLoginFlowAlias",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub first_broker_login_flow_alias: Option<String>,
-    #[serde(rename = "postBrokerLoginFlowAlias")]
+    #[serde(
+        rename = "postBrokerLoginFlowAlias",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub post_broker_login_flow_alias: Option<String>,
-    #[serde(rename = "displayName")]
+    #[serde(rename = "displayName", skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub config: Option<HashMap<String, String>>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -227,22 +243,27 @@ pub struct IdentityProviderRepresentation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClientRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    #[serde(rename = "clientId")]
+    #[serde(rename = "clientId", skip_serializing_if = "Option::is_none")]
     pub client_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub protocol: Option<String>,
-    #[serde(rename = "redirectUris")]
+    #[serde(rename = "redirectUris", skip_serializing_if = "Option::is_none")]
     pub redirect_uris: Option<Vec<String>>,
-    #[serde(rename = "webOrigins")]
+    #[serde(rename = "webOrigins", skip_serializing_if = "Option::is_none")]
     pub web_origins: Option<Vec<String>>,
-    #[serde(rename = "publicClient")]
+    #[serde(rename = "publicClient", skip_serializing_if = "Option::is_none")]
     pub public_client: Option<bool>,
-    #[serde(rename = "bearerOnly")]
+    #[serde(rename = "bearerOnly", skip_serializing_if = "Option::is_none")]
     pub bearer_only: Option<bool>,
-    #[serde(rename = "serviceAccountsEnabled")]
+    #[serde(rename = "serviceAccountsEnabled", skip_serializing_if = "Option::is_none")]
     pub service_accounts_enabled: Option<bool>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -250,10 +271,12 @@ pub struct ClientRepresentation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RoleRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    #[serde(rename = "containerId")]
+    #[serde(rename = "containerId", skip_serializing_if = "Option::is_none")]
     pub container_id: Option<String>,
     #[serde(default)]
     pub composite: bool,
@@ -265,10 +288,15 @@ pub struct RoleRepresentation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClientScopeRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub protocol: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub attributes: Option<HashMap<String, String>>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -276,10 +304,13 @@ pub struct ClientScopeRepresentation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GroupRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
-    #[serde(rename = "subGroups")]
+    #[serde(rename = "subGroups", skip_serializing_if = "Option::is_none")]
     pub sub_groups: Option<Vec<GroupRepresentation>>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -287,10 +318,13 @@ pub struct GroupRepresentation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CredentialRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    #[serde(rename = "type")]
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub type_: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub temporary: Option<bool>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -298,16 +332,21 @@ pub struct CredentialRepresentation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UserRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
-    #[serde(rename = "firstName")]
+    #[serde(rename = "firstName", skip_serializing_if = "Option::is_none")]
     pub first_name: Option<String>,
-    #[serde(rename = "lastName")]
+    #[serde(rename = "lastName", skip_serializing_if = "Option::is_none")]
     pub last_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
-    #[serde(rename = "emailVerified")]
+    #[serde(rename = "emailVerified", skip_serializing_if = "Option::is_none")]
     pub email_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub credentials: Option<Vec<CredentialRepresentation>>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -315,16 +354,19 @@ pub struct UserRepresentation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AuthenticationExecutionExportRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub authenticator: Option<String>,
-    #[serde(rename = "authenticatorConfig")]
+    #[serde(rename = "authenticatorConfig", skip_serializing_if = "Option::is_none")]
     pub authenticator_config: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub requirement: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<i32>,
-    #[serde(rename = "authenticatorFlow")]
+    #[serde(rename = "authenticatorFlow", skip_serializing_if = "Option::is_none")]
     pub authenticator_flow: Option<bool>,
-    #[serde(rename = "flowAlias")]
+    #[serde(rename = "flowAlias", skip_serializing_if = "Option::is_none")]
     pub flow_alias: Option<String>,
-    #[serde(rename = "userSetupAllowed")]
+    #[serde(rename = "userSetupAllowed", skip_serializing_if = "Option::is_none")]
     pub user_setup_allowed: Option<bool>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -332,16 +374,22 @@ pub struct AuthenticationExecutionExportRepresentation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AuthenticationFlowRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    #[serde(rename = "providerId")]
+    #[serde(rename = "providerId", skip_serializing_if = "Option::is_none")]
     pub provider_id: Option<String>,
-    #[serde(rename = "topLevel")]
+    #[serde(rename = "topLevel", skip_serializing_if = "Option::is_none")]
     pub top_level: Option<bool>,
-    #[serde(rename = "builtIn")]
+    #[serde(rename = "builtIn", skip_serializing_if = "Option::is_none")]
     pub built_in: Option<bool>,
-    #[serde(rename = "authenticationExecutions")]
+    #[serde(
+        rename = "authenticationExecutions",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub authentication_executions: Option<Vec<AuthenticationExecutionExportRepresentation>>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -349,14 +397,19 @@ pub struct AuthenticationFlowRepresentation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RequiredActionProviderRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(rename = "providerId")]
+    #[serde(rename = "providerId", skip_serializing_if = "Option::is_none")]
     pub provider_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
-    #[serde(rename = "defaultAction")]
+    #[serde(rename = "defaultAction", skip_serializing_if = "Option::is_none")]
     pub default_action: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub config: Option<HashMap<String, String>>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -364,16 +417,19 @@ pub struct RequiredActionProviderRepresentation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ComponentRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(rename = "providerId")]
+    #[serde(rename = "providerId", skip_serializing_if = "Option::is_none")]
     pub provider_id: Option<String>,
-    #[serde(rename = "providerType")]
+    #[serde(rename = "providerType", skip_serializing_if = "Option::is_none")]
     pub provider_type: Option<String>,
-    #[serde(rename = "parentId")]
+    #[serde(rename = "parentId", skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<String>,
-    #[serde(rename = "subType")]
+    #[serde(rename = "subType", skip_serializing_if = "Option::is_none")]
     pub sub_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub config: Option<HashMap<String, Value>>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
