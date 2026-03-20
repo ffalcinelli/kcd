@@ -39,6 +39,10 @@ pub enum Commands {
         /// Output directory for configuration files
         #[arg(long, short, default_value = "config")]
         output: PathBuf,
+
+        /// Skip confirmation prompt when overwriting local files
+        #[arg(long, short = 'y', default_value = "false")]
+        yes: bool,
     },
     /// Validate the local Keycloak configuration files
     Validate {

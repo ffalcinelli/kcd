@@ -18,7 +18,7 @@ async fn test_inspect() {
     let dir = tempdir().unwrap();
     let output_dir = dir.path().to_path_buf();
 
-    inspect::run(&client, output_dir.clone(), &["test-realm".to_string()])
+    inspect::run(&client, output_dir.clone(), &["test-realm".to_string()], true)
         .await
         .expect("Inspect failed");
 

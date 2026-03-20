@@ -2,6 +2,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+pub trait KeycloakResource {
+    fn get_identity(&self) -> Option<String>;
+    fn get_name(&self) -> String;
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RealmRepresentation {
     pub realm: String,
@@ -11,6 +16,364 @@ pub struct RealmRepresentation {
     pub display_name: Option<String>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
+}
+
+impl KeycloakResource for RealmRepresentation {
+    fn get_identity(&self) -> Option<String> {
+        Some(self.realm.clone())
+    }
+    fn get_name(&self) -> String {
+        self.realm.clone()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IdentityProviderRepresentation {
+    #[serde(rename = "internalId", skip_serializing_if = "Option::is_none")]
+    pub internal_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+    #[serde(rename = "providerId", skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(
+        rename = "updateProfileFirstLoginMode",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub update_profile_first_login_mode: Option<String>,
+    #[serde(rename = "trustEmail", skip_serializing_if = "Option::is_none")]
+    pub trust_email: Option<bool>,
+    #[serde(rename = "storeToken", skip_serializing_if = "Option::is_none")]
+    pub store_token: Option<bool>,
+    #[serde(
+        rename = "addReadTokenRoleOnCreate",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub add_read_token_role_on_create: Option<bool>,
+    #[serde(rename = "authenticateByDefault", skip_serializing_if = "Option::is_none")]
+    pub authenticate_by_default: Option<bool>,
+    #[serde(rename = "linkOnly", skip_serializing_if = "Option::is_none")]
+    pub link_only: Option<bool>,
+    #[serde(
+        rename = "firstBrokerLoginFlowAlias",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub first_broker_login_flow_alias: Option<String>,
+    #[serde(
+        rename = "postBrokerLoginFlowAlias",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub post_broker_login_flow_alias: Option<String>,
+    #[serde(rename = "displayName", skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<HashMap<String, String>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+impl KeycloakResource for IdentityProviderRepresentation {
+    fn get_identity(&self) -> Option<String> {
+        self.alias.clone().or_else(|| self.internal_id.clone())
+    }
+    fn get_name(&self) -> String {
+        self.alias.clone().unwrap_or_else(|| "unknown".to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ClientRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(rename = "clientId", skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
+    #[serde(rename = "redirectUris", skip_serializing_if = "Option::is_none")]
+    pub redirect_uris: Option<Vec<String>>,
+    #[serde(rename = "webOrigins", skip_serializing_if = "Option::is_none")]
+    pub web_origins: Option<Vec<String>>,
+    #[serde(rename = "publicClient", skip_serializing_if = "Option::is_none")]
+    pub public_client: Option<bool>,
+    #[serde(rename = "bearerOnly", skip_serializing_if = "Option::is_none")]
+    pub bearer_only: Option<bool>,
+    #[serde(rename = "serviceAccountsEnabled", skip_serializing_if = "Option::is_none")]
+    pub service_accounts_enabled: Option<bool>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+impl KeycloakResource for ClientRepresentation {
+    fn get_identity(&self) -> Option<String> {
+        self.id.clone().or_else(|| self.client_id.clone())
+    }
+    fn get_name(&self) -> String {
+        self.client_id
+            .clone()
+            .or_else(|| self.name.clone())
+            .unwrap_or_else(|| "unknown".to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RoleRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(rename = "containerId", skip_serializing_if = "Option::is_none")]
+    pub container_id: Option<String>,
+    #[serde(default)]
+    pub composite: bool,
+    #[serde(rename = "clientRole", default)]
+    pub client_role: bool,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+impl KeycloakResource for RoleRepresentation {
+    fn get_identity(&self) -> Option<String> {
+        self.id.clone().or_else(|| Some(self.name.clone()))
+    }
+    fn get_name(&self) -> String {
+        self.name.clone()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ClientScopeRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<HashMap<String, String>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+impl KeycloakResource for ClientScopeRepresentation {
+    fn get_identity(&self) -> Option<String> {
+        self.id.clone().or_else(|| self.name.clone())
+    }
+    fn get_name(&self) -> String {
+        self.name.clone().unwrap_or_else(|| "unknown".to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GroupRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(rename = "subGroups", skip_serializing_if = "Option::is_none")]
+    pub sub_groups: Option<Vec<GroupRepresentation>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+impl KeycloakResource for GroupRepresentation {
+    fn get_identity(&self) -> Option<String> {
+        self.id.clone().or_else(|| self.name.clone())
+    }
+    fn get_name(&self) -> String {
+        self.name.clone().unwrap_or_else(|| "unknown".to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CredentialRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub type_: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temporary: Option<bool>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(rename = "firstName", skip_serializing_if = "Option::is_none")]
+    pub first_name: Option<String>,
+    #[serde(rename = "lastName", skip_serializing_if = "Option::is_none")]
+    pub last_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+    #[serde(rename = "emailVerified", skip_serializing_if = "Option::is_none")]
+    pub email_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credentials: Option<Vec<CredentialRepresentation>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+impl KeycloakResource for UserRepresentation {
+    fn get_identity(&self) -> Option<String> {
+        self.id.clone().or_else(|| self.username.clone())
+    }
+    fn get_name(&self) -> String {
+        self.username.clone().unwrap_or_else(|| "unknown".to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AuthenticationExecutionExportRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authenticator: Option<String>,
+    #[serde(rename = "authenticatorConfig", skip_serializing_if = "Option::is_none")]
+    pub authenticator_config: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requirement: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<i32>,
+    #[serde(rename = "authenticatorFlow", skip_serializing_if = "Option::is_none")]
+    pub authenticator_flow: Option<bool>,
+    #[serde(rename = "flowAlias", skip_serializing_if = "Option::is_none")]
+    pub flow_alias: Option<String>,
+    #[serde(rename = "userSetupAllowed", skip_serializing_if = "Option::is_none")]
+    pub user_setup_allowed: Option<bool>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AuthenticationFlowRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(rename = "providerId", skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
+    #[serde(rename = "topLevel", skip_serializing_if = "Option::is_none")]
+    pub top_level: Option<bool>,
+    #[serde(rename = "builtIn", skip_serializing_if = "Option::is_none")]
+    pub built_in: Option<bool>,
+    #[serde(
+        rename = "authenticationExecutions",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub authentication_executions: Option<Vec<AuthenticationExecutionExportRepresentation>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+impl KeycloakResource for AuthenticationFlowRepresentation {
+    fn get_identity(&self) -> Option<String> {
+        self.id.clone().or_else(|| self.alias.clone())
+    }
+    fn get_name(&self) -> String {
+        self.alias.clone().unwrap_or_else(|| "unknown".to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RequiredActionProviderRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(rename = "providerId", skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(rename = "defaultAction", skip_serializing_if = "Option::is_none")]
+    pub default_action: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<HashMap<String, String>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+impl KeycloakResource for RequiredActionProviderRepresentation {
+    fn get_identity(&self) -> Option<String> {
+        self.alias.clone()
+    }
+    fn get_name(&self) -> String {
+        self.alias.clone().unwrap_or_else(|| "unknown".to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ComponentRepresentation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(rename = "providerId", skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
+    #[serde(rename = "providerType", skip_serializing_if = "Option::is_none")]
+    pub provider_type: Option<String>,
+    #[serde(rename = "parentId", skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    #[serde(rename = "subType", skip_serializing_if = "Option::is_none")]
+    pub sub_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<HashMap<String, Value>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+impl KeycloakResource for ComponentRepresentation {
+    fn get_identity(&self) -> Option<String> {
+        self.id.clone()
+    }
+    fn get_name(&self) -> String {
+        self.name.clone().unwrap_or_else(|| "unknown".to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct KeyMetadataRepresentation {
+    #[serde(rename = "providerId")]
+    pub provider_id: Option<String>,
+    #[serde(rename = "providerPriority")]
+    pub provider_priority: Option<i64>,
+    pub kid: Option<String>,
+    pub status: Option<String>,
+    #[serde(rename = "type")]
+    pub key_type: Option<String>,
+    pub algorithm: Option<String>,
+    #[serde(rename = "publicKey")]
+    pub public_key: Option<String>,
+    pub certificate: Option<String>,
+    pub use_: Option<String>,
+    #[serde(rename = "validTo")]
+    pub valid_to: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct KeysMetadataRepresentation {
+    pub active: Option<HashMap<String, String>>,
+    pub keys: Option<Vec<KeyMetadataRepresentation>>,
 }
 
 #[cfg(test)]
@@ -193,269 +556,4 @@ mod tests {
             serde_json::from_str(&json_str).expect("Failed to deserialize user");
         assert_eq!(deserialized.first_name, Some("John".to_string()));
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct IdentityProviderRepresentation {
-    #[serde(rename = "internalId", skip_serializing_if = "Option::is_none")]
-    pub internal_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub alias: Option<String>,
-    #[serde(rename = "providerId", skip_serializing_if = "Option::is_none")]
-    pub provider_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub enabled: Option<bool>,
-    #[serde(
-        rename = "updateProfileFirstLoginMode",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub update_profile_first_login_mode: Option<String>,
-    #[serde(rename = "trustEmail", skip_serializing_if = "Option::is_none")]
-    pub trust_email: Option<bool>,
-    #[serde(rename = "storeToken", skip_serializing_if = "Option::is_none")]
-    pub store_token: Option<bool>,
-    #[serde(
-        rename = "addReadTokenRoleOnCreate",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub add_read_token_role_on_create: Option<bool>,
-    #[serde(rename = "authenticateByDefault", skip_serializing_if = "Option::is_none")]
-    pub authenticate_by_default: Option<bool>,
-    #[serde(rename = "linkOnly", skip_serializing_if = "Option::is_none")]
-    pub link_only: Option<bool>,
-    #[serde(
-        rename = "firstBrokerLoginFlowAlias",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub first_broker_login_flow_alias: Option<String>,
-    #[serde(
-        rename = "postBrokerLoginFlowAlias",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub post_broker_login_flow_alias: Option<String>,
-    #[serde(rename = "displayName", skip_serializing_if = "Option::is_none")]
-    pub display_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub config: Option<HashMap<String, String>>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ClientRepresentation {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(rename = "clientId", skip_serializing_if = "Option::is_none")]
-    pub client_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub enabled: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub protocol: Option<String>,
-    #[serde(rename = "redirectUris", skip_serializing_if = "Option::is_none")]
-    pub redirect_uris: Option<Vec<String>>,
-    #[serde(rename = "webOrigins", skip_serializing_if = "Option::is_none")]
-    pub web_origins: Option<Vec<String>>,
-    #[serde(rename = "publicClient", skip_serializing_if = "Option::is_none")]
-    pub public_client: Option<bool>,
-    #[serde(rename = "bearerOnly", skip_serializing_if = "Option::is_none")]
-    pub bearer_only: Option<bool>,
-    #[serde(rename = "serviceAccountsEnabled", skip_serializing_if = "Option::is_none")]
-    pub service_accounts_enabled: Option<bool>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RoleRepresentation {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(rename = "containerId", skip_serializing_if = "Option::is_none")]
-    pub container_id: Option<String>,
-    #[serde(default)]
-    pub composite: bool,
-    #[serde(rename = "clientRole", default)]
-    pub client_role: bool,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ClientScopeRepresentation {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub protocol: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub attributes: Option<HashMap<String, String>>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GroupRepresentation {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub path: Option<String>,
-    #[serde(rename = "subGroups", skip_serializing_if = "Option::is_none")]
-    pub sub_groups: Option<Vec<GroupRepresentation>>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CredentialRepresentation {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub type_: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub temporary: Option<bool>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct UserRepresentation {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub username: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub enabled: Option<bool>,
-    #[serde(rename = "firstName", skip_serializing_if = "Option::is_none")]
-    pub first_name: Option<String>,
-    #[serde(rename = "lastName", skip_serializing_if = "Option::is_none")]
-    pub last_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub email: Option<String>,
-    #[serde(rename = "emailVerified", skip_serializing_if = "Option::is_none")]
-    pub email_verified: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub credentials: Option<Vec<CredentialRepresentation>>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AuthenticationExecutionExportRepresentation {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub authenticator: Option<String>,
-    #[serde(rename = "authenticatorConfig", skip_serializing_if = "Option::is_none")]
-    pub authenticator_config: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub requirement: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub priority: Option<i32>,
-    #[serde(rename = "authenticatorFlow", skip_serializing_if = "Option::is_none")]
-    pub authenticator_flow: Option<bool>,
-    #[serde(rename = "flowAlias", skip_serializing_if = "Option::is_none")]
-    pub flow_alias: Option<String>,
-    #[serde(rename = "userSetupAllowed", skip_serializing_if = "Option::is_none")]
-    pub user_setup_allowed: Option<bool>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AuthenticationFlowRepresentation {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub alias: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(rename = "providerId", skip_serializing_if = "Option::is_none")]
-    pub provider_id: Option<String>,
-    #[serde(rename = "topLevel", skip_serializing_if = "Option::is_none")]
-    pub top_level: Option<bool>,
-    #[serde(rename = "builtIn", skip_serializing_if = "Option::is_none")]
-    pub built_in: Option<bool>,
-    #[serde(
-        rename = "authenticationExecutions",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub authentication_executions: Option<Vec<AuthenticationExecutionExportRepresentation>>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RequiredActionProviderRepresentation {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub alias: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(rename = "providerId", skip_serializing_if = "Option::is_none")]
-    pub provider_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub enabled: Option<bool>,
-    #[serde(rename = "defaultAction", skip_serializing_if = "Option::is_none")]
-    pub default_action: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub priority: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub config: Option<HashMap<String, String>>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ComponentRepresentation {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(rename = "providerId", skip_serializing_if = "Option::is_none")]
-    pub provider_id: Option<String>,
-    #[serde(rename = "providerType", skip_serializing_if = "Option::is_none")]
-    pub provider_type: Option<String>,
-    #[serde(rename = "parentId", skip_serializing_if = "Option::is_none")]
-    pub parent_id: Option<String>,
-    #[serde(rename = "subType", skip_serializing_if = "Option::is_none")]
-    pub sub_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub config: Option<HashMap<String, Value>>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct KeyMetadataRepresentation {
-    #[serde(rename = "providerId")]
-    pub provider_id: Option<String>,
-    #[serde(rename = "providerPriority")]
-    pub provider_priority: Option<i64>,
-    pub kid: Option<String>,
-    pub status: Option<String>,
-    #[serde(rename = "type")]
-    pub key_type: Option<String>,
-    pub algorithm: Option<String>,
-    #[serde(rename = "publicKey")]
-    pub public_key: Option<String>,
-    pub certificate: Option<String>,
-    pub use_: Option<String>,
-    #[serde(rename = "validTo")]
-    pub valid_to: Option<i64>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct KeysMetadataRepresentation {
-    pub active: Option<HashMap<String, String>>,
-    pub keys: Option<Vec<KeyMetadataRepresentation>>,
 }

@@ -1,7 +1,7 @@
 use crate::client::KeycloakClient;
 use crate::models::{
     AuthenticationFlowRepresentation, ClientRepresentation, ClientScopeRepresentation,
-    ComponentRepresentation, GroupRepresentation, IdentityProviderRepresentation,
+    ComponentRepresentation, GroupRepresentation, IdentityProviderRepresentation, KeycloakResource,
     RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation,
     UserRepresentation,
 };
@@ -111,7 +111,14 @@ async fn apply_roles(
         let existing_roles = client.get_roles().await?;
         let existing_roles_map: HashMap<String, String> = existing_roles
             .into_iter()
-            .filter_map(|r| r.id.map(|id| (r.name, id)))
+            .filter_map(|r| {
+                let identity = r.get_identity();
+                let id = r.id.clone();
+                match (identity, id) {
+                    (Some(identity), Some(id)) => Some((identity, id)),
+                    _ => None,
+                }
+            })
             .collect();
         let existing_roles_map = std::sync::Arc::new(existing_roles_map);
 
@@ -131,20 +138,24 @@ async fn apply_roles(
                     substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                     let mut role_rep: RoleRepresentation = serde_json::from_value(val)?;
 
-                    if let Some(id) = existing_roles_map.get(&role_rep.name) {
+                    let identity = role_rep
+                        .get_identity()
+                        .context(format!("Failed to get identity for role in {:?}", path))?;
+
+                    if let Some(id) = existing_roles_map.get(&identity) {
                         role_rep.id = Some(id.clone()); // Use remote ID
                         client
                             .update_role(id, &role_rep)
                             .await
-                            .context(format!("Failed to update role {}", role_rep.name))?;
-                        println!("Updated role {}", role_rep.name);
+                            .context(format!("Failed to update role {}", role_rep.get_name()))?;
+                        println!("Updated role {}", role_rep.get_name());
                     } else {
                         role_rep.id = None; // Don't send ID on create
                         client
                             .create_role(&role_rep)
                             .await
-                            .context(format!("Failed to create role {}", role_rep.name))?;
-                        println!("Created role {}", role_rep.name);
+                            .context(format!("Failed to create role {}", role_rep.get_name()))?;
+                        println!("Created role {}", role_rep.get_name());
                     }
                     Ok::<(), anyhow::Error>(())
                 });
@@ -168,7 +179,7 @@ async fn apply_identity_providers(
         let existing_idps = client.get_identity_providers().await?;
         let existing_idps_map: HashMap<String, IdentityProviderRepresentation> = existing_idps
             .into_iter()
-            .filter_map(|i| i.alias.clone().map(|alias| (alias, i)))
+            .filter_map(|i| i.get_identity().map(|id| (id, i)))
             .collect();
         let existing_idps_map = std::sync::Arc::new(existing_idps_map);
 
@@ -187,29 +198,27 @@ async fn apply_identity_providers(
                         .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
                     substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                     let mut idp_rep: IdentityProviderRepresentation = serde_json::from_value(val)?;
-                    let alias = idp_rep.alias.clone().unwrap_or_default();
 
-                    if alias.is_empty() {
-                        println!("Skipping IDP file {:?} due to missing alias", path);
-                        return Ok::<(), anyhow::Error>(());
-                    }
+                    let identity = idp_rep
+                        .get_identity()
+                        .context(format!("Failed to get identity for IDP in {:?}", path))?;
 
-                    if let Some(existing) = existing_idps_map.get(&alias) {
+                    if let Some(existing) = existing_idps_map.get(&identity) {
                         if let Some(internal_id) = &existing.internal_id {
                             idp_rep.internal_id = Some(internal_id.clone());
                             client
-                                .update_identity_provider(&alias, &idp_rep)
+                                .update_identity_provider(&identity, &idp_rep)
                                 .await
-                                .context(format!("Failed to update identity provider {}", alias))?;
-                            println!("Updated identity provider {}", alias);
+                                .context(format!("Failed to update identity provider {}", idp_rep.get_name()))?;
+                            println!("Updated identity provider {}", idp_rep.get_name());
                         }
                     } else {
                         idp_rep.internal_id = None;
                         client
                             .create_identity_provider(&idp_rep)
                             .await
-                            .context(format!("Failed to create identity provider {}", alias))?;
-                        println!("Created identity provider {}", alias);
+                            .context(format!("Failed to create identity provider {}", idp_rep.get_name()))?;
+                        println!("Created identity provider {}", idp_rep.get_name());
                     }
                     Ok::<(), anyhow::Error>(())
                 });
@@ -233,7 +242,7 @@ async fn apply_clients(
         let existing_clients = client.get_clients().await?;
         let existing_clients_map: HashMap<String, ClientRepresentation> = existing_clients
             .into_iter()
-            .filter_map(|c| c.client_id.clone().map(|id| (id, c)))
+            .filter_map(|c| c.get_identity().map(|id| (id, c)))
             .collect();
         let existing_clients_map = std::sync::Arc::new(existing_clients_map);
 
@@ -252,29 +261,27 @@ async fn apply_clients(
                         .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
                     substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                     let mut client_rep: ClientRepresentation = serde_json::from_value(val)?;
-                    let client_id = client_rep.client_id.clone().unwrap_or_default();
 
-                    if client_id.is_empty() {
-                        println!("Skipping client file {:?} due to missing clientId", path);
-                        return Ok::<(), anyhow::Error>(());
-                    }
+                    let identity = client_rep
+                        .get_identity()
+                        .context(format!("Failed to get identity for client in {:?}", path))?;
 
-                    if let Some(existing) = existing_clients_map.get(&client_id) {
+                    if let Some(existing) = existing_clients_map.get(&identity) {
                         if let Some(id) = &existing.id {
                             client_rep.id = Some(id.clone()); // Use remote ID
                             client
                                 .update_client(id, &client_rep)
                                 .await
-                                .context(format!("Failed to update client {}", client_id))?;
-                            println!("Updated client {}", client_id);
+                                .context(format!("Failed to update client {}", client_rep.get_name()))?;
+                            println!("Updated client {}", client_rep.get_name());
                         }
                     } else {
                         client_rep.id = None; // Don't send ID on create
                         client
                             .create_client(&client_rep)
                             .await
-                            .context(format!("Failed to create client {}", client_id))?;
-                        println!("Created client {}", client_id);
+                            .context(format!("Failed to create client {}", client_rep.get_name()))?;
+                        println!("Created client {}", client_rep.get_name());
                     }
                     Ok::<(), anyhow::Error>(())
                 });
@@ -298,7 +305,7 @@ async fn apply_client_scopes(
         let existing_scopes = client.get_client_scopes().await?;
         let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
             .into_iter()
-            .filter_map(|s| s.name.clone().map(|n| (n, s)))
+            .filter_map(|s| s.get_identity().map(|id| (id, s)))
             .collect();
 
         let mut entries = async_fs::read_dir(&scopes_dir).await?;
@@ -310,28 +317,27 @@ async fn apply_client_scopes(
                     .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
                 substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let mut scope_rep: ClientScopeRepresentation = serde_json::from_value(val)?;
-                let name = scope_rep.name.as_deref().unwrap_or("");
 
-                if name.is_empty() {
-                    continue;
-                }
+                let identity = scope_rep
+                    .get_identity()
+                    .context(format!("Failed to get identity for client scope in {:?}", path))?;
 
-                if let Some(existing) = existing_scopes_map.get(name) {
+                if let Some(existing) = existing_scopes_map.get(&identity) {
                     if let Some(id) = &existing.id {
                         scope_rep.id = Some(id.clone());
                         client
                             .update_client_scope(id, &scope_rep)
                             .await
-                            .context(format!("Failed to update client scope {}", name))?;
-                        println!("Updated client scope {}", name);
+                            .context(format!("Failed to update client scope {}", scope_rep.get_name()))?;
+                        println!("Updated client scope {}", scope_rep.get_name());
                     }
                 } else {
                     scope_rep.id = None;
                     client
                         .create_client_scope(&scope_rep)
                         .await
-                        .context(format!("Failed to create client scope {}", name))?;
-                    println!("Created client scope {}", name);
+                        .context(format!("Failed to create client scope {}", scope_rep.get_name()))?;
+                    println!("Created client scope {}", scope_rep.get_name());
                 }
             }
         }
@@ -350,7 +356,7 @@ async fn apply_groups(
         let existing_groups = client.get_groups().await?;
         let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
             .into_iter()
-            .filter_map(|g| g.name.clone().map(|n| (n, g)))
+            .filter_map(|g| g.get_identity().map(|id| (id, g)))
             .collect();
 
         let mut entries = async_fs::read_dir(&groups_dir).await?;
@@ -362,28 +368,27 @@ async fn apply_groups(
                     .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
                 substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let mut group_rep: GroupRepresentation = serde_json::from_value(val)?;
-                let name = group_rep.name.as_deref().unwrap_or("");
 
-                if name.is_empty() {
-                    continue;
-                }
+                let identity = group_rep
+                    .get_identity()
+                    .context(format!("Failed to get identity for group in {:?}", path))?;
 
-                if let Some(existing) = existing_groups_map.get(name) {
+                if let Some(existing) = existing_groups_map.get(&identity) {
                     if let Some(id) = &existing.id {
                         group_rep.id = Some(id.clone());
                         client
                             .update_group(id, &group_rep)
                             .await
-                            .context(format!("Failed to update group {}", name))?;
-                        println!("Updated group {}", name);
+                            .context(format!("Failed to update group {}", group_rep.get_name()))?;
+                        println!("Updated group {}", group_rep.get_name());
                     }
                 } else {
                     group_rep.id = None;
                     client
                         .create_group(&group_rep)
                         .await
-                        .context(format!("Failed to create group {}", name))?;
-                    println!("Created group {}", name);
+                        .context(format!("Failed to create group {}", group_rep.get_name()))?;
+                    println!("Created group {}", group_rep.get_name());
                 }
             }
         }
@@ -402,7 +407,7 @@ async fn apply_users(
         let existing_users = client.get_users().await?;
         let existing_users_map: HashMap<String, UserRepresentation> = existing_users
             .into_iter()
-            .filter_map(|u| u.username.clone().map(|n| (n, u)))
+            .filter_map(|u| u.get_identity().map(|id| (id, u)))
             .collect();
 
         let mut entries = async_fs::read_dir(&users_dir).await?;
@@ -414,28 +419,27 @@ async fn apply_users(
                     .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
                 substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let mut user_rep: UserRepresentation = serde_json::from_value(val)?;
-                let username = user_rep.username.as_deref().unwrap_or("");
 
-                if username.is_empty() {
-                    continue;
-                }
+                let identity = user_rep
+                    .get_identity()
+                    .context(format!("Failed to get identity for user in {:?}", path))?;
 
-                if let Some(existing) = existing_users_map.get(username) {
+                if let Some(existing) = existing_users_map.get(&identity) {
                     if let Some(id) = &existing.id {
                         user_rep.id = Some(id.clone());
                         client
                             .update_user(id, &user_rep)
                             .await
-                            .context(format!("Failed to update user {}", username))?;
-                        println!("Updated user {}", username);
+                            .context(format!("Failed to update user {}", user_rep.get_name()))?;
+                        println!("Updated user {}", user_rep.get_name());
                     }
                 } else {
                     user_rep.id = None;
                     client
                         .create_user(&user_rep)
                         .await
-                        .context(format!("Failed to create user {}", username))?;
-                    println!("Created user {}", username);
+                        .context(format!("Failed to create user {}", user_rep.get_name()))?;
+                    println!("Created user {}", user_rep.get_name());
                 }
             }
         }
@@ -454,7 +458,7 @@ async fn apply_authentication_flows(
         let existing_flows = client.get_authentication_flows().await?;
         let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
             .into_iter()
-            .filter_map(|f| f.alias.clone().map(|a| (a, f)))
+            .filter_map(|f| f.get_identity().map(|id| (id, f)))
             .collect();
 
         let mut entries = async_fs::read_dir(&flows_dir).await?;
@@ -466,28 +470,27 @@ async fn apply_authentication_flows(
                     .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
                 substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let mut flow_rep: AuthenticationFlowRepresentation = serde_json::from_value(val)?;
-                let alias = flow_rep.alias.as_deref().unwrap_or("");
 
-                if alias.is_empty() {
-                    continue;
-                }
+                let identity = flow_rep
+                    .get_identity()
+                    .context(format!("Failed to get identity for flow in {:?}", path))?;
 
-                if let Some(existing) = existing_flows_map.get(alias) {
+                if let Some(existing) = existing_flows_map.get(&identity) {
                     if let Some(id) = &existing.id {
                         flow_rep.id = Some(id.clone());
                         client
                             .update_authentication_flow(id, &flow_rep)
                             .await
-                            .context(format!("Failed to update authentication flow {}", alias))?;
-                        println!("Updated authentication flow {}", alias);
+                            .context(format!("Failed to update authentication flow {}", flow_rep.get_name()))?;
+                        println!("Updated authentication flow {}", flow_rep.get_name());
                     }
                 } else {
                     flow_rep.id = None;
                     client
                         .create_authentication_flow(&flow_rep)
                         .await
-                        .context(format!("Failed to create authentication flow {}", alias))?;
-                    println!("Created authentication flow {}", alias);
+                        .context(format!("Failed to create authentication flow {}", flow_rep.get_name()))?;
+                    println!("Created authentication flow {}", flow_rep.get_name());
                 }
             }
         }
@@ -507,7 +510,7 @@ async fn apply_required_actions(
         let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
             existing_actions
                 .into_iter()
-                .filter_map(|a| a.alias.clone().map(|n| (n, a)))
+                .filter_map(|a| a.get_identity().map(|id| (id, a)))
                 .collect();
 
         let mut entries = async_fs::read_dir(&actions_dir).await?;
@@ -519,32 +522,31 @@ async fn apply_required_actions(
                     .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
                 substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let action_rep: RequiredActionProviderRepresentation = serde_json::from_value(val)?;
-                let alias = action_rep.alias.as_deref().unwrap_or("");
 
-                if alias.is_empty() {
-                    continue;
-                }
+                let identity = action_rep
+                    .get_identity()
+                    .context(format!("Failed to get identity for required action in {:?}", path))?;
 
-                if existing_actions_map.contains_key(alias) {
+                if existing_actions_map.contains_key(&identity) {
                     client
-                        .update_required_action(alias, &action_rep)
+                        .update_required_action(&identity, &action_rep)
                         .await
-                        .context(format!("Failed to update required action {}", alias))?;
-                    println!("Updated required action {}", alias);
+                        .context(format!("Failed to update required action {}", action_rep.get_name()))?;
+                    println!("Updated required action {}", action_rep.get_name());
                 } else {
                     // Register
                     client
                         .register_required_action(&action_rep)
                         .await
-                        .context(format!("Failed to register required action {}", alias))?;
+                        .context(format!("Failed to register required action {}", action_rep.get_name()))?;
                     client
-                        .update_required_action(alias, &action_rep)
+                        .update_required_action(&identity, &action_rep)
                         .await
                         .context(format!(
                             "Failed to configure registered required action {}",
-                            alias
+                            action_rep.get_name()
                         ))?;
-                    println!("Registered required action {}", alias);
+                    println!("Registered required action {}", action_rep.get_name());
                 }
             }
         }
@@ -561,10 +563,22 @@ async fn apply_components_or_keys(
     let components_dir = input_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
         let existing_components = client.get_components().await?;
-        let existing_components_map: HashMap<String, ComponentRepresentation> = existing_components
-            .into_iter()
-            .filter_map(|c| c.name.clone().map(|n| (n, c)))
-            .collect();
+        let mut by_identity: HashMap<String, ComponentRepresentation> = HashMap::new();
+        let mut by_details: HashMap<(Option<String>, Option<String>, Option<String>, Option<String>), ComponentRepresentation> =
+            HashMap::new();
+
+        for c in existing_components {
+            if let Some(id) = c.get_identity() {
+                by_identity.insert(id, c.clone());
+            }
+            let key = (
+                c.name.clone(),
+                c.sub_type.clone(),
+                c.provider_id.clone(),
+                c.parent_id.clone(),
+            );
+            by_details.insert(key, c);
+        }
 
         let mut entries = async_fs::read_dir(&components_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
@@ -575,28 +589,43 @@ async fn apply_components_or_keys(
                     .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
                 substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let mut component_rep: ComponentRepresentation = serde_json::from_value(val)?;
-                let name = component_rep.name.as_deref().unwrap_or("");
 
-                if name.is_empty() {
-                    continue;
-                }
+                let existing = if let Some(identity) = component_rep.get_identity() {
+                    by_identity.get(&identity).or_else(|| {
+                        let key = (
+                            component_rep.name.clone(),
+                            component_rep.sub_type.clone(),
+                            component_rep.provider_id.clone(),
+                            component_rep.parent_id.clone(),
+                        );
+                        by_details.get(&key)
+                    })
+                } else {
+                    let key = (
+                        component_rep.name.clone(),
+                        component_rep.sub_type.clone(),
+                        component_rep.provider_id.clone(),
+                        component_rep.parent_id.clone(),
+                    );
+                    by_details.get(&key)
+                };
 
-                if let Some(existing) = existing_components_map.get(name) {
+                if let Some(existing) = existing {
                     if let Some(id) = &existing.id {
                         component_rep.id = Some(id.clone());
                         client
                             .update_component(id, &component_rep)
                             .await
-                            .context(format!("Failed to update component {}", name))?;
-                        println!("Updated component {}", name);
+                            .context(format!("Failed to update component {}", component_rep.get_name()))?;
+                        println!("Updated component {}", component_rep.get_name());
                     }
                 } else {
                     component_rep.id = None;
                     client
                         .create_component(&component_rep)
                         .await
-                        .context(format!("Failed to create component {}", name))?;
-                    println!("Created component {}", name);
+                        .context(format!("Failed to create component {}", component_rep.get_name()))?;
+                    println!("Created component {}", component_rep.get_name());
                 }
             }
         }

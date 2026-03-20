@@ -39,10 +39,10 @@ async fn main() -> Result<()> {
     }
 
     match &cli.command {
-        Commands::Inspect { output } => {
+        Commands::Inspect { output, yes } => {
             let client = init_client(&cli).await?;
             println!("Inspecting Keycloak configuration into {:?}", output);
-            inspect::run(&client, output.clone(), &cli.realms).await?;
+            inspect::run(&client, output.clone(), &cli.realms, *yes).await?;
         }
         Commands::Validate { input } => {
             println!("Validating Keycloak configuration from {:?}", input);
