@@ -15,7 +15,7 @@ impl DockerComposeGuard {
             .args(&["compose", "up", "-d", "--wait"])
             .status()
             .expect("Failed to execute docker compose up");
-        
+
         if !status.success() {
             panic!("docker compose up failed with status: {}", status);
         }
@@ -34,7 +34,7 @@ impl Drop for DockerComposeGuard {
 
 async fn wait_for_keycloak() -> Result<KeycloakClient> {
     let mut client = KeycloakClient::new("http://localhost:8080".to_string());
-    
+
     let mut attempts = 0;
     loop {
         match client
@@ -71,7 +71,13 @@ async fn test_real_keycloak_integration() -> Result<()> {
 
     // 3. Inspect the current (empty/default) state
     println!("Inspecting initial state...");
-    inspect::run(&client, workspace_dir.clone(), &["master".to_string()], true).await?;
+    inspect::run(
+        &client,
+        workspace_dir.clone(),
+        &["master".to_string()],
+        true,
+    )
+    .await?;
 
     let realm_file = workspace_dir.join("master").join("realm.yaml");
     assert!(realm_file.exists(), "realm.yaml should exist after inspect");
@@ -87,16 +93,32 @@ enabled: true
 publicClient: true
 standardFlowEnabled: true
 "#;
-    fs::write(clients_dir.join("integration-test-client.yaml"), new_client_yaml)?;
+    fs::write(
+        clients_dir.join("integration-test-client.yaml"),
+        new_client_yaml,
+    )?;
 
     // 5. Plan - Should see changes
     println!("Planning changes...");
     // Just ensuring plan runs without error
-    plan::run(&client, workspace_dir.clone(), true, false, &["master".to_string()]).await?;
+    plan::run(
+        &client,
+        workspace_dir.clone(),
+        true,
+        false,
+        &["master".to_string()],
+    )
+    .await?;
 
     // 6. Apply the changes
     println!("Applying changes...");
-    apply::run(&client, workspace_dir.clone(), &["master".to_string()], true).await?;
+    apply::run(
+        &client,
+        workspace_dir.clone(),
+        &["master".to_string()],
+        true,
+    )
+    .await?;
 
     // 7. Verify the client was created by inspecting to a new dir
     let inspect_dir2 = dir.path().join("inspect2");
@@ -106,7 +128,7 @@ standardFlowEnabled: true
     // We might have a file named something like `integration-test-client.yaml` or whatever `sanitize` outputs
     // The id is not known, but the client_id is known. So there should be a file for it.
     let applied_clients_dir = inspect_dir2.join("master").join("clients");
-    
+
     // Find the file containing `integration-test-client`
     let mut found = false;
     for entry in fs::read_dir(applied_clients_dir)? {
@@ -120,8 +142,11 @@ standardFlowEnabled: true
             }
         }
     }
-    
-    assert!(found, "The newly created client was not found in the subsequent inspect.");
+
+    assert!(
+        found,
+        "The newly created client was not found in the subsequent inspect."
+    );
 
     println!("Integration test completed successfully!");
     Ok(())

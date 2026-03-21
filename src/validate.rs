@@ -5,7 +5,7 @@ use crate::models::{
     UserRepresentation,
 };
 use anyhow::{Context, Result};
-use console::{style, Emoji};
+use console::{Emoji, style};
 use serde::de::DeserializeOwned;
 use std::collections::HashSet;
 use std::fs;
@@ -53,15 +53,35 @@ pub fn run(workspace_dir: PathBuf, realms_to_validate: &[String]) -> Result<()> 
     };
 
     if realms.is_empty() {
-        println!("{} {}", WARN, style(format!("No realms found to validate in {:?}", workspace_dir)).yellow());
+        println!(
+            "{} {}",
+            WARN,
+            style(format!(
+                "No realms found to validate in {:?}",
+                workspace_dir
+            ))
+            .yellow()
+        );
         return Ok(());
     }
 
     for realm_name in &realms {
-        println!("\n{} {}", SEARCH, style(format!("Validating realm: {}", realm_name)).cyan().bold());
+        println!(
+            "\n{} {}",
+            SEARCH,
+            style(format!("Validating realm: {}", realm_name))
+                .cyan()
+                .bold()
+        );
         let realm_dir = workspace_dir.join(realm_name);
         validate_realm(realm_dir)?;
-        println!("  {} {}", SUCCESS, style(format!("Successfully validated realm: {}", realm_name)).green().bold());
+        println!(
+            "  {} {}",
+            SUCCESS,
+            style(format!("Successfully validated realm: {}", realm_name))
+                .green()
+                .bold()
+        );
     }
     Ok(())
 }
@@ -79,7 +99,12 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     if realm.realm.is_empty() {
         anyhow::bail!("Realm name is empty in realm.yaml");
     }
-    println!("  {} {} {}", CHECK, style("Realm configuration is valid:").dim(), style(&realm.realm).green());
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Realm configuration is valid:").dim(),
+        style(&realm.realm).green()
+    );
 
     // 2. Validate Roles
     let roles_dir = workspace_dir.join("roles");
@@ -95,7 +120,12 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
         }
         role_names.insert(role.name.clone());
     }
-    println!("  {} {} {}", CHECK, style("Validated roles:").dim(), style(roles.len()).green());
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated roles:").dim(),
+        style(roles.len()).green()
+    );
 
     // 3. Validate Clients
     let clients_dir = workspace_dir.join("clients");
@@ -106,7 +136,12 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
             anyhow::bail!("Client ID is missing or empty in {:?}", path);
         }
     }
-    println!("  {} {} {}", CHECK, style("Validated clients:").dim(), style(clients.len()).green());
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated clients:").dim(),
+        style(clients.len()).green()
+    );
 
     // 4. Validate Identity Providers
     let idps_dir = workspace_dir.join("identity-providers");
@@ -123,7 +158,12 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
             );
         }
     }
-    println!("  {} {} {}", CHECK, style("Validated Identity Providers:").dim(), style(idps.len()).green());
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated Identity Providers:").dim(),
+        style(idps.len()).green()
+    );
 
     // 5. Validate Client Scopes
     let scopes_dir = workspace_dir.join("client-scopes");
@@ -134,7 +174,12 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
             anyhow::bail!("Client Scope name is missing or empty in {:?}", path);
         }
     }
-    println!("  {} {} {}", CHECK, style("Validated client scopes:").dim(), style(scopes.len()).green());
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated client scopes:").dim(),
+        style(scopes.len()).green()
+    );
 
     // 6. Validate Groups
     let groups_dir = workspace_dir.join("groups");
@@ -144,7 +189,12 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
             anyhow::bail!("Group name is missing or empty in {:?}", path);
         }
     }
-    println!("  {} {} {}", CHECK, style("Validated groups:").dim(), style(groups.len()).green());
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated groups:").dim(),
+        style(groups.len()).green()
+    );
 
     // 7. Validate Users
     let users_dir = workspace_dir.join("users");
@@ -154,7 +204,12 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
             anyhow::bail!("User username is missing or empty in {:?}", path);
         }
     }
-    println!("  {} {} {}", CHECK, style("Validated users:").dim(), style(users.len()).green());
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated users:").dim(),
+        style(users.len()).green()
+    );
 
     // 8. Validate Authentication Flows
     let flows_dir = workspace_dir.join("authentication-flows");
@@ -168,7 +223,12 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
             );
         }
     }
-    println!("  {} {} {}", CHECK, style("Validated authentication flows:").dim(), style(flows.len()).green());
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated authentication flows:").dim(),
+        style(flows.len()).green()
+    );
 
     // 9. Validate Required Actions
     let actions_dir = workspace_dir.join("required-actions");
@@ -185,7 +245,12 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
             );
         }
     }
-    println!("  {} {} {}", CHECK, style("Validated required actions:").dim(), style(actions.len()).green());
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated required actions:").dim(),
+        style(actions.len()).green()
+    );
 
     // 10. Validate Components and Keys
     for dir_name in ["components", "keys"].iter() {
@@ -194,16 +259,21 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
             let components: Vec<(PathBuf, ComponentRepresentation)> =
                 read_yaml_files(&dir, dir_name)?;
             for (path, component) in &components {
-                if let Some(name) = &component.name {
-                    if name.is_empty() {
-                        anyhow::bail!("Component name is empty in {:?}", path);
-                    }
+                if let Some(name) = &component.name
+                    && name.is_empty()
+                {
+                    anyhow::bail!("Component name is empty in {:?}", path);
                 }
                 if component.provider_id.as_deref().unwrap_or("").is_empty() {
                     anyhow::bail!("Component providerId is missing or empty in {:?}", path);
                 }
             }
-            println!("  {} {} {}", CHECK, style(format!("Validated {}:", dir_name)).dim(), style(components.len()).green());
+            println!(
+                "  {} {} {}",
+                CHECK,
+                style(format!("Validated {}:", dir_name)).dim(),
+                style(components.len()).green()
+            );
         }
     }
 

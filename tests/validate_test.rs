@@ -701,7 +701,11 @@ fn test_validate_missing_component_name() {
     .unwrap();
 
     let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
-    assert!(result.is_ok(), "Validation should succeed for missing component name. Error: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Validation should succeed for missing component name. Error: {:?}",
+        result.err()
+    );
 }
 
 #[test]
