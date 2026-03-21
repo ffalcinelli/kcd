@@ -1,5 +1,5 @@
 .secrets
-config/
+workspace/
 target/
 .env
 .git
