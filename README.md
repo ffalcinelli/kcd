@@ -1,6 +1,6 @@
 # Keycloak Continuous Delivery (kcd)
 
-[![CI](https://github.com/fabio-test/kcd/actions/workflows/ci.yml/badge.svg)](https://github.com/fabio-test/kcd/actions/workflows/ci.yml)
+[![CI](https://github.com/ffalcinelli/kcd/actions/workflows/ci.yml/badge.svg)](https://github.com/ffalcinelli/kcd/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Rust Version](https://img.shields.io/badge/rust-1.85%2B-blue.svg)
 
