@@ -1,0 +1,5 @@
+.secrets
+workspace/
+target/
+.env
+.git

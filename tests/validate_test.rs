@@ -11,8 +11,8 @@ use tempfile::tempdir;
 #[test]
 fn test_validate() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     // Create valid realm.yaml
@@ -28,15 +28,15 @@ fn test_validate() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_ok());
 }
 
 #[test]
 fn test_validate_empty_role_name() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     // Create valid realm.yaml
@@ -72,7 +72,7 @@ fn test_validate_empty_role_name() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -85,8 +85,8 @@ fn test_validate_empty_role_name() {
 #[test]
 fn test_validate_duplicate_role_name() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     // Create valid realm.yaml
@@ -138,7 +138,7 @@ fn test_validate_duplicate_role_name() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -151,11 +151,11 @@ fn test_validate_duplicate_role_name() {
 #[test]
 fn test_validate_missing_realm() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -168,8 +168,8 @@ fn test_validate_missing_realm() {
 #[test]
 fn test_validate_empty_client_id() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     // Create valid realm.yaml
@@ -210,7 +210,7 @@ fn test_validate_empty_client_id() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -223,8 +223,8 @@ fn test_validate_empty_client_id() {
 #[test]
 fn test_validate_empty_idp_alias() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     let realm = RealmRepresentation {
@@ -265,7 +265,7 @@ fn test_validate_empty_idp_alias() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -278,8 +278,8 @@ fn test_validate_empty_idp_alias() {
 #[test]
 fn test_validate_empty_idp_provider_id() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     let realm = RealmRepresentation {
@@ -320,7 +320,7 @@ fn test_validate_empty_idp_provider_id() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -333,8 +333,8 @@ fn test_validate_empty_idp_provider_id() {
 #[test]
 fn test_validate_empty_client_scope_name() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     let realm = RealmRepresentation {
@@ -366,7 +366,7 @@ fn test_validate_empty_client_scope_name() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -379,8 +379,8 @@ fn test_validate_empty_client_scope_name() {
 #[test]
 fn test_validate_empty_group_name() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     let realm = RealmRepresentation {
@@ -411,7 +411,7 @@ fn test_validate_empty_group_name() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -424,8 +424,8 @@ fn test_validate_empty_group_name() {
 #[test]
 fn test_validate_empty_username() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     let realm = RealmRepresentation {
@@ -460,7 +460,7 @@ fn test_validate_empty_username() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -473,8 +473,8 @@ fn test_validate_empty_username() {
 #[test]
 fn test_validate_empty_auth_flow_alias() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     let realm = RealmRepresentation {
@@ -508,7 +508,7 @@ fn test_validate_empty_auth_flow_alias() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -521,8 +521,8 @@ fn test_validate_empty_auth_flow_alias() {
 #[test]
 fn test_validate_empty_required_action_alias() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     let realm = RealmRepresentation {
@@ -556,7 +556,7 @@ fn test_validate_empty_required_action_alias() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -569,8 +569,8 @@ fn test_validate_empty_required_action_alias() {
 #[test]
 fn test_validate_empty_required_action_provider_id() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     let realm = RealmRepresentation {
@@ -604,7 +604,7 @@ fn test_validate_empty_required_action_provider_id() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -617,8 +617,8 @@ fn test_validate_empty_required_action_provider_id() {
 #[test]
 fn test_validate_empty_component_name() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     let realm = RealmRepresentation {
@@ -652,21 +652,67 @@ fn test_validate_empty_component_name() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
             .unwrap_err()
             .to_string()
-            .contains("Component name is missing or empty")
+            .contains("Component name is empty")
+    );
+}
+
+#[test]
+fn test_validate_missing_component_name() {
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
+    std::fs::create_dir_all(&realm_dir).unwrap();
+
+    let realm = RealmRepresentation {
+        realm: "test-realm".to_string(),
+        enabled: Some(true),
+        display_name: None,
+        extra: std::collections::HashMap::new(),
+    };
+    fs::write(
+        realm_dir.join("realm.yaml"),
+        serde_yaml::to_string(&realm).unwrap(),
+    )
+    .unwrap();
+
+    let components_dir = realm_dir.join("components");
+    fs::create_dir(&components_dir).unwrap();
+
+    let component = ComponentRepresentation {
+        id: None,
+        name: None, // Missing name
+        provider_id: Some("provider".to_string()),
+        provider_type: None,
+        parent_id: None,
+        sub_type: None,
+        config: None,
+        extra: std::collections::HashMap::new(),
+    };
+    fs::write(
+        components_dir.join("component.yaml"),
+        serde_yaml::to_string(&component).unwrap(),
+    )
+    .unwrap();
+
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    assert!(
+        result.is_ok(),
+        "Validation should succeed for missing component name. Error: {:?}",
+        result.err()
     );
 }
 
 #[test]
 fn test_validate_empty_component_provider_id() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     let realm = RealmRepresentation {
@@ -700,7 +746,7 @@ fn test_validate_empty_component_provider_id() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result
@@ -713,8 +759,8 @@ fn test_validate_empty_component_provider_id() {
 #[test]
 fn test_validate_empty_realm_name() {
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     // Create realm.yaml with empty name
@@ -730,7 +776,7 @@ fn test_validate_empty_realm_name() {
     )
     .unwrap();
 
-    let result = validate::run(input_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
     assert!(result.is_err());
     assert!(
         result

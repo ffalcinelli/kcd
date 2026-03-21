@@ -1,23 +1,31 @@
 use crate::client::KeycloakClient;
+use crate::models::KeycloakResource;
 use crate::utils::to_sorted_yaml_with_secrets;
 use anyhow::{Context, Result};
+use console::{Emoji, style};
+use dialoguer::{Confirm, theme::ColorfulTheme};
 use sanitize_filename::sanitize;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::Mutex;
 
+static ACTION: Emoji<'_, '_> = Emoji("🔍 ", "> ");
+static SUCCESS: Emoji<'_, '_> = Emoji("✅ ", "√ ");
+static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
+
 pub async fn run(
     client: &KeycloakClient,
-    output_dir: PathBuf,
+    workspace_dir: PathBuf,
     realms_to_inspect: &[String],
+    yes: bool,
 ) -> Result<()> {
-    if !fs::try_exists(&output_dir)
+    if !fs::try_exists(&workspace_dir)
         .await
         .context("Failed to check output directory")?
     {
-        fs::create_dir_all(&output_dir)
+        fs::create_dir_all(&workspace_dir)
             .await
             .context("Failed to create output directory")?;
     }
@@ -33,18 +41,33 @@ pub async fn run(
     };
 
     let all_secrets = Arc::new(Mutex::new(HashMap::new()));
+    let prompt_mutex = Arc::new(Mutex::new(()));
 
     for realm_name in realms {
         let mut realm_client = client.clone();
         realm_client.set_target_realm(realm_name.clone());
-        let realm_dir = output_dir.join(&realm_name);
-        println!("Inspecting realm: {}", realm_name);
-        inspect_realm(&realm_client, realm_dir, Arc::clone(&all_secrets)).await?;
+        let realm_dir = workspace_dir.join(&realm_name);
+        println!(
+            "\n{} {}",
+            ACTION,
+            style(format!("Inspecting realm: {}", realm_name))
+                .cyan()
+                .bold()
+        );
+        inspect_realm(
+            &realm_client,
+            &realm_name,
+            realm_dir,
+            Arc::clone(&all_secrets),
+            yes,
+            Arc::clone(&prompt_mutex),
+        )
+        .await?;
     }
 
     let secrets_lock = all_secrets.lock().await;
     if !secrets_lock.is_empty() {
-        let env_path = output_dir.join(".env");
+        let env_path = workspace_dir.join(".secrets");
         let mut env_content = String::new();
         let mut keys: Vec<&String> = secrets_lock.keys().collect();
         keys.sort();
@@ -63,25 +86,99 @@ pub async fn run(
             }
         }
 
-        fs::write(&env_path, format!("{}{}", existing_env, env_content))
-            .await
-            .context("Failed to write .env file")?;
-        println!("Exported secrets to .env");
+        let new_content = format!("{}{}", existing_env, env_content);
+        write_if_changed_with_mutex(&env_path, &new_content, yes, Arc::clone(&prompt_mutex))
+            .await?;
+        println!(
+            "{} {}",
+            SUCCESS,
+            style("Exported secrets to .secrets").green()
+        );
     }
 
     Ok(())
 }
 
+async fn write_if_changed(path: &Path, content: &str, yes: bool) -> Result<()> {
+    if fs::try_exists(path).await.unwrap_or(false) {
+        let existing = fs::read_to_string(path).await.unwrap_or_default();
+        if existing == content {
+            return Ok(());
+        }
+
+        if !yes
+            && !Confirm::with_theme(&ColorfulTheme::default())
+                .with_prompt(format!(
+                    "File {:?} already exists with different content. Overwrite?",
+                    path
+                ))
+                .default(false)
+                .interact()?
+        {
+            println!(
+                "{} {}",
+                WARN,
+                style(format!("Skipping {:?}", path)).yellow()
+            );
+            return Ok(());
+        }
+    }
+    fs::write(path, content)
+        .await
+        .context(format!("Failed to write {:?}", path))?;
+    Ok(())
+}
+
+async fn write_if_changed_with_mutex(
+    path: &Path,
+    content: &str,
+    yes: bool,
+    prompt_mutex: Arc<Mutex<()>>,
+) -> Result<()> {
+    if fs::try_exists(path).await.unwrap_or(false) {
+        let existing = fs::read_to_string(path).await.unwrap_or_default();
+        if existing == content {
+            return Ok(());
+        }
+
+        if !yes {
+            let _lock = prompt_mutex.lock().await;
+            if !Confirm::with_theme(&ColorfulTheme::default())
+                .with_prompt(format!(
+                    "File {:?} already exists with different content. Overwrite?",
+                    path
+                ))
+                .default(false)
+                .interact()?
+            {
+                println!(
+                    "{} {}",
+                    WARN,
+                    style(format!("Skipping {:?}", path)).yellow()
+                );
+                return Ok(());
+            }
+        }
+    }
+    fs::write(path, content)
+        .await
+        .context(format!("Failed to write {:?}", path))?;
+    Ok(())
+}
+
 async fn inspect_realm(
     client: &KeycloakClient,
-    output_dir: PathBuf,
+    realm_name: &str,
+    workspace_dir: PathBuf,
     all_secrets: Arc<Mutex<HashMap<String, String>>>,
+    yes: bool,
+    prompt_mutex: Arc<Mutex<()>>,
 ) -> Result<()> {
-    if !fs::try_exists(&output_dir)
+    if !fs::try_exists(&workspace_dir)
         .await
         .context("Failed to check output directory")?
     {
-        fs::create_dir_all(&output_dir)
+        fs::create_dir_all(&workspace_dir)
             .await
             .context("Failed to create output directory")?;
     }
@@ -89,20 +186,25 @@ async fn inspect_realm(
     // Fetch realm
     let realm = client.get_realm().await.context("Failed to fetch realm")?;
     let mut local_secrets = HashMap::new();
-    let realm_yaml = to_sorted_yaml_with_secrets(&realm, "realm", &mut local_secrets)
+    let realm_prefix = format!("realm_{}", realm_name);
+    let realm_yaml = to_sorted_yaml_with_secrets(&realm, &realm_prefix, &mut local_secrets)
         .context("Failed to serialize realm")?;
     all_secrets.lock().await.extend(local_secrets);
-    fs::write(output_dir.join("realm.yaml"), realm_yaml)
-        .await
-        .context("Failed to write realm.yaml")?;
-    println!("Exported realm configuration to realm.yaml");
+
+    let realm_path = workspace_dir.join("realm.yaml");
+    write_if_changed(&realm_path, &realm_yaml, yes).await?;
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported realm configuration to realm.yaml").green()
+    );
 
     // Fetch clients
     let clients = client
         .get_clients()
         .await
         .context("Failed to fetch clients")?;
-    let clients_dir = output_dir.join("clients");
+    let clients_dir = workspace_dir.join("clients");
     if !fs::try_exists(&clients_dir)
         .await
         .context("Failed to check clients directory")?
@@ -115,31 +217,32 @@ async fn inspect_realm(
     for client_rep in clients {
         let clients_dir = clients_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
+        let prompt_mutex = Arc::clone(&prompt_mutex);
         set.spawn(async move {
-            let name = client_rep
-                .client_id
-                .as_deref()
-                .unwrap_or("unknown")
-                .to_string();
+            let name = client_rep.get_name();
             let filename = format!("{}.yaml", sanitize(&name));
             let path = clients_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&client_rep, "client", &mut local_secrets)
+            let prefix = format!("realm_{}_client", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&client_rep, &prefix, &mut local_secrets)
                 .context("Failed to serialize client")?;
             all_secrets.lock().await.extend(local_secrets);
-            fs::write(&path, yaml)
-                .await
-                .context(format!("Failed to write client {}", name))
+            write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
         });
     }
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported clients to clients/");
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported clients to clients/").green()
+    );
 
     // Fetch roles
     let roles = client.get_roles().await.context("Failed to fetch roles")?;
-    let roles_dir = output_dir.join("roles");
+    let roles_dir = workspace_dir.join("roles");
     if !fs::try_exists(&roles_dir)
         .await
         .context("Failed to check roles directory")?
@@ -152,30 +255,35 @@ async fn inspect_realm(
     for role in roles {
         let roles_dir = roles_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
+        let prompt_mutex = Arc::clone(&prompt_mutex);
         set.spawn(async move {
-            let name = &role.name;
-            let filename = format!("{}.yaml", sanitize(name));
+            let name = role.get_name();
+            let filename = format!("{}.yaml", sanitize(&name));
             let path = roles_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&role, "role", &mut local_secrets)
+            let prefix = format!("realm_{}_role", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&role, &prefix, &mut local_secrets)
                 .context("Failed to serialize role")?;
             all_secrets.lock().await.extend(local_secrets);
-            fs::write(&path, yaml)
-                .await
-                .context(format!("Failed to write role {}", name))
+            write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
         });
     }
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported roles to roles/");
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported roles to roles/").green()
+    );
 
     // Fetch client scopes
     let client_scopes = client
         .get_client_scopes()
         .await
         .context("Failed to fetch client scopes")?;
-    let scopes_dir = output_dir.join("client-scopes");
+    let scopes_dir = workspace_dir.join("client-scopes");
     if !fs::try_exists(&scopes_dir)
         .await
         .context("Failed to check client-scopes directory")?
@@ -188,30 +296,76 @@ async fn inspect_realm(
     for scope in client_scopes {
         let scopes_dir = scopes_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
+        let prompt_mutex = Arc::clone(&prompt_mutex);
         set.spawn(async move {
-            let name = scope.name.as_deref().unwrap_or("unknown").to_string();
+            let name = scope.get_name();
             let filename = format!("{}.yaml", sanitize(&name));
             let path = scopes_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&scope, "client_scope", &mut local_secrets)
+            let prefix = format!("realm_{}_client_scope", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&scope, &prefix, &mut local_secrets)
                 .context("Failed to serialize client scope")?;
             all_secrets.lock().await.extend(local_secrets);
-            fs::write(&path, yaml)
-                .await
-                .context(format!("Failed to write client scope {}", name))
+            write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
         });
     }
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported client scopes to client-scopes/");
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported client scopes to client-scopes/").green()
+    );
+
+    // Fetch identity providers
+    let idps = client
+        .get_identity_providers()
+        .await
+        .context("Failed to fetch identity providers")?;
+    let idps_dir = workspace_dir.join("identity-providers");
+    if !fs::try_exists(&idps_dir)
+        .await
+        .context("Failed to check identity-providers directory")?
+    {
+        fs::create_dir_all(&idps_dir)
+            .await
+            .context("Failed to create identity-providers directory")?;
+    }
+    let mut set = tokio::task::JoinSet::new();
+    for idp in idps {
+        let idps_dir = idps_dir.clone();
+        let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
+        let prompt_mutex = Arc::clone(&prompt_mutex);
+        set.spawn(async move {
+            let name = idp.get_name();
+            let filename = format!("{}.yaml", sanitize(&name));
+            let path = idps_dir.join(filename);
+            let mut local_secrets = HashMap::new();
+            let prefix = format!("realm_{}_idp", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&idp, &prefix, &mut local_secrets)
+                .context("Failed to serialize identity provider")?;
+            all_secrets.lock().await.extend(local_secrets);
+            write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
+    }
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported identity providers to identity-providers/").green()
+    );
 
     // Fetch groups
     let groups = client
         .get_groups()
         .await
         .context("Failed to fetch groups")?;
-    let groups_dir = output_dir.join("groups");
+    let groups_dir = workspace_dir.join("groups");
     if !fs::try_exists(&groups_dir)
         .await
         .context("Failed to check groups directory")?
@@ -224,27 +378,33 @@ async fn inspect_realm(
     for group in groups {
         let groups_dir = groups_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
+        let prompt_mutex = Arc::clone(&prompt_mutex);
         set.spawn(async move {
-            let name = group.name.as_deref().unwrap_or("unknown").to_string();
-            let filename = format!("{}.yaml", sanitize(&name));
+            let name = group.get_name();
+            let id = group.id.as_deref().unwrap_or("unknown");
+            let filename = format!("{}-{}.yaml", sanitize(&name), id);
             let path = groups_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&group, "group", &mut local_secrets)
+            let prefix = format!("realm_{}_group", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&group, &prefix, &mut local_secrets)
                 .context("Failed to serialize group")?;
             all_secrets.lock().await.extend(local_secrets);
-            fs::write(&path, yaml)
-                .await
-                .context(format!("Failed to write group {}", name))
+            write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
         });
     }
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported groups to groups/");
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported groups to groups/").green()
+    );
 
     // Fetch users
     let users = client.get_users().await.context("Failed to fetch users")?;
-    let users_dir = output_dir.join("users");
+    let users_dir = workspace_dir.join("users");
     if !fs::try_exists(&users_dir)
         .await
         .context("Failed to check users directory")?
@@ -257,30 +417,35 @@ async fn inspect_realm(
     for user in users {
         let users_dir = users_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
+        let prompt_mutex = Arc::clone(&prompt_mutex);
         set.spawn(async move {
-            let username = user.username.as_deref().unwrap_or("unknown").to_string();
-            let filename = format!("{}.yaml", sanitize(&username));
+            let name = user.get_name();
+            let filename = format!("{}.yaml", sanitize(&name));
             let path = users_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&user, "user", &mut local_secrets)
+            let prefix = format!("realm_{}_user", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&user, &prefix, &mut local_secrets)
                 .context("Failed to serialize user")?;
             all_secrets.lock().await.extend(local_secrets);
-            fs::write(&path, yaml)
-                .await
-                .context(format!("Failed to write user {}", username))
+            write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
         });
     }
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported users to users/");
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported users to users/").green()
+    );
 
     // Fetch authentication flows
     let flows = client
         .get_authentication_flows()
         .await
         .context("Failed to fetch authentication flows")?;
-    let flows_dir = output_dir.join("authentication-flows");
+    let flows_dir = workspace_dir.join("authentication-flows");
     if !fs::try_exists(&flows_dir)
         .await
         .context("Failed to check authentication-flows directory")?
@@ -293,30 +458,35 @@ async fn inspect_realm(
     for flow in flows {
         let flows_dir = flows_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
+        let prompt_mutex = Arc::clone(&prompt_mutex);
         set.spawn(async move {
-            let alias = flow.alias.as_deref().unwrap_or("unknown").to_string();
-            let filename = format!("{}.yaml", sanitize(&alias));
+            let name = flow.get_name();
+            let filename = format!("{}.yaml", sanitize(&name));
             let path = flows_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&flow, "flow", &mut local_secrets)
+            let prefix = format!("realm_{}_flow", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&flow, &prefix, &mut local_secrets)
                 .context("Failed to serialize authentication flow")?;
             all_secrets.lock().await.extend(local_secrets);
-            fs::write(&path, yaml)
-                .await
-                .context(format!("Failed to write authentication flow {}", alias))
+            write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
         });
     }
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported authentication flows to authentication-flows/");
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported authentication flows to authentication-flows/").green()
+    );
 
     // Fetch required actions
     let actions = client
         .get_required_actions()
         .await
         .context("Failed to fetch required actions")?;
-    let actions_dir = output_dir.join("required-actions");
+    let actions_dir = workspace_dir.join("required-actions");
     if !fs::try_exists(&actions_dir)
         .await
         .context("Failed to check required-actions directory")?
@@ -329,23 +499,28 @@ async fn inspect_realm(
     for action in actions {
         let actions_dir = actions_dir.clone();
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
+        let prompt_mutex = Arc::clone(&prompt_mutex);
         set.spawn(async move {
-            let alias = action.alias.as_deref().unwrap_or("unknown").to_string();
-            let filename = format!("{}.yaml", sanitize(&alias));
+            let name = action.get_name();
+            let filename = format!("{}.yaml", sanitize(&name));
             let path = actions_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let yaml = to_sorted_yaml_with_secrets(&action, "action", &mut local_secrets)
+            let prefix = format!("realm_{}_action", realm_name);
+            let yaml = to_sorted_yaml_with_secrets(&action, &prefix, &mut local_secrets)
                 .context("Failed to serialize required action")?;
             all_secrets.lock().await.extend(local_secrets);
-            fs::write(&path, yaml)
-                .await
-                .context(format!("Failed to write required action {}", alias))
+            write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
         });
     }
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported required actions to required-actions/");
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported required actions to required-actions/").green()
+    );
 
     // Fetch components and keys
     let all_components = client
@@ -353,7 +528,7 @@ async fn inspect_realm(
         .await
         .context("Failed to fetch components")?;
 
-    let components_dir = output_dir.join("components");
+    let components_dir = workspace_dir.join("components");
     if !fs::try_exists(&components_dir)
         .await
         .context("Failed to check components directory")?
@@ -363,7 +538,7 @@ async fn inspect_realm(
             .context("Failed to create components directory")?;
     }
 
-    let keys_dir = output_dir.join("keys");
+    let keys_dir = workspace_dir.join("keys");
     if !fs::try_exists(&keys_dir)
         .await
         .context("Failed to check keys directory")?
@@ -386,24 +561,30 @@ async fn inspect_realm(
         };
 
         let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
+        let prompt_mutex = Arc::clone(&prompt_mutex);
         set.spawn(async move {
-            let name = component.name.as_deref().unwrap_or("unknown").to_string();
-            let filename = format!("{}.yaml", sanitize(&name));
+            let name = component.get_name();
+            let id = component.id.as_deref().unwrap_or("unknown");
+            let filename = format!("{}-{}.yaml", sanitize(&name), id);
             let path = target_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let prefix = if is_key { "key" } else { "component" };
-            let yaml = to_sorted_yaml_with_secrets(&component, prefix, &mut local_secrets)
+            let sub_prefix = if is_key { "key" } else { "component" };
+            let prefix = format!("realm_{}_{}", realm_name, sub_prefix);
+            let yaml = to_sorted_yaml_with_secrets(&component, &prefix, &mut local_secrets)
                 .context("Failed to serialize component")?;
             all_secrets.lock().await.extend(local_secrets);
-            fs::write(&path, yaml)
-                .await
-                .context(format!("Failed to write component {}", name))
+            write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
         });
     }
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported components to components/ and keys to keys/");
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported components to components/ and keys to keys/").green()
+    );
 
     Ok(())
 }

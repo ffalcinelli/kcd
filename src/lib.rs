@@ -1,5 +1,6 @@
 pub mod apply;
 pub mod args;
+pub mod clean;
 pub mod cli;
 pub mod client;
 pub mod inspect;

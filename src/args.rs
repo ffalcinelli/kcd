@@ -36,42 +36,64 @@ pub struct Cli {
 pub enum Commands {
     /// Inspect the current Keycloak configuration and dump to files
     Inspect {
-        /// Output directory for configuration files
-        #[arg(long, short, default_value = "config")]
-        output: PathBuf,
+        /// Workspace directory for configuration files
+        #[arg(long, short = 'w', default_value = "workspace")]
+        workspace: PathBuf,
+
+        /// Skip confirmation prompt when overwriting local files
+        #[arg(long, short = 'y', default_value = "false")]
+        yes: bool,
     },
     /// Validate the local Keycloak configuration files
     Validate {
-        /// Input directory containing configuration files
-        #[arg(long, short, default_value = "config")]
-        input: PathBuf,
+        /// Workspace directory containing configuration files
+        #[arg(long, short = 'w', default_value = "workspace")]
+        workspace: PathBuf,
     },
     /// Apply the local Keycloak configuration to the server
     Apply {
-        /// Input directory containing configuration files
-        #[arg(long, short, default_value = "config")]
-        input: PathBuf,
+        /// Workspace directory containing configuration files
+        #[arg(long, short = 'w', default_value = "workspace")]
+        workspace: PathBuf,
+
+        /// Skip confirmation prompt
+        #[arg(long, short = 'y', default_value = "false")]
+        yes: bool,
     },
     /// Plan the application of the local Keycloak configuration
     Plan {
-        /// Input directory containing configuration files
-        #[arg(long, short, default_value = "config")]
-        input: PathBuf,
+        /// Workspace directory containing configuration files
+        #[arg(long, short = 'w', default_value = "workspace")]
+        workspace: PathBuf,
 
         /// Show only changes, suppressing "No changes" messages
         #[arg(long, short = 'c')]
         changes_only: bool,
+
+        /// Ask interactively whether to include each change in the plan
+        #[arg(long, short = 'i', default_value = "false")]
+        interactive: bool,
     },
     /// Check for drift between local configuration and server
     Drift {
-        /// Input directory containing configuration files
-        #[arg(long, short, default_value = "config")]
-        input: PathBuf,
+        /// Workspace directory containing configuration files
+        #[arg(long, short = 'w', default_value = "workspace")]
+        workspace: PathBuf,
     },
     /// Interactive CLI mode to generate local configuration
     Cli {
-        /// Base directory for configuration files
-        #[arg(long, short, default_value = "config")]
-        config_dir: PathBuf,
+        /// Workspace directory for configuration files
+        #[arg(long, short = 'w', default_value = "workspace")]
+        workspace: PathBuf,
+    },
+    /// Clean the local configuration files
+    Clean {
+        /// Workspace directory containing configuration files
+        #[arg(long, short = 'w', default_value = "workspace")]
+        workspace: PathBuf,
+
+        /// Skip confirmation prompt
+        #[arg(long, short = 'y', default_value = "false")]
+        yes: bool,
     },
 }

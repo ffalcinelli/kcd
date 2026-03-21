@@ -17,8 +17,8 @@ async fn test_plan() {
         .expect("Login failed");
 
     let dir = tempdir().unwrap();
-    let input_dir = dir.path().to_path_buf();
-    let realm_dir = input_dir.join("test-realm");
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
     // Create realm.yaml
@@ -93,8 +93,9 @@ async fn test_plan() {
     // Run plan
     plan::run(
         &client,
-        input_dir.clone(),
+        workspace_dir.clone(),
         false, // changes_only
+        false, // interactive
         &["test-realm".to_string()],
     )
     .await

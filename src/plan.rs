@@ -1,13 +1,13 @@
 use crate::client::KeycloakClient;
 use crate::models::{
     AuthenticationFlowRepresentation, ClientRepresentation, ClientScopeRepresentation,
-    ComponentRepresentation, GroupRepresentation, IdentityProviderRepresentation,
+    ComponentRepresentation, GroupRepresentation, IdentityProviderRepresentation, KeycloakResource,
     RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation,
     UserRepresentation,
 };
 
-use anyhow::Result;
-use console::{Emoji, Style};
+use anyhow::{Context, Result};
+use console::{Emoji, Style, style};
 use serde::Serialize;
 use similar::{ChangeTag, TextDiff};
 use std::collections::HashMap;
@@ -16,20 +16,31 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs as async_fs;
 
+static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
+static ACTION: Emoji<'_, '_> = Emoji("🔍 ", "> ");
+
 pub async fn run(
     client: &KeycloakClient,
-    input_dir: PathBuf,
+    workspace_dir: PathBuf,
     changes_only: bool,
+    interactive: bool,
     realms_to_plan: &[String],
 ) -> Result<()> {
-    let env_vars = Arc::new(env::vars().collect::<HashMap<String, String>>());
-    if !input_dir.exists() {
-        anyhow::bail!("Input directory {:?} does not exist", input_dir);
+    if !workspace_dir.exists() {
+        anyhow::bail!("Input directory {:?} does not exist", workspace_dir);
     }
+
+    // Load .secrets from input directory if it exists
+    let env_path = workspace_dir.join(".secrets");
+    if env_path.exists() {
+        dotenvy::from_path(&env_path).ok();
+    }
+
+    let env_vars = Arc::new(env::vars().collect::<HashMap<String, String>>());
 
     let realms = if realms_to_plan.is_empty() {
         let mut dirs = Vec::new();
-        let mut entries = async_fs::read_dir(&input_dir).await?;
+        let mut entries = async_fs::read_dir(&workspace_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             if entry.file_type().await?.is_dir() {
                 dirs.push(entry.file_name().to_string_lossy().to_string());
@@ -41,78 +52,176 @@ pub async fn run(
     };
 
     if realms.is_empty() {
-        println!("No realms found to plan in {:?}", input_dir);
+        println!(
+            "{} {}",
+            WARN,
+            style(format!("No realms found to plan in {:?}", workspace_dir)).yellow()
+        );
         return Ok(());
     }
 
+    let mut changed_files = Vec::new();
     for realm_name in realms {
         let mut realm_client = client.clone();
         realm_client.set_target_realm(realm_name.clone());
-        let realm_dir = input_dir.join(&realm_name);
+        let realm_dir = workspace_dir.join(&realm_name);
         println!(
-            "{} Planning changes for realm: {}",
-            Emoji("🔮", ""),
-            realm_name
+            "\n{} {}",
+            ACTION,
+            style(format!("Planning changes for realm: {}", realm_name))
+                .cyan()
+                .bold()
         );
         plan_single_realm(
             &realm_client,
             realm_dir,
             changes_only,
+            interactive,
             Arc::clone(&env_vars),
+            &mut changed_files,
         )
         .await?;
     }
+
+    let plan_file = workspace_dir.join(".kcdplan");
+    if changed_files.is_empty() {
+        if async_fs::try_exists(&plan_file).await? {
+            async_fs::remove_file(&plan_file).await?;
+        }
+    } else {
+        let content = serde_json::to_string_pretty(&changed_files)?;
+        async_fs::write(&plan_file, content).await?;
+    }
+
     Ok(())
 }
 
 async fn plan_single_realm(
     client: &KeycloakClient,
-    input_dir: PathBuf,
+    workspace_dir: PathBuf,
     changes_only: bool,
+    interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
+    changed_files: &mut Vec<PathBuf>,
 ) -> Result<()> {
     // 1. Plan Realm
-    plan_realm(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
+    plan_realm(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 2. Plan Roles
-    plan_roles(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
+    plan_roles(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 3. Plan Clients
-    plan_clients(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
+    plan_clients(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 4. Plan Identity Providers
-    plan_identity_providers(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
+    plan_identity_providers(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 5. Plan Client Scopes
-    plan_client_scopes(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
+    plan_client_scopes(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 6. Plan Groups
-    plan_groups(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
+    plan_groups(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 7. Plan Users
-    plan_users(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
+    plan_users(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 8. Plan Authentication Flows
-    plan_authentication_flows(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
+    plan_authentication_flows(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 9. Plan Required Actions
-    plan_required_actions(client, &input_dir, changes_only, Arc::clone(&env_vars)).await?;
+    plan_required_actions(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 10. Plan Components
     plan_components_or_keys(
         client,
-        &input_dir,
+        &workspace_dir,
         changes_only,
+        interactive,
         "components",
         Arc::clone(&env_vars),
+        changed_files,
     )
     .await?;
     plan_components_or_keys(
         client,
-        &input_dir,
+        &workspace_dir,
         changes_only,
+        interactive,
         "keys",
         Arc::clone(&env_vars),
+        changed_files,
     )
     .await?;
     check_keys_drift(client, changes_only).await?;
@@ -127,24 +236,24 @@ fn print_diff<T: Serialize>(
     old: Option<&T>,
     new: &T,
     changes_only: bool,
-    env_vars: Arc<HashMap<String, String>>,
-) -> Result<()> {
+    prefix: &str,
+) -> Result<bool> {
     let old_yaml = if let Some(o) = old {
         let mut val = serde_json::to_value(o)?;
-        obfuscate_secrets(&mut val);
+        obfuscate_secrets(&mut val, prefix);
         crate::utils::to_sorted_yaml(&val)?
     } else {
         String::new()
     };
 
     let mut new_val = serde_json::to_value(new)?;
-    substitute_secrets(&mut new_val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
-    obfuscate_secrets(&mut new_val);
+    obfuscate_secrets(&mut new_val, prefix);
     let new_yaml = crate::utils::to_sorted_yaml(&new_val)?;
 
     let diff = TextDiff::from_lines(&old_yaml, &new_yaml);
+    let changed = diff.ratio() < 1.0;
 
-    if diff.ratio() < 1.0 {
+    if changed {
         println!("\n{} Changes for {}:", Emoji("📝", ""), name);
         for change in diff.iter_all_changes() {
             let (sign, style) = match change.tag() {
@@ -157,21 +266,23 @@ fn print_diff<T: Serialize>(
     } else if !changes_only {
         println!("{} No changes for {}", Emoji("✅", ""), name);
     }
-    Ok(())
+    Ok(changed)
 }
 
 async fn plan_client_scopes(
     client: &KeycloakClient,
-    input_dir: &Path,
+    workspace_dir: &Path,
     changes_only: bool,
+    interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
+    changed_files: &mut Vec<PathBuf>,
 ) -> Result<()> {
-    let scopes_dir = input_dir.join("client-scopes");
+    let scopes_dir = workspace_dir.join("client-scopes");
     if async_fs::try_exists(&scopes_dir).await? {
         let existing_scopes = client.get_client_scopes().await?;
         let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
             .into_iter()
-            .filter_map(|mut s| s.name.take().map(|n| (n, s)))
+            .filter_map(|s| s.get_identity().map(|id| (id, s)))
             .collect();
 
         let mut entries = async_fs::read_dir(&scopes_dir).await?;
@@ -179,35 +290,57 @@ async fn plan_client_scopes(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_scope: ClientScopeRepresentation = serde_yaml::from_str(&content)?;
-                let name = local_scope.name.as_deref().unwrap_or("");
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_scope: ClientScopeRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
 
-                if name.is_empty() {
-                    continue;
-                }
+                let identity = local_scope
+                    .get_identity()
+                    .context(format!("Failed to get identity for scope in {:?}", path))?;
+                let remote = existing_scopes_map.get(&identity);
 
-                if let Some(remote) = existing_scopes_map.get(name) {
+                let changed = if let Some(remote) = remote {
                     let mut remote_clone = remote.clone();
-                    remote_clone.name = Some(name.to_string());
                     if local_scope.id.is_none() {
                         remote_clone.id = None;
                     }
                     print_diff(
-                        &format!("ClientScope {}", name),
+                        &format!("ClientScope {}", local_scope.get_name()),
                         Some(&remote_clone),
                         &local_scope,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "client_scope",
+                    )?
                 } else {
-                    println!("\n{} Will create ClientScope: {}", Emoji("✨", ""), name);
+                    println!(
+                        "\n{} Will create ClientScope: {}",
+                        Emoji("✨", ""),
+                        local_scope.get_name()
+                    );
                     print_diff(
-                        &format!("ClientScope {}", name),
+                        &format!("ClientScope {}", local_scope.get_name()),
                         None::<&ClientScopeRepresentation>,
                         &local_scope,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "client_scope",
+                    )?
+                };
+
+                if changed {
+                    let mut include = true;
+                    if interactive {
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
+                    }
+                    if include {
+                        changed_files.push(path);
+                    }
                 }
             }
         }
@@ -217,16 +350,18 @@ async fn plan_client_scopes(
 
 async fn plan_groups(
     client: &KeycloakClient,
-    input_dir: &Path,
+    workspace_dir: &Path,
     changes_only: bool,
+    interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
+    changed_files: &mut Vec<PathBuf>,
 ) -> Result<()> {
-    let groups_dir = input_dir.join("groups");
+    let groups_dir = workspace_dir.join("groups");
     if async_fs::try_exists(&groups_dir).await? {
         let existing_groups = client.get_groups().await?;
         let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
             .into_iter()
-            .filter_map(|mut g| g.name.take().map(|n| (n, g)))
+            .filter_map(|g| g.get_identity().map(|id| (id, g)))
             .collect();
 
         let mut entries = async_fs::read_dir(&groups_dir).await?;
@@ -234,35 +369,57 @@ async fn plan_groups(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_group: GroupRepresentation = serde_yaml::from_str(&content)?;
-                let name = local_group.name.as_deref().unwrap_or("");
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_group: GroupRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
 
-                if name.is_empty() {
-                    continue;
-                }
+                let identity = local_group
+                    .get_identity()
+                    .context(format!("Failed to get identity for group in {:?}", path))?;
+                let remote = existing_groups_map.get(&identity);
 
-                if let Some(remote) = existing_groups_map.get(name) {
+                let changed = if let Some(remote) = remote {
                     let mut remote_clone = remote.clone();
-                    remote_clone.name = Some(name.to_string());
                     if local_group.id.is_none() {
                         remote_clone.id = None;
                     }
                     print_diff(
-                        &format!("Group {}", name),
+                        &format!("Group {}", local_group.get_name()),
                         Some(&remote_clone),
                         &local_group,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "group",
+                    )?
                 } else {
-                    println!("\n{} Will create Group: {}", Emoji("✨", ""), name);
+                    println!(
+                        "\n{} Will create Group: {}",
+                        Emoji("✨", ""),
+                        local_group.get_name()
+                    );
                     print_diff(
-                        &format!("Group {}", name),
+                        &format!("Group {}", local_group.get_name()),
                         None::<&GroupRepresentation>,
                         &local_group,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "group",
+                    )?
+                };
+
+                if changed {
+                    let mut include = true;
+                    if interactive {
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
+                    }
+                    if include {
+                        changed_files.push(path);
+                    }
                 }
             }
         }
@@ -272,16 +429,18 @@ async fn plan_groups(
 
 async fn plan_users(
     client: &KeycloakClient,
-    input_dir: &Path,
+    workspace_dir: &Path,
     changes_only: bool,
+    interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
+    changed_files: &mut Vec<PathBuf>,
 ) -> Result<()> {
-    let users_dir = input_dir.join("users");
+    let users_dir = workspace_dir.join("users");
     if async_fs::try_exists(&users_dir).await? {
         let existing_users = client.get_users().await?;
         let existing_users_map: HashMap<String, UserRepresentation> = existing_users
             .into_iter()
-            .filter_map(|mut u| u.username.take().map(|n| (n, u)))
+            .filter_map(|u| u.get_identity().map(|id| (id, u)))
             .collect();
 
         let mut entries = async_fs::read_dir(&users_dir).await?;
@@ -289,35 +448,57 @@ async fn plan_users(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_user: UserRepresentation = serde_yaml::from_str(&content)?;
-                let username = local_user.username.as_deref().unwrap_or("");
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_user: UserRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
 
-                if username.is_empty() {
-                    continue;
-                }
+                let identity = local_user
+                    .get_identity()
+                    .context(format!("Failed to get identity for user in {:?}", path))?;
+                let remote = existing_users_map.get(&identity);
 
-                if let Some(remote) = existing_users_map.get(username) {
+                let changed = if let Some(remote) = remote {
                     let mut remote_clone = remote.clone();
-                    remote_clone.username = Some(username.to_string());
                     if local_user.id.is_none() {
                         remote_clone.id = None;
                     }
                     print_diff(
-                        &format!("User {}", username),
+                        &format!("User {}", local_user.get_name()),
                         Some(&remote_clone),
                         &local_user,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "user",
+                    )?
                 } else {
-                    println!("\n{} Will create User: {}", Emoji("✨", ""), username);
+                    println!(
+                        "\n{} Will create User: {}",
+                        Emoji("✨", ""),
+                        local_user.get_name()
+                    );
                     print_diff(
-                        &format!("User {}", username),
+                        &format!("User {}", local_user.get_name()),
                         None::<&UserRepresentation>,
                         &local_user,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "user",
+                    )?
+                };
+
+                if changed {
+                    let mut include = true;
+                    if interactive {
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
+                    }
+                    if include {
+                        changed_files.push(path);
+                    }
                 }
             }
         }
@@ -327,16 +508,18 @@ async fn plan_users(
 
 async fn plan_authentication_flows(
     client: &KeycloakClient,
-    input_dir: &Path,
+    workspace_dir: &Path,
     changes_only: bool,
+    interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
+    changed_files: &mut Vec<PathBuf>,
 ) -> Result<()> {
-    let flows_dir = input_dir.join("authentication-flows");
+    let flows_dir = workspace_dir.join("authentication-flows");
     if async_fs::try_exists(&flows_dir).await? {
         let existing_flows = client.get_authentication_flows().await?;
         let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
             .into_iter()
-            .filter_map(|mut f| f.alias.take().map(|a| (a, f)))
+            .filter_map(|f| f.get_identity().map(|id| (id, f)))
             .collect();
 
         let mut entries = async_fs::read_dir(&flows_dir).await?;
@@ -344,39 +527,57 @@ async fn plan_authentication_flows(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_flow: AuthenticationFlowRepresentation = serde_yaml::from_str(&content)?;
-                let alias = local_flow.alias.as_deref().unwrap_or("");
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_flow: AuthenticationFlowRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
 
-                if alias.is_empty() {
-                    continue;
-                }
+                let identity = local_flow
+                    .get_identity()
+                    .context(format!("Failed to get identity for flow in {:?}", path))?;
+                let remote = existing_flows_map.get(&identity);
 
-                if let Some(remote) = existing_flows_map.get(alias) {
+                let changed = if let Some(remote) = remote {
                     let mut remote_clone = remote.clone();
-                    remote_clone.alias = Some(alias.to_string());
                     if local_flow.id.is_none() {
                         remote_clone.id = None;
                     }
                     print_diff(
-                        &format!("AuthenticationFlow {}", alias),
+                        &format!("AuthenticationFlow {}", local_flow.get_name()),
                         Some(&remote_clone),
                         &local_flow,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "flow",
+                    )?
                 } else {
                     println!(
                         "\n{} Will create AuthenticationFlow: {}",
                         Emoji("✨", ""),
-                        alias
+                        local_flow.get_name()
                     );
                     print_diff(
-                        &format!("AuthenticationFlow {}", alias),
+                        &format!("AuthenticationFlow {}", local_flow.get_name()),
                         None::<&AuthenticationFlowRepresentation>,
                         &local_flow,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "flow",
+                    )?
+                };
+
+                if changed {
+                    let mut include = true;
+                    if interactive {
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
+                    }
+                    if include {
+                        changed_files.push(path);
+                    }
                 }
             }
         }
@@ -386,17 +587,19 @@ async fn plan_authentication_flows(
 
 async fn plan_required_actions(
     client: &KeycloakClient,
-    input_dir: &Path,
+    workspace_dir: &Path,
     changes_only: bool,
+    interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
+    changed_files: &mut Vec<PathBuf>,
 ) -> Result<()> {
-    let actions_dir = input_dir.join("required-actions");
+    let actions_dir = workspace_dir.join("required-actions");
     if async_fs::try_exists(&actions_dir).await? {
         let existing_actions = client.get_required_actions().await?;
         let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
             existing_actions
                 .into_iter()
-                .filter_map(|mut a| a.alias.take().map(|n| (n, a)))
+                .filter_map(|a| a.get_identity().map(|id| (id, a)))
                 .collect();
 
         let mut entries = async_fs::read_dir(&actions_dir).await?;
@@ -404,37 +607,55 @@ async fn plan_required_actions(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                 let local_action: RequiredActionProviderRepresentation =
-                    serde_yaml::from_str(&content)?;
-                let alias = local_action.alias.as_deref().unwrap_or("");
+                    serde_json::from_value(val)
+                        .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
 
-                if alias.is_empty() {
-                    continue;
-                }
+                let identity = local_action
+                    .get_identity()
+                    .context(format!("Failed to get identity for action in {:?}", path))?;
+                let remote = existing_actions_map.get(&identity);
 
-                if let Some(remote) = existing_actions_map.get(alias) {
-                    let mut remote_clone = remote.clone();
-                    remote_clone.alias = Some(alias.to_string());
+                let changed = if let Some(remote) = remote {
+                    let remote_clone = remote.clone();
                     print_diff(
-                        &format!("RequiredAction {}", alias),
+                        &format!("RequiredAction {}", local_action.get_name()),
                         Some(&remote_clone),
                         &local_action,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "action",
+                    )?
                 } else {
                     println!(
-                        "\n{} Will register RequiredAction: {}",
+                        "\n{} Will create RequiredAction: {}",
                         Emoji("✨", ""),
-                        alias
+                        local_action.get_name()
                     );
                     print_diff(
-                        &format!("RequiredAction {}", alias),
+                        &format!("RequiredAction {}", local_action.get_name()),
                         None::<&RequiredActionProviderRepresentation>,
                         &local_action,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "action",
+                    )?
+                };
+
+                if changed {
+                    let mut include = true;
+                    if interactive {
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
+                    }
+                    if include {
+                        changed_files.push(path);
+                    }
                 }
             }
         }
@@ -444,53 +665,119 @@ async fn plan_required_actions(
 
 async fn plan_components_or_keys(
     client: &KeycloakClient,
-    input_dir: &Path,
+    workspace_dir: &Path,
     changes_only: bool,
+    interactive: bool,
     dir_name: &str,
     env_vars: Arc<HashMap<String, String>>,
+    changed_files: &mut Vec<PathBuf>,
 ) -> Result<()> {
-    let components_dir = input_dir.join(dir_name);
+    let components_dir = workspace_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
         let existing_components = client.get_components().await?;
-        let existing_components_map: HashMap<String, ComponentRepresentation> = existing_components
-            .into_iter()
-            .filter_map(|mut c| c.name.take().map(|n| (n, c)))
-            .collect();
+        let mut by_identity: HashMap<String, ComponentRepresentation> = HashMap::new();
+        type ComponentKey = (
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        );
+        let mut by_details: HashMap<ComponentKey, ComponentRepresentation> = HashMap::new();
+
+        for c in existing_components {
+            if let Some(id) = c.get_identity() {
+                by_identity.insert(id, c.clone());
+            }
+            let key = (
+                c.name.clone(),
+                c.sub_type.clone(),
+                c.provider_id.clone(),
+                c.parent_id.clone(),
+            );
+            by_details.insert(key, c);
+        }
 
         let mut entries = async_fs::read_dir(&components_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_component: ComponentRepresentation = serde_yaml::from_str(&content)?;
-                let name = local_component.name.as_deref().unwrap_or("");
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_component: ComponentRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
 
-                if name.is_empty() {
-                    continue;
-                }
+                let remote = if let Some(identity) = local_component.get_identity() {
+                    by_identity.get(&identity).or_else(|| {
+                        let key = (
+                            local_component.name.clone(),
+                            local_component.sub_type.clone(),
+                            local_component.provider_id.clone(),
+                            local_component.parent_id.clone(),
+                        );
+                        by_details.get(&key)
+                    })
+                } else {
+                    let key = (
+                        local_component.name.clone(),
+                        local_component.sub_type.clone(),
+                        local_component.provider_id.clone(),
+                        local_component.parent_id.clone(),
+                    );
+                    by_details.get(&key)
+                };
 
-                if let Some(remote) = existing_components_map.get(name) {
+                let changed = if let Some(remote) = remote {
                     let mut remote_clone = remote.clone();
-                    remote_clone.name = Some(name.to_string());
                     if local_component.id.is_none() {
                         remote_clone.id = None;
                     }
+                    let prefix = if dir_name == "keys" {
+                        "key"
+                    } else {
+                        "component"
+                    };
                     print_diff(
-                        &format!("Component {}", name),
+                        &format!("Component {}", local_component.get_name()),
                         Some(&remote_clone),
                         &local_component,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        prefix,
+                    )?
                 } else {
-                    println!("\n{} Will create Component: {}", Emoji("✨", ""), name);
+                    println!(
+                        "\n{} Will create Component: {}",
+                        Emoji("✨", ""),
+                        local_component.get_name()
+                    );
+                    let prefix = if dir_name == "keys" {
+                        "key"
+                    } else {
+                        "component"
+                    };
                     print_diff(
-                        &format!("Component {}", name),
+                        &format!("Component {}", local_component.get_name()),
                         None::<&ComponentRepresentation>,
                         &local_component,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        prefix,
+                    )?
+                };
+
+                if changed {
+                    let mut include = true;
+                    if interactive {
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
+                    }
+                    if include {
+                        changed_files.push(path);
+                    }
                 }
             }
         }
@@ -500,14 +787,20 @@ async fn plan_components_or_keys(
 
 async fn plan_realm(
     client: &KeycloakClient,
-    input_dir: &Path,
+    workspace_dir: &Path,
     changes_only: bool,
+    interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
+    changed_files: &mut Vec<PathBuf>,
 ) -> Result<()> {
-    let realm_path = input_dir.join("realm.yaml");
+    let realm_path = workspace_dir.join("realm.yaml");
     if async_fs::try_exists(&realm_path).await? {
         let content = async_fs::read_to_string(&realm_path).await?;
-        let local_realm: RealmRepresentation = serde_yaml::from_str(&content)?;
+        let mut val: serde_json::Value = serde_yaml::from_str(&content)
+            .with_context(|| format!("Failed to parse YAML file: {:?}", realm_path))?;
+        substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+        let local_realm: RealmRepresentation = serde_json::from_value(val)
+            .with_context(|| format!("Failed to deserialize YAML file: {:?}", realm_path))?;
 
         // We handle the case where remote realm fetch might fail (e.g. if we are creating it)
         // by treating it as None (creation). However, usually plan is run against existing realm.
@@ -523,29 +816,43 @@ async fn plan_realm(
             }
         };
 
-        print_diff(
+        if print_diff(
             "Realm",
             remote_realm.as_ref(),
             &local_realm,
             changes_only,
-            Arc::clone(&env_vars),
-        )?;
+            "realm",
+        )? {
+            let mut include = true;
+            if interactive {
+                include =
+                    dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
+            }
+            if include {
+                changed_files.push(realm_path);
+            }
+        }
     }
     Ok(())
 }
 
 async fn plan_roles(
     client: &KeycloakClient,
-    input_dir: &Path,
+    workspace_dir: &Path,
     changes_only: bool,
+    interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
+    changed_files: &mut Vec<PathBuf>,
 ) -> Result<()> {
-    let roles_dir = input_dir.join("roles");
+    let roles_dir = workspace_dir.join("roles");
     if async_fs::try_exists(&roles_dir).await? {
         let existing_roles = client.get_roles().await?;
         let existing_roles_map: HashMap<String, RoleRepresentation> = existing_roles
             .into_iter()
-            .map(|mut r| (std::mem::take(&mut r.name), r))
+            .filter_map(|r| r.get_identity().map(|id| (id, r)))
             .collect();
 
         let mut entries = async_fs::read_dir(&roles_dir).await?;
@@ -553,38 +860,59 @@ async fn plan_roles(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_role: RoleRepresentation = serde_yaml::from_str(&content)?;
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_role: RoleRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
 
-                let remote_role = existing_roles_map.get(&local_role.name);
+                let identity = local_role
+                    .get_identity()
+                    .context(format!("Failed to get identity for role in {:?}", path))?;
+                let remote_role = existing_roles_map.get(&identity);
 
-                if let Some(remote) = remote_role {
+                let changed = if let Some(remote) = remote_role {
                     let mut remote_clone = remote.clone();
-                    remote_clone.name = local_role.name.clone();
                     // Ignore ID differences if local doesn't specify it
                     if local_role.id.is_none() {
                         remote_clone.id = None;
                         remote_clone.container_id = None;
                     }
                     print_diff(
-                        &format!("Role {}", local_role.name),
+                        &format!("Role {}", local_role.get_name()),
                         Some(&remote_clone),
                         &local_role,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "role",
+                    )?
                 } else {
                     println!(
                         "\n{} Will create Role: {}",
                         Emoji("✨", ""),
-                        local_role.name
+                        local_role.get_name()
                     );
                     print_diff(
-                        &format!("Role {}", local_role.name),
+                        &format!("Role {}", local_role.get_name()),
                         None::<&RoleRepresentation>,
                         &local_role,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "role",
+                    )?
+                };
+
+                if changed {
+                    let mut include = true;
+                    if interactive {
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
+                    }
+                    if include {
+                        changed_files.push(path);
+                    }
                 }
             }
         }
@@ -594,16 +922,18 @@ async fn plan_roles(
 
 async fn plan_clients(
     client: &KeycloakClient,
-    input_dir: &Path,
+    workspace_dir: &Path,
     changes_only: bool,
+    interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
+    changed_files: &mut Vec<PathBuf>,
 ) -> Result<()> {
-    let clients_dir = input_dir.join("clients");
+    let clients_dir = workspace_dir.join("clients");
     if async_fs::try_exists(&clients_dir).await? {
         let existing_clients = client.get_clients().await?;
         let existing_clients_map: HashMap<String, ClientRepresentation> = existing_clients
             .into_iter()
-            .filter_map(|mut c| c.client_id.take().map(|id| (id, c)))
+            .filter_map(|c| c.get_identity().map(|id| (id, c)))
             .collect();
 
         let mut entries = async_fs::read_dir(&clients_dir).await?;
@@ -611,35 +941,57 @@ async fn plan_clients(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_client: ClientRepresentation = serde_yaml::from_str(&content)?;
-                let client_id = local_client.client_id.as_deref().unwrap_or("");
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_client: ClientRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
 
-                if client_id.is_empty() {
-                    continue;
-                }
+                let identity = local_client
+                    .get_identity()
+                    .context(format!("Failed to get identity for client in {:?}", path))?;
+                let remote = existing_clients_map.get(&identity);
 
-                if let Some(remote) = existing_clients_map.get(client_id) {
+                let changed = if let Some(remote) = remote {
                     let mut remote_clone = remote.clone();
-                    remote_clone.client_id = Some(client_id.to_string());
                     if local_client.id.is_none() {
                         remote_clone.id = None;
                     }
                     print_diff(
-                        &format!("Client {}", client_id),
+                        &format!("Client {}", local_client.get_name()),
                         Some(&remote_clone),
                         &local_client,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "client",
+                    )?
                 } else {
-                    println!("\n{} Will create Client: {}", Emoji("✨", ""), client_id);
+                    println!(
+                        "\n{} Will create Client: {}",
+                        Emoji("✨", ""),
+                        local_client.get_name()
+                    );
                     print_diff(
-                        &format!("Client {}", client_id),
+                        &format!("Client {}", local_client.get_name()),
                         None::<&ClientRepresentation>,
                         &local_client,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "client",
+                    )?
+                };
+
+                if changed {
+                    let mut include = true;
+                    if interactive {
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
+                    }
+                    if include {
+                        changed_files.push(path);
+                    }
                 }
             }
         }
@@ -649,16 +1001,18 @@ async fn plan_clients(
 
 async fn plan_identity_providers(
     client: &KeycloakClient,
-    input_dir: &Path,
+    workspace_dir: &Path,
     changes_only: bool,
+    interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
+    changed_files: &mut Vec<PathBuf>,
 ) -> Result<()> {
-    let idps_dir = input_dir.join("identity-providers");
+    let idps_dir = workspace_dir.join("identity-providers");
     if async_fs::try_exists(&idps_dir).await? {
         let existing_idps = client.get_identity_providers().await?;
         let existing_idps_map: HashMap<String, IdentityProviderRepresentation> = existing_idps
             .into_iter()
-            .filter_map(|mut i| i.alias.take().map(|alias| (alias, i)))
+            .filter_map(|i| i.get_identity().map(|id| (id, i)))
             .collect();
 
         let mut entries = async_fs::read_dir(&idps_dir).await?;
@@ -666,39 +1020,57 @@ async fn plan_identity_providers(
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let content = async_fs::read_to_string(&path).await?;
-                let local_idp: IdentityProviderRepresentation = serde_yaml::from_str(&content)?;
-                let alias = local_idp.alias.as_deref().unwrap_or("");
+                let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                    .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                let local_idp: IdentityProviderRepresentation = serde_json::from_value(val)
+                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
 
-                if alias.is_empty() {
-                    continue;
-                }
+                let identity = local_idp
+                    .get_identity()
+                    .context(format!("Failed to get identity for IDP in {:?}", path))?;
+                let remote = existing_idps_map.get(&identity);
 
-                if let Some(remote) = existing_idps_map.get(alias) {
+                let changed = if let Some(remote) = remote {
                     let mut remote_clone = remote.clone();
-                    remote_clone.alias = Some(alias.to_string());
                     if local_idp.internal_id.is_none() {
                         remote_clone.internal_id = None;
                     }
                     print_diff(
-                        &format!("IdentityProvider {}", alias),
+                        &format!("IdentityProvider {}", local_idp.get_name()),
                         Some(&remote_clone),
                         &local_idp,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "idp",
+                    )?
                 } else {
                     println!(
                         "\n{} Will create IdentityProvider: {}",
                         Emoji("✨", ""),
-                        alias
+                        local_idp.get_name()
                     );
                     print_diff(
-                        &format!("IdentityProvider {}", alias),
+                        &format!("IdentityProvider {}", local_idp.get_name()),
                         None::<&IdentityProviderRepresentation>,
                         &local_idp,
                         changes_only,
-                        Arc::clone(&env_vars),
-                    )?;
+                        "idp",
+                    )?
+                };
+
+                if changed {
+                    let mut include = true;
+                    if interactive {
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
+                    }
+                    if include {
+                        changed_files.push(path);
+                    }
                 }
             }
         }
@@ -706,7 +1078,6 @@ async fn plan_identity_providers(
     Ok(())
 }
 
-use console::style;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 async fn check_keys_drift(client: &KeycloakClient, changes_only: bool) -> Result<()> {

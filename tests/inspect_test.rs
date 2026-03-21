@@ -16,25 +16,30 @@ async fn test_inspect() {
         .expect("Login failed");
 
     let dir = tempdir().unwrap();
-    let output_dir = dir.path().to_path_buf();
+    let workspace_dir = dir.path().to_path_buf();
 
-    inspect::run(&client, output_dir.clone(), &["test-realm".to_string()])
-        .await
-        .expect("Inspect failed");
+    inspect::run(
+        &client,
+        workspace_dir.clone(),
+        &["test-realm".to_string()],
+        true,
+    )
+    .await
+    .expect("Inspect failed");
 
     assert!(
-        output_dir.join("test-realm").join("realm.yaml").exists(),
+        workspace_dir.join("test-realm").join("realm.yaml").exists(),
         "realm.yaml missing"
     );
     assert!(
-        output_dir
+        workspace_dir
             .join("test-realm")
             .join("clients/client-1.yaml")
             .exists(),
         "client-1.yaml missing"
     );
     assert!(
-        output_dir
+        workspace_dir
             .join("test-realm")
             .join("roles/role-1.yaml")
             .exists(),
@@ -43,6 +48,6 @@ async fn test_inspect() {
 
     // Check content
     let realm_content =
-        fs::read_to_string(output_dir.join("test-realm").join("realm.yaml")).unwrap();
+        fs::read_to_string(workspace_dir.join("test-realm").join("realm.yaml")).unwrap();
     assert!(realm_content.contains("test-realm"));
 }

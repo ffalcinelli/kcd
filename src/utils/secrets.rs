@@ -2,9 +2,38 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 /// Heuristics to identify a secret key based on its name.
-fn is_secret_key(key: &str) -> bool {
+fn is_secret_key(key: &str, prefix: &str) -> bool {
     let lower_key = key.to_lowercase();
-    lower_key.contains("secret") || lower_key.contains("password") || lower_key == "value"
+
+    // Blacklist common false positives in Keycloak configuration
+    if lower_key.contains("policy")
+        || lower_key.contains("passwordless")
+        || lower_key.contains("creation")
+        || lower_key.contains("delivery")
+    {
+        return false;
+    }
+
+    if lower_key.contains("secret") || lower_key.contains("password") || lower_key.contains("token")
+    {
+        return true;
+    }
+
+    if lower_key == "value" {
+        let lower_prefix = prefix.to_lowercase();
+        return lower_prefix.contains("credential")
+            || lower_prefix.contains("secret")
+            || lower_prefix.contains("password")
+            || lower_prefix.contains("token");
+    }
+
+    false
+}
+
+/// Heuristics to identify if a string looks like a boolean or simple toggle.
+fn is_boolean_string(s: &str) -> bool {
+    let lower = s.to_lowercase();
+    lower == "true" || lower == "false" || lower == "on" || lower == "off"
 }
 
 /// Recursively extract secrets and replace them with ${ENV_VAR}
@@ -13,14 +42,35 @@ pub fn extract_secrets(value: &mut Value, prefix: &str, secrets: &mut HashMap<St
         Value::Object(map) => {
             let mut keys_to_update = Vec::new();
 
+            // Try to find an identifier for this object to make secret names better
+            let id = map
+                .get("clientId")
+                .or_else(|| map.get("username"))
+                .or_else(|| map.get("alias"))
+                .or_else(|| map.get("name"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            let current_prefix = if let Some(id_str) = id {
+                if prefix.is_empty() {
+                    id_str
+                } else {
+                    format!("{}_{}", prefix, id_str)
+                }
+            } else {
+                prefix.to_string()
+            };
+
             for (k, v) in map.iter_mut() {
-                if v.is_string() && is_secret_key(k) {
-                    keys_to_update.push(k.clone());
+                if let Value::String(s) = v {
+                    if is_secret_key(k, &current_prefix) && !is_boolean_string(s) {
+                        keys_to_update.push(k.clone());
+                    }
                 } else if v.is_object() || v.is_array() {
-                    let new_prefix = if prefix.is_empty() {
+                    let new_prefix = if current_prefix.is_empty() {
                         k.clone()
                     } else {
-                        format!("{}_{}", prefix, k)
+                        format!("{}_{}", current_prefix, k)
                     };
                     extract_secrets(v, &new_prefix, secrets);
                 }
@@ -28,10 +78,10 @@ pub fn extract_secrets(value: &mut Value, prefix: &str, secrets: &mut HashMap<St
 
             for k in keys_to_update {
                 if let Some(Value::String(s)) = map.get_mut(&k) {
-                    let mut env_var_name = if prefix.is_empty() {
+                    let mut env_var_name = if current_prefix.is_empty() {
                         format!("KEYCLOAK_{}", k)
                     } else {
-                        format!("KEYCLOAK_{}_{}", prefix, k)
+                        format!("KEYCLOAK_{}_{}", current_prefix, k)
                     };
                     env_var_name = env_var_name
                         .chars()
@@ -77,13 +127,15 @@ pub fn substitute_secrets(
         Value::String(s) => {
             if s.starts_with("${") && s.ends_with("}") {
                 let var_name = &s[2..s.len() - 1];
-                if let Some(env_val) = env_vars.get(var_name) {
-                    *s = env_val.clone();
-                } else {
-                    return Err(format!(
-                        "Missing required environment variable: {}",
-                        var_name
-                    ));
+                if var_name.starts_with("KEYCLOAK_") {
+                    if let Some(env_val) = env_vars.get(var_name) {
+                        *s = env_val.clone();
+                    } else {
+                        return Err(format!(
+                            "Missing required environment variable: {}",
+                            var_name
+                        ));
+                    }
                 }
             }
         }
@@ -108,16 +160,40 @@ fn obfuscate_string(s: &str) -> String {
 }
 
 /// Recursively obfuscate known secret fields
-pub fn obfuscate_secrets(value: &mut Value) {
+pub fn obfuscate_secrets(value: &mut Value, prefix: &str) {
     match value {
         Value::Object(map) => {
             let mut keys_to_obfuscate = Vec::new();
 
+            // Try to find an identifier for this object to make secret identification better
+            let id = map
+                .get("clientId")
+                .or_else(|| map.get("username"))
+                .or_else(|| map.get("alias"))
+                .or_else(|| map.get("name"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            let current_prefix = if let Some(id_str) = id {
+                if prefix.is_empty() {
+                    id_str
+                } else {
+                    format!("{}_{}", prefix, id_str)
+                }
+            } else {
+                prefix.to_string()
+            };
+
             for (k, v) in map.iter_mut() {
-                if v.is_string() && is_secret_key(k) {
+                if v.is_string() && is_secret_key(k, &current_prefix) {
                     keys_to_obfuscate.push(k.clone());
                 } else if v.is_object() || v.is_array() {
-                    obfuscate_secrets(v);
+                    let new_prefix = if current_prefix.is_empty() {
+                        k.clone()
+                    } else {
+                        format!("{}_{}", current_prefix, k)
+                    };
+                    obfuscate_secrets(v, &new_prefix);
                 }
             }
 
@@ -128,8 +204,9 @@ pub fn obfuscate_secrets(value: &mut Value) {
             }
         }
         Value::Array(arr) => {
-            for v in arr.iter_mut() {
-                obfuscate_secrets(v);
+            for (i, v) in arr.iter_mut().enumerate() {
+                let new_prefix = format!("{}_{}", prefix, i);
+                obfuscate_secrets(v, &new_prefix);
             }
         }
         _ => {}
@@ -144,17 +221,23 @@ mod tests {
     #[test]
     fn test_extract_secrets() {
         let mut val = json!({
+            "clientId": "my_client",
             "clientSecret": "my_super_secret",
-            "name": "my_client"
+            "storeToken": "true"
         });
         let mut secrets = HashMap::new();
         extract_secrets(&mut val, "client", &mut secrets);
 
-        assert_eq!(val["clientSecret"], "${KEYCLOAK_CLIENT_CLIENTSECRET}");
         assert_eq!(
-            secrets.get("KEYCLOAK_CLIENT_CLIENTSECRET"),
+            val["clientSecret"],
+            "${KEYCLOAK_CLIENT_MY_CLIENT_CLIENTSECRET}"
+        );
+        assert_eq!(val["storeToken"], "true");
+        assert_eq!(
+            secrets.get("KEYCLOAK_CLIENT_MY_CLIENT_CLIENTSECRET"),
             Some(&"my_super_secret".to_string())
         );
+        assert!(secrets.get("KEYCLOAK_CLIENT_STORETOKEN").is_none());
     }
 
     #[test]
@@ -172,14 +255,15 @@ mod tests {
     #[test]
     fn test_extract_secrets_no_prefix() {
         let mut val = json!({
+            "clientId": "web",
             "clientSecret": "s1"
         });
         let mut secrets = HashMap::new();
         extract_secrets(&mut val, "", &mut secrets);
 
-        assert_eq!(val["clientSecret"], "${KEYCLOAK_CLIENTSECRET}");
+        assert_eq!(val["clientSecret"], "${KEYCLOAK_WEB_CLIENTSECRET}");
         assert_eq!(
-            secrets.get("KEYCLOAK_CLIENTSECRET"),
+            secrets.get("KEYCLOAK_WEB_CLIENTSECRET"),
             Some(&"s1".to_string())
         );
     }
@@ -187,21 +271,22 @@ mod tests {
     #[test]
     fn test_extract_secrets_sanitization() {
         let mut val = json!({
+            "name": "my-app",
             "client-secret": "s1",
             "db.password": "p1"
         });
         let mut secrets = HashMap::new();
         extract_secrets(&mut val, "app", &mut secrets);
 
-        assert_eq!(val["client-secret"], "${KEYCLOAK_APP_CLIENT_SECRET}");
-        assert_eq!(val["db.password"], "${KEYCLOAK_APP_DB_PASSWORD}");
+        assert_eq!(val["client-secret"], "${KEYCLOAK_APP_MY_APP_CLIENT_SECRET}");
+        assert_eq!(val["db.password"], "${KEYCLOAK_APP_MY_APP_DB_PASSWORD}");
 
         assert_eq!(
-            secrets.get("KEYCLOAK_APP_CLIENT_SECRET"),
+            secrets.get("KEYCLOAK_APP_MY_APP_CLIENT_SECRET"),
             Some(&"s1".to_string())
         );
         assert_eq!(
-            secrets.get("KEYCLOAK_APP_DB_PASSWORD"),
+            secrets.get("KEYCLOAK_APP_MY_APP_DB_PASSWORD"),
             Some(&"p1".to_string())
         );
     }
@@ -209,33 +294,35 @@ mod tests {
     #[test]
     fn test_extract_secrets_nested() {
         let mut val = json!({
+            "name": "root",
             "level1": {
+                "name": "l1",
                 "password": "p1",
                 "level2": [
-                    { "secret": "s1" },
+                    { "name": "idx0", "secret": "s1" },
                     { "other": "v1" }
                 ]
             }
         });
         let mut secrets = HashMap::new();
-        extract_secrets(&mut val, "root", &mut secrets);
+        extract_secrets(&mut val, "", &mut secrets);
 
         assert_eq!(
             val["level1"]["password"],
-            "${KEYCLOAK_ROOT_LEVEL1_PASSWORD}"
+            "${KEYCLOAK_ROOT_LEVEL1_L1_PASSWORD}"
         );
         assert_eq!(
             val["level1"]["level2"][0]["secret"],
-            "${KEYCLOAK_ROOT_LEVEL1_LEVEL2_0_SECRET}"
+            "${KEYCLOAK_ROOT_LEVEL1_L1_LEVEL2_0_IDX0_SECRET}"
         );
         assert_eq!(val["level1"]["level2"][1]["other"], "v1");
 
         assert_eq!(
-            secrets.get("KEYCLOAK_ROOT_LEVEL1_PASSWORD"),
+            secrets.get("KEYCLOAK_ROOT_LEVEL1_L1_PASSWORD"),
             Some(&"p1".to_string())
         );
         assert_eq!(
-            secrets.get("KEYCLOAK_ROOT_LEVEL1_LEVEL2_0_SECRET"),
+            secrets.get("KEYCLOAK_ROOT_LEVEL1_L1_LEVEL2_0_IDX0_SECRET"),
             Some(&"s1".to_string())
         );
     }
@@ -243,26 +330,31 @@ mod tests {
     #[test]
     fn test_substitute_secrets() {
         let mut env_vars = HashMap::new();
-        env_vars.insert("MY_TEST_SECRET".to_string(), "actual_value".to_string());
+        env_vars.insert(
+            "KEYCLOAK_TEST_SECRET".to_string(),
+            "actual_value".to_string(),
+        );
 
         let mut val = json!({
-            "clientSecret": "${MY_TEST_SECRET}"
+            "clientSecret": "${KEYCLOAK_TEST_SECRET}",
+            "other": "${NOT_A_SECRET}"
         });
         substitute_secrets(&mut val, &env_vars).unwrap();
         assert_eq!(val["clientSecret"], "actual_value");
+        assert_eq!(val["other"], "${NOT_A_SECRET}");
     }
 
     #[test]
     fn test_substitute_secrets_missing() {
         let env_vars = HashMap::new();
         let mut val = json!({
-            "clientSecret": "${MISSING_VAR}"
+            "clientSecret": "${KEYCLOAK_MISSING_VAR}"
         });
         let res = substitute_secrets(&mut val, &env_vars);
         assert!(res.is_err());
         assert_eq!(
             res.unwrap_err(),
-            "Missing required environment variable: MISSING_VAR"
+            "Missing required environment variable: KEYCLOAK_MISSING_VAR"
         );
     }
 
@@ -271,24 +363,31 @@ mod tests {
         let mut val = json!({
             "clientSecret": "supersecret"
         });
-        obfuscate_secrets(&mut val);
+        obfuscate_secrets(&mut val, "client");
         assert_eq!(val["clientSecret"], "s***t");
     }
 
     #[test]
     fn test_is_secret_key() {
-        assert!(is_secret_key("secret"));
-        assert!(is_secret_key("password"));
-        assert!(is_secret_key("value"));
-        assert!(is_secret_key("SECRET"));
-        assert!(is_secret_key("Password"));
-        assert!(is_secret_key("VALUE"));
-        assert!(is_secret_key("clientSecret"));
-        assert!(is_secret_key("db_password"));
+        assert!(is_secret_key("secret", ""));
+        assert!(is_secret_key("password", ""));
+        assert!(is_secret_key("token", ""));
+        assert!(is_secret_key("value", "credential"));
+        assert!(is_secret_key("value", "secret"));
+        assert!(is_secret_key("SECRET", ""));
+        assert!(is_secret_key("Password", ""));
+        assert!(is_secret_key("TOKEN", ""));
+        assert!(is_secret_key("clientSecret", ""));
+        assert!(is_secret_key("db_password", ""));
 
-        assert!(!is_secret_key(""));
-        assert!(!is_secret_key("username"));
-        assert!(!is_secret_key("id"));
+        assert!(!is_secret_key("passwordPolicy", ""));
+        assert!(!is_secret_key("webAuthnPolicyPasswordless", ""));
+        assert!(!is_secret_key("createdAt", ""));
+        assert!(!is_secret_key("deliveryMode", ""));
+        assert!(!is_secret_key("value", "name"));
+        assert!(!is_secret_key("", ""));
+        assert!(!is_secret_key("username", ""));
+        assert!(!is_secret_key("id", ""));
     }
 
     #[test]
