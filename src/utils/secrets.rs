@@ -228,7 +228,10 @@ mod tests {
         let mut secrets = HashMap::new();
         extract_secrets(&mut val, "client", &mut secrets);
 
-        assert_eq!(val["clientSecret"], "${KEYCLOAK_CLIENT_MY_CLIENT_CLIENTSECRET}");
+        assert_eq!(
+            val["clientSecret"],
+            "${KEYCLOAK_CLIENT_MY_CLIENT_CLIENTSECRET}"
+        );
         assert_eq!(val["storeToken"], "true");
         assert_eq!(
             secrets.get("KEYCLOAK_CLIENT_MY_CLIENT_CLIENTSECRET"),
@@ -327,7 +330,10 @@ mod tests {
     #[test]
     fn test_substitute_secrets() {
         let mut env_vars = HashMap::new();
-        env_vars.insert("KEYCLOAK_TEST_SECRET".to_string(), "actual_value".to_string());
+        env_vars.insert(
+            "KEYCLOAK_TEST_SECRET".to_string(),
+            "actual_value".to_string(),
+        );
 
         let mut val = json!({
             "clientSecret": "${KEYCLOAK_TEST_SECRET}",

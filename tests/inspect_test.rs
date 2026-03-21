@@ -18,9 +18,14 @@ async fn test_inspect() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
 
-    inspect::run(&client, workspace_dir.clone(), &["test-realm".to_string()], true)
-        .await
-        .expect("Inspect failed");
+    inspect::run(
+        &client,
+        workspace_dir.clone(),
+        &["test-realm".to_string()],
+        true,
+    )
+    .await
+    .expect("Inspect failed");
 
     assert!(
         workspace_dir.join("test-realm").join("realm.yaml").exists(),

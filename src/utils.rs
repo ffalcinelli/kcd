@@ -18,7 +18,10 @@ pub fn recursive_sort(value: &mut serde_json::Value) {
             }
 
             // Sort arrays of simple values (Strings, Numbers, Bools)
-            if arr.iter().all(|v| v.is_string() || v.is_number() || v.is_boolean()) {
+            if arr
+                .iter()
+                .all(|v| v.is_string() || v.is_number() || v.is_boolean())
+            {
                 arr.sort_by(|a, b| {
                     let s_a = a.to_string();
                     let s_b = b.to_string();
@@ -56,7 +59,8 @@ pub fn to_sorted_yaml_with_secrets<T: Serialize>(
 }
 
 pub fn to_sorted_yaml<T: Serialize>(value: &T) -> anyhow::Result<String> {
-    let mut json_value = serde_json::to_value(value).context("Failed to serialize to JSON value")?;
+    let mut json_value =
+        serde_json::to_value(value).context("Failed to serialize to JSON value")?;
     recursive_sort(&mut json_value);
     serde_yaml::to_string(&json_value).context("Failed to serialize to sorted YAML")
 }
@@ -64,9 +68,6 @@ pub fn to_sorted_yaml<T: Serialize>(value: &T) -> anyhow::Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::{Deserialize, Serialize};
-    use serde_json::Value;
-    use std::collections::HashMap;
 
     #[test]
     fn test_sorting_with_value() {

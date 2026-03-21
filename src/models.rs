@@ -51,7 +51,10 @@ pub struct IdentityProviderRepresentation {
         skip_serializing_if = "Option::is_none"
     )]
     pub add_read_token_role_on_create: Option<bool>,
-    #[serde(rename = "authenticateByDefault", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "authenticateByDefault",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub authenticate_by_default: Option<bool>,
     #[serde(rename = "linkOnly", skip_serializing_if = "Option::is_none")]
     pub link_only: Option<bool>,
@@ -104,7 +107,10 @@ pub struct ClientRepresentation {
     pub public_client: Option<bool>,
     #[serde(rename = "bearerOnly", skip_serializing_if = "Option::is_none")]
     pub bearer_only: Option<bool>,
-    #[serde(rename = "serviceAccountsEnabled", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "serviceAccountsEnabled",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub service_accounts_enabled: Option<bool>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -237,7 +243,9 @@ impl KeycloakResource for UserRepresentation {
         self.id.clone().or_else(|| self.username.clone())
     }
     fn get_name(&self) -> String {
-        self.username.clone().unwrap_or_else(|| "unknown".to_string())
+        self.username
+            .clone()
+            .unwrap_or_else(|| "unknown".to_string())
     }
 }
 
@@ -245,7 +253,10 @@ impl KeycloakResource for UserRepresentation {
 pub struct AuthenticationExecutionExportRepresentation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authenticator: Option<String>,
-    #[serde(rename = "authenticatorConfig", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "authenticatorConfig",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub authenticator_config: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub requirement: Option<String>,

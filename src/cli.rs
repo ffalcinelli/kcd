@@ -4,8 +4,8 @@ use crate::models::{
     RoleRepresentation, UserRepresentation,
 };
 use anyhow::{Context, Result};
-use console::{style, Emoji};
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
+use console::{Emoji, style};
+use dialoguer::{Confirm, Input, Password, Select, theme::ColorfulTheme};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -17,7 +17,11 @@ static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
 static INFO: Emoji<'_, '_> = Emoji("💡 ", "i ");
 
 pub async fn run(workspace_dir: PathBuf) -> Result<()> {
-    println!("{} {}", INFO, style("Welcome to kcd interactive CLI!").cyan().bold());
+    println!(
+        "{} {}",
+        INFO,
+        style("Welcome to kcd interactive CLI!").cyan().bold()
+    );
     let theme = ColorfulTheme::default();
     let selections = &[
         "Create User",
@@ -41,42 +45,74 @@ pub async fn run(workspace_dir: PathBuf) -> Result<()> {
         match selection {
             0 => {
                 if let Err(e) = create_user_interactive(&workspace_dir).await {
-                    println!("{} {}", ERROR, style(format!("Error creating user: {}", e)).red());
+                    println!(
+                        "{} {}",
+                        ERROR,
+                        style(format!("Error creating user: {}", e)).red()
+                    );
                 }
             }
             1 => {
                 if let Err(e) = change_user_password_interactive(&workspace_dir).await {
-                    println!("{} {}", ERROR, style(format!("Error changing password: {}", e)).red());
+                    println!(
+                        "{} {}",
+                        ERROR,
+                        style(format!("Error changing password: {}", e)).red()
+                    );
                 }
             }
             2 => {
                 if let Err(e) = create_client_interactive(&workspace_dir).await {
-                    println!("{} {}", ERROR, style(format!("Error creating client: {}", e)).red());
+                    println!(
+                        "{} {}",
+                        ERROR,
+                        style(format!("Error creating client: {}", e)).red()
+                    );
                 }
             }
             3 => {
                 if let Err(e) = create_role_interactive(&workspace_dir).await {
-                    println!("{} {}", ERROR, style(format!("Error creating role: {}", e)).red());
+                    println!(
+                        "{} {}",
+                        ERROR,
+                        style(format!("Error creating role: {}", e)).red()
+                    );
                 }
             }
             4 => {
                 if let Err(e) = create_group_interactive(&workspace_dir).await {
-                    println!("{} {}", ERROR, style(format!("Error creating group: {}", e)).red());
+                    println!(
+                        "{} {}",
+                        ERROR,
+                        style(format!("Error creating group: {}", e)).red()
+                    );
                 }
             }
             5 => {
                 if let Err(e) = create_idp_interactive(&workspace_dir).await {
-                    println!("{} {}", ERROR, style(format!("Error creating IDP: {}", e)).red());
+                    println!(
+                        "{} {}",
+                        ERROR,
+                        style(format!("Error creating IDP: {}", e)).red()
+                    );
                 }
             }
             6 => {
                 if let Err(e) = create_client_scope_interactive(&workspace_dir).await {
-                    println!("{} {}", ERROR, style(format!("Error creating client scope: {}", e)).red());
+                    println!(
+                        "{} {}",
+                        ERROR,
+                        style(format!("Error creating client scope: {}", e)).red()
+                    );
                 }
             }
             7 => {
                 if let Err(e) = rotate_keys_interactive(&workspace_dir).await {
-                    println!("{} {}", ERROR, style(format!("Error rotating keys: {}", e)).red());
+                    println!(
+                        "{} {}",
+                        ERROR,
+                        style(format!("Error rotating keys: {}", e)).red()
+                    );
                 }
             }
             8 => {
@@ -129,7 +165,13 @@ async fn create_role_interactive(workspace_dir: &Path) -> Result<()> {
     create_role_yaml(workspace_dir, &realm, &name, description_opt, client_id).await?;
 
     println!(
-        "{} {}", SUCCESS, style(format!("Successfully generated YAML for role '{}' in realm '{}'.", name, realm)).green()
+        "{} {}",
+        SUCCESS,
+        style(format!(
+            "Successfully generated YAML for role '{}' in realm '{}'.",
+            name, realm
+        ))
+        .green()
     );
     Ok(())
 }
@@ -186,7 +228,13 @@ async fn create_group_interactive(workspace_dir: &Path) -> Result<()> {
     create_group_yaml(workspace_dir, &realm, &name).await?;
 
     println!(
-        "{} {}", SUCCESS, style(format!("Successfully generated YAML for group '{}' in realm '{}'.", name, realm)).green()
+        "{} {}",
+        SUCCESS,
+        style(format!(
+            "Successfully generated YAML for group '{}' in realm '{}'.",
+            name, realm
+        ))
+        .green()
     );
     Ok(())
 }
@@ -234,7 +282,13 @@ async fn create_idp_interactive(workspace_dir: &Path) -> Result<()> {
     create_idp_yaml(workspace_dir, &realm, &alias, &provider_id).await?;
 
     println!(
-        "{} {}", SUCCESS, style(format!("Successfully generated YAML for Identity Provider '{}' in realm '{}'.", alias, realm)).green()
+        "{} {}",
+        SUCCESS,
+        style(format!(
+            "Successfully generated YAML for Identity Provider '{}' in realm '{}'.",
+            alias, realm
+        ))
+        .green()
     );
     Ok(())
 }
@@ -297,7 +351,13 @@ async fn create_client_scope_interactive(workspace_dir: &Path) -> Result<()> {
     create_client_scope_yaml(workspace_dir, &realm, &name, &protocol).await?;
 
     println!(
-        "{} {}", SUCCESS, style(format!("Successfully generated YAML for client scope '{}' in realm '{}'.", name, realm)).green()
+        "{} {}",
+        SUCCESS,
+        style(format!(
+            "Successfully generated YAML for client scope '{}' in realm '{}'.",
+            name, realm
+        ))
+        .green()
     );
     Ok(())
 }
@@ -343,10 +403,24 @@ async fn rotate_keys_interactive(workspace_dir: &Path) -> Result<()> {
 
     if rotated_count > 0 {
         println!(
-            "{} {}", SUCCESS, style(format!("Successfully generated {} rotated key component(s) for realm '{}'.", rotated_count, realm)).green()
+            "{} {}",
+            SUCCESS,
+            style(format!(
+                "Successfully generated {} rotated key component(s) for realm '{}'.",
+                rotated_count, realm
+            ))
+            .green()
         );
     } else {
-        println!("{} {}", INFO, style(format!("No key providers found to rotate for realm '{}'.", realm)).cyan());
+        println!(
+            "{} {}",
+            INFO,
+            style(format!(
+                "No key providers found to rotate for realm '{}'.",
+                realm
+            ))
+            .cyan()
+        );
     }
 
     Ok(())
@@ -520,10 +594,19 @@ mod tests {
         let workspace_dir = dir.path();
 
         // Realm role
-        create_role_yaml(workspace_dir, "master", "admin", Some("desc".to_string()), None)
-            .await
-            .unwrap();
-        let realm_role_path = workspace_dir.join("master").join("roles").join("admin.yaml");
+        create_role_yaml(
+            workspace_dir,
+            "master",
+            "admin",
+            Some("desc".to_string()),
+            None,
+        )
+        .await
+        .unwrap();
+        let realm_role_path = workspace_dir
+            .join("master")
+            .join("roles")
+            .join("admin.yaml");
         assert!(realm_role_path.exists());
         let content = fs::read_to_string(&realm_role_path).await.unwrap();
         let role: RoleRepresentation = serde_yaml::from_str(&content).unwrap();
@@ -557,7 +640,10 @@ mod tests {
         create_group_yaml(workspace_dir, "master", "my-group")
             .await
             .unwrap();
-        let file_path = workspace_dir.join("master").join("groups").join("my-group.yaml");
+        let file_path = workspace_dir
+            .join("master")
+            .join("groups")
+            .join("my-group.yaml");
         assert!(file_path.exists());
     }
 
@@ -661,7 +747,13 @@ async fn create_client_interactive(workspace_dir: &Path) -> Result<()> {
     create_client_yaml(workspace_dir, &realm, &client_id, is_public).await?;
 
     println!(
-        "{} {}", SUCCESS, style(format!("Successfully generated YAML for client '{}' in realm '{}'.", client_id, realm)).green()
+        "{} {}",
+        SUCCESS,
+        style(format!(
+            "Successfully generated YAML for client '{}' in realm '{}'.",
+            client_id, realm
+        ))
+        .green()
     );
     Ok(())
 }
@@ -721,7 +813,13 @@ async fn change_user_password_interactive(workspace_dir: &Path) -> Result<()> {
     change_user_password_yaml(workspace_dir, &realm, &username, &new_password).await?;
 
     println!(
-        "{} {}", SUCCESS, style(format!("Successfully updated YAML for user '{}' in realm '{}' with new password.", username, realm)).green()
+        "{} {}",
+        SUCCESS,
+        style(format!(
+            "Successfully updated YAML for user '{}' in realm '{}' with new password.",
+            username, realm
+        ))
+        .green()
     );
     Ok(())
 }
@@ -739,7 +837,13 @@ pub async fn change_user_password_yaml(
 
     if !file_path.exists() {
         println!(
-            "{} {}", WARN, style(format!("Warning: User file {:?} does not exist. Creating a new one.", file_path)).yellow()
+            "{} {}",
+            WARN,
+            style(format!(
+                "Warning: User file {:?} does not exist. Creating a new one.",
+                file_path
+            ))
+            .yellow()
         );
         create_user_yaml(workspace_dir, realm, username, None, None, None).await?;
     }
@@ -828,7 +932,13 @@ async fn create_user_interactive(workspace_dir: &Path) -> Result<()> {
     .await?;
 
     println!(
-        "{} {}", SUCCESS, style(format!("Successfully generated YAML for user '{}' in realm '{}'.", username, realm)).green()
+        "{} {}",
+        SUCCESS,
+        style(format!(
+            "Successfully generated YAML for user '{}' in realm '{}'.",
+            username, realm
+        ))
+        .green()
     );
     Ok(())
 }

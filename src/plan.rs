@@ -7,7 +7,7 @@ use crate::models::{
 };
 
 use anyhow::{Context, Result};
-use console::{style, Emoji, Style};
+use console::{Emoji, Style, style};
 use serde::Serialize;
 use similar::{ChangeTag, TextDiff};
 use std::collections::HashMap;
@@ -52,7 +52,11 @@ pub async fn run(
     };
 
     if realms.is_empty() {
-        println!("{} {}", WARN, style(format!("No realms found to plan in {:?}", workspace_dir)).yellow());
+        println!(
+            "{} {}",
+            WARN,
+            style(format!("No realms found to plan in {:?}", workspace_dir)).yellow()
+        );
         return Ok(());
     }
 
@@ -64,7 +68,9 @@ pub async fn run(
         println!(
             "\n{} {}",
             ACTION,
-            style(format!("Planning changes for realm: {}", realm_name)).cyan().bold()
+            style(format!("Planning changes for realm: {}", realm_name))
+                .cyan()
+                .bold()
         );
         plan_single_realm(
             &realm_client,
@@ -99,31 +105,103 @@ async fn plan_single_realm(
     changed_files: &mut Vec<PathBuf>,
 ) -> Result<()> {
     // 1. Plan Realm
-    plan_realm(client, &workspace_dir, changes_only, interactive, Arc::clone(&env_vars), changed_files).await?;
+    plan_realm(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 2. Plan Roles
-    plan_roles(client, &workspace_dir, changes_only, interactive, Arc::clone(&env_vars), changed_files).await?;
+    plan_roles(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 3. Plan Clients
-    plan_clients(client, &workspace_dir, changes_only, interactive, Arc::clone(&env_vars), changed_files).await?;
+    plan_clients(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 4. Plan Identity Providers
-    plan_identity_providers(client, &workspace_dir, changes_only, interactive, Arc::clone(&env_vars), changed_files).await?;
+    plan_identity_providers(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 5. Plan Client Scopes
-    plan_client_scopes(client, &workspace_dir, changes_only, interactive, Arc::clone(&env_vars), changed_files).await?;
+    plan_client_scopes(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 6. Plan Groups
-    plan_groups(client, &workspace_dir, changes_only, interactive, Arc::clone(&env_vars), changed_files).await?;
+    plan_groups(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 7. Plan Users
-    plan_users(client, &workspace_dir, changes_only, interactive, Arc::clone(&env_vars), changed_files).await?;
+    plan_users(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 8. Plan Authentication Flows
-    plan_authentication_flows(client, &workspace_dir, changes_only, interactive, Arc::clone(&env_vars), changed_files).await?;
+    plan_authentication_flows(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 9. Plan Required Actions
-    plan_required_actions(client, &workspace_dir, changes_only, interactive, Arc::clone(&env_vars), changed_files).await?;
+    plan_required_actions(
+        client,
+        &workspace_dir,
+        changes_only,
+        interactive,
+        Arc::clone(&env_vars),
+        changed_files,
+    )
+    .await?;
 
     // 10. Plan Components
     plan_components_or_keys(
@@ -253,10 +331,12 @@ async fn plan_client_scopes(
                 if changed {
                     let mut include = true;
                     if interactive {
-                        include = dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                            .with_prompt("Include this change in the plan?")
-                            .default(true)
-                            .interact()?;
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
                     }
                     if include {
                         changed_files.push(path);
@@ -330,10 +410,12 @@ async fn plan_groups(
                 if changed {
                     let mut include = true;
                     if interactive {
-                        include = dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                            .with_prompt("Include this change in the plan?")
-                            .default(true)
-                            .interact()?;
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
                     }
                     if include {
                         changed_files.push(path);
@@ -407,10 +489,12 @@ async fn plan_users(
                 if changed {
                     let mut include = true;
                     if interactive {
-                        include = dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                            .with_prompt("Include this change in the plan?")
-                            .default(true)
-                            .interact()?;
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
                     }
                     if include {
                         changed_files.push(path);
@@ -484,10 +568,12 @@ async fn plan_authentication_flows(
                 if changed {
                     let mut include = true;
                     if interactive {
-                        include = dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                            .with_prompt("Include this change in the plan?")
-                            .default(true)
-                            .interact()?;
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
                     }
                     if include {
                         changed_files.push(path);
@@ -524,8 +610,9 @@ async fn plan_required_actions(
                 let mut val: serde_json::Value = serde_yaml::from_str(&content)
                     .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
                 substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
-                let local_action: RequiredActionProviderRepresentation = serde_json::from_value(val)
-                    .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
+                let local_action: RequiredActionProviderRepresentation =
+                    serde_json::from_value(val)
+                        .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
 
                 let identity = local_action
                     .get_identity()
@@ -559,10 +646,12 @@ async fn plan_required_actions(
                 if changed {
                     let mut include = true;
                     if interactive {
-                        include = dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                            .with_prompt("Include this change in the plan?")
-                            .default(true)
-                            .interact()?;
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
                     }
                     if include {
                         changed_files.push(path);
@@ -587,8 +676,13 @@ async fn plan_components_or_keys(
     if async_fs::try_exists(&components_dir).await? {
         let existing_components = client.get_components().await?;
         let mut by_identity: HashMap<String, ComponentRepresentation> = HashMap::new();
-        let mut by_details: HashMap<(Option<String>, Option<String>, Option<String>, Option<String>), ComponentRepresentation> =
-            HashMap::new();
+        type ComponentKey = (
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        );
+        let mut by_details: HashMap<ComponentKey, ComponentRepresentation> = HashMap::new();
 
         for c in existing_components {
             if let Some(id) = c.get_identity() {
@@ -639,7 +733,11 @@ async fn plan_components_or_keys(
                     if local_component.id.is_none() {
                         remote_clone.id = None;
                     }
-                    let prefix = if dir_name == "keys" { "key" } else { "component" };
+                    let prefix = if dir_name == "keys" {
+                        "key"
+                    } else {
+                        "component"
+                    };
                     print_diff(
                         &format!("Component {}", local_component.get_name()),
                         Some(&remote_clone),
@@ -653,7 +751,11 @@ async fn plan_components_or_keys(
                         Emoji("✨", ""),
                         local_component.get_name()
                     );
-                    let prefix = if dir_name == "keys" { "key" } else { "component" };
+                    let prefix = if dir_name == "keys" {
+                        "key"
+                    } else {
+                        "component"
+                    };
                     print_diff(
                         &format!("Component {}", local_component.get_name()),
                         None::<&ComponentRepresentation>,
@@ -666,10 +768,12 @@ async fn plan_components_or_keys(
                 if changed {
                     let mut include = true;
                     if interactive {
-                        include = dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                            .with_prompt("Include this change in the plan?")
-                            .default(true)
-                            .interact()?;
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
                     }
                     if include {
                         changed_files.push(path);
@@ -721,10 +825,11 @@ async fn plan_realm(
         )? {
             let mut include = true;
             if interactive {
-                include = dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                    .with_prompt("Include this change in the plan?")
-                    .default(true)
-                    .interact()?;
+                include =
+                    dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
             }
             if include {
                 changed_files.push(realm_path);
@@ -798,10 +903,12 @@ async fn plan_roles(
                 if changed {
                     let mut include = true;
                     if interactive {
-                        include = dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                            .with_prompt("Include this change in the plan?")
-                            .default(true)
-                            .interact()?;
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
                     }
                     if include {
                         changed_files.push(path);
@@ -875,10 +982,12 @@ async fn plan_clients(
                 if changed {
                     let mut include = true;
                     if interactive {
-                        include = dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                            .with_prompt("Include this change in the plan?")
-                            .default(true)
-                            .interact()?;
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
                     }
                     if include {
                         changed_files.push(path);
@@ -952,10 +1061,12 @@ async fn plan_identity_providers(
                 if changed {
                     let mut include = true;
                     if interactive {
-                        include = dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                            .with_prompt("Include this change in the plan?")
-                            .default(true)
-                            .interact()?;
+                        include = dialoguer::Confirm::with_theme(
+                            &dialoguer::theme::ColorfulTheme::default(),
+                        )
+                        .with_prompt("Include this change in the plan?")
+                        .default(true)
+                        .interact()?;
                     }
                     if include {
                         changed_files.push(path);
@@ -966,7 +1077,6 @@ async fn plan_identity_providers(
     }
     Ok(())
 }
-
 
 use std::time::{SystemTime, UNIX_EPOCH};
 

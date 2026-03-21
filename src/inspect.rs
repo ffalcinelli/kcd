@@ -2,8 +2,8 @@ use crate::client::KeycloakClient;
 use crate::models::KeycloakResource;
 use crate::utils::to_sorted_yaml_with_secrets;
 use anyhow::{Context, Result};
-use console::{style, Emoji};
-use dialoguer::{theme::ColorfulTheme, Confirm};
+use console::{Emoji, style};
+use dialoguer::{Confirm, theme::ColorfulTheme};
 use sanitize_filename::sanitize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -47,7 +47,13 @@ pub async fn run(
         let mut realm_client = client.clone();
         realm_client.set_target_realm(realm_name.clone());
         let realm_dir = workspace_dir.join(&realm_name);
-        println!("\n{} {}", ACTION, style(format!("Inspecting realm: {}", realm_name)).cyan().bold());
+        println!(
+            "\n{} {}",
+            ACTION,
+            style(format!("Inspecting realm: {}", realm_name))
+                .cyan()
+                .bold()
+        );
         inspect_realm(
             &realm_client,
             &realm_name,
@@ -81,8 +87,13 @@ pub async fn run(
         }
 
         let new_content = format!("{}{}", existing_env, env_content);
-        write_if_changed_with_mutex(&env_path, &new_content, yes, Arc::clone(&prompt_mutex)).await?;
-        println!("{} {}", SUCCESS, style("Exported secrets to .secrets").green());
+        write_if_changed_with_mutex(&env_path, &new_content, yes, Arc::clone(&prompt_mutex))
+            .await?;
+        println!(
+            "{} {}",
+            SUCCESS,
+            style("Exported secrets to .secrets").green()
+        );
     }
 
     Ok(())
@@ -95,22 +106,35 @@ async fn write_if_changed(path: &Path, content: &str, yes: bool) -> Result<()> {
             return Ok(());
         }
 
-        if !yes {
-            if !Confirm::with_theme(&ColorfulTheme::default())
-                .with_prompt(format!("File {:?} already exists with different content. Overwrite?", path))
+        if !yes
+            && !Confirm::with_theme(&ColorfulTheme::default())
+                .with_prompt(format!(
+                    "File {:?} already exists with different content. Overwrite?",
+                    path
+                ))
                 .default(false)
                 .interact()?
-            {
-                println!("{} {}", WARN, style(format!("Skipping {:?}", path)).yellow());
-                return Ok(());
-            }
+        {
+            println!(
+                "{} {}",
+                WARN,
+                style(format!("Skipping {:?}", path)).yellow()
+            );
+            return Ok(());
         }
     }
-    fs::write(path, content).await.context(format!("Failed to write {:?}", path))?;
+    fs::write(path, content)
+        .await
+        .context(format!("Failed to write {:?}", path))?;
     Ok(())
 }
 
-async fn write_if_changed_with_mutex(path: &Path, content: &str, yes: bool, prompt_mutex: Arc<Mutex<()>>) -> Result<()> {
+async fn write_if_changed_with_mutex(
+    path: &Path,
+    content: &str,
+    yes: bool,
+    prompt_mutex: Arc<Mutex<()>>,
+) -> Result<()> {
     if fs::try_exists(path).await.unwrap_or(false) {
         let existing = fs::read_to_string(path).await.unwrap_or_default();
         if existing == content {
@@ -120,16 +144,25 @@ async fn write_if_changed_with_mutex(path: &Path, content: &str, yes: bool, prom
         if !yes {
             let _lock = prompt_mutex.lock().await;
             if !Confirm::with_theme(&ColorfulTheme::default())
-                .with_prompt(format!("File {:?} already exists with different content. Overwrite?", path))
+                .with_prompt(format!(
+                    "File {:?} already exists with different content. Overwrite?",
+                    path
+                ))
                 .default(false)
                 .interact()?
             {
-                println!("{} {}", WARN, style(format!("Skipping {:?}", path)).yellow());
+                println!(
+                    "{} {}",
+                    WARN,
+                    style(format!("Skipping {:?}", path)).yellow()
+                );
                 return Ok(());
             }
         }
     }
-    fs::write(path, content).await.context(format!("Failed to write {:?}", path))?;
+    fs::write(path, content)
+        .await
+        .context(format!("Failed to write {:?}", path))?;
     Ok(())
 }
 
@@ -157,10 +190,14 @@ async fn inspect_realm(
     let realm_yaml = to_sorted_yaml_with_secrets(&realm, &realm_prefix, &mut local_secrets)
         .context("Failed to serialize realm")?;
     all_secrets.lock().await.extend(local_secrets);
-    
+
     let realm_path = workspace_dir.join("realm.yaml");
     write_if_changed(&realm_path, &realm_yaml, yes).await?;
-    println!("  {} {}", SUCCESS, style("Exported realm configuration to realm.yaml").green());
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported realm configuration to realm.yaml").green()
+    );
 
     // Fetch clients
     let clients = client
@@ -197,7 +234,11 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("  {} {}", SUCCESS, style("Exported clients to clients/").green());
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported clients to clients/").green()
+    );
 
     // Fetch roles
     let roles = client.get_roles().await.context("Failed to fetch roles")?;
@@ -231,7 +272,11 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("  {} {}", SUCCESS, style("Exported roles to roles/").green());
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported roles to roles/").green()
+    );
 
     // Fetch client scopes
     let client_scopes = client
@@ -268,7 +313,11 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("  {} {}", SUCCESS, style("Exported client scopes to client-scopes/").green());
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported client scopes to client-scopes/").green()
+    );
 
     // Fetch identity providers
     let idps = client
@@ -305,7 +354,11 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("  {} {}", SUCCESS, style("Exported identity providers to identity-providers/").green());
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported identity providers to identity-providers/").green()
+    );
 
     // Fetch groups
     let groups = client
@@ -343,7 +396,11 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("  {} {}", SUCCESS, style("Exported groups to groups/").green());
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported groups to groups/").green()
+    );
 
     // Fetch users
     let users = client.get_users().await.context("Failed to fetch users")?;
@@ -377,7 +434,11 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("  {} {}", SUCCESS, style("Exported users to users/").green());
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported users to users/").green()
+    );
 
     // Fetch authentication flows
     let flows = client
@@ -414,7 +475,11 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("  {} {}", SUCCESS, style("Exported authentication flows to authentication-flows/").green());
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported authentication flows to authentication-flows/").green()
+    );
 
     // Fetch required actions
     let actions = client
@@ -451,7 +516,11 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("  {} {}", SUCCESS, style("Exported required actions to required-actions/").green());
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported required actions to required-actions/").green()
+    );
 
     // Fetch components and keys
     let all_components = client
@@ -511,7 +580,11 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("  {} {}", SUCCESS, style("Exported components to components/ and keys to keys/").green());
+    println!(
+        "  {} {}",
+        SUCCESS,
+        style("Exported components to components/ and keys to keys/").green()
+    );
 
     Ok(())
 }

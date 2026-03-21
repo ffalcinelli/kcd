@@ -91,7 +91,12 @@ async fn test_apply() {
     .unwrap();
 
     // Run apply
-    apply::run(&client, workspace_dir.clone(), &["test-realm".to_string()], true)
-        .await
-        .expect("Apply failed");
+    apply::run(
+        &client,
+        workspace_dir.clone(),
+        &["test-realm".to_string()],
+        true,
+    )
+    .await
+    .expect("Apply failed");
 }
