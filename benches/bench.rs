@@ -20,7 +20,7 @@ fn main() {
 
         let start = std::time::Instant::now();
         for _ in 0..50 {
-            plan::run(&client, PathBuf::from("/tmp/perf_test"), true, &[])
+            plan::run(&client, PathBuf::from("/tmp/perf_test"), true, false, &[])
                 .await
                 .unwrap();
         }

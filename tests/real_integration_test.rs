@@ -67,17 +67,17 @@ async fn test_real_keycloak_integration() -> Result<()> {
     client.set_target_realm("master".to_string());
 
     let dir = tempdir()?;
-    let config_dir = dir.path().to_path_buf();
+    let workspace_dir = dir.path().to_path_buf();
 
     // 3. Inspect the current (empty/default) state
     println!("Inspecting initial state...");
-    inspect::run(&client, config_dir.clone(), &["master".to_string()], true).await?;
+    inspect::run(&client, workspace_dir.clone(), &["master".to_string()], true).await?;
 
-    let realm_file = config_dir.join("master").join("realm.yaml");
+    let realm_file = workspace_dir.join("master").join("realm.yaml");
     assert!(realm_file.exists(), "realm.yaml should exist after inspect");
 
     // 4. Modify something (e.g. add a client)
-    let clients_dir = config_dir.join("master").join("clients");
+    let clients_dir = workspace_dir.join("master").join("clients");
     fs::create_dir_all(&clients_dir)?;
 
     let new_client_yaml = r#"
@@ -92,11 +92,11 @@ standardFlowEnabled: true
     // 5. Plan - Should see changes
     println!("Planning changes...");
     // Just ensuring plan runs without error
-    plan::run(&client, config_dir.clone(), true, &["master".to_string()]).await?;
+    plan::run(&client, workspace_dir.clone(), true, false, &["master".to_string()]).await?;
 
     // 6. Apply the changes
     println!("Applying changes...");
-    apply::run(&client, config_dir.clone(), &["master".to_string()]).await?;
+    apply::run(&client, workspace_dir.clone(), &["master".to_string()], true).await?;
 
     // 7. Verify the client was created by inspecting to a new dir
     let inspect_dir2 = dir.path().join("inspect2");

@@ -1,73 +1,82 @@
 # GEMINI.md - Keycloak Continuous Delivery (kcd)
 
-## Project Overview
-`kcd` is a Rust-based command-line tool designed for the declarative management of Keycloak configurations. It allows administrators to treat Keycloak settings as code by using local YAML files to represent the desired state of a Keycloak server.
+This document serves as the internal developer guide for `kcd`. It explains the architecture, design decisions, and workflows for extending the tool.
 
-### Core Technologies
-- **Language**: Rust (Edition 2024)
-- **Runtime**: `tokio` (Asynchronous I/O)
-- **HTTP Client**: `reqwest`
-- **Serialization**: `serde`, `serde_json`, `serde_yaml_ng`
-- **CLI Framework**: `clap` (with derive and env features)
-- **Secret Management**: Custom heuristic-based masking and environment variable substitution.
+## 🏛️ Architecture Overview
 
-### Architecture
-The project follows a modular structure where each major CLI command has its own module:
-- `src/main.rs`: Application entry point and command dispatching.
-- `src/client.rs`: A robust wrapper around the Keycloak Admin REST API.
-- `src/models.rs`: Defines Keycloak resource representations (Realms, Clients, Users, etc.) using `serde`.
-- `src/inspect.rs`: Logic for fetching remote state and exporting to YAML.
-- `src/apply.rs`: Logic for reconciling local YAML state with the remote server (Create/Update/Delete).
-- `src/plan.rs`: Logic for calculating and displaying differences between local and remote states.
-- `src/validate.rs`: Local configuration structure and syntax validation.
-- `src/utils/secrets.rs`: Core logic for identifying and masking sensitive data in configuration files.
+`kcd` follows a **Reconciliation Loop** pattern, similar to Kubernetes controllers.
 
-## Building and Running
+1.  **Desired State**: Defined in local YAML files within the workspace.
+2.  **Current State**: Fetched from the Keycloak Admin API.
+3.  **Diff Engine (`plan.rs`)**: Compares the two states to identify what needs to be Created, Updated, or Deleted.
+4.  **Reconciler (`apply.rs`)**: Executes the necessary API calls to bring the Current State in line with the Desired State.
 
-### Prerequisites
-- Rust and Cargo (latest stable recommended)
+### Core Modules
 
-### Build Commands
-- **Debug Build**: `cargo build`
-- **Release Build**: `cargo build --release`
-- **Run Locally**: `cargo run -- <COMMAND> [ARGS]` (e.g., `cargo run -- plan --input config`)
+-   `src/client.rs`: Low-level wrapper for the Keycloak Admin REST API. Handles authentication (Token/Password/Client Credentials) and HTTP requests using `reqwest`.
+-   `src/models.rs`: Serde-based representations of Keycloak resources. We use `#[serde(flatten)]` with a `HashMap<String, Value>` to maintain forward/backward compatibility with unknown Keycloak fields.
+-   `src/inspect.rs`: Deep-scans the remote Keycloak server and serializes resources into local files.
+-   `src/utils/secrets.rs`: Uses heuristics to find and mask sensitive fields in configuration objects.
 
-### Testing
-- **Run All Tests**: `cargo test`
-- **Run Benchmarks**: `cargo bench`
+---
 
-### Environment Configuration
-The tool requires several environment variables to connect to Keycloak:
-- `KEYCLOAK_URL`: Base URL of the Keycloak server.
-- `KEYCLOAK_USER` / `KEYCLOAK_PASSWORD`: Admin credentials.
-- `KEYCLOAK_CLIENT_ID` / `KEYCLOAK_CLIENT_SECRET`: Client credentials for authentication.
+## 🛠️ Adding a New Resource Support
 
-## Development Conventions
+To support a new Keycloak resource (e.g., "Event Listeners"):
 
-### Coding Style
-- Follow standard Rust idioms and `rustfmt` conventions.
-- Use `anyhow::Result` for error handling in high-level logic.
-- Utilize `serde(flatten)` and `HashMap<String, Value>` in models to maintain compatibility with unknown or extra Keycloak fields.
+1.  **Update `models.rs`**: Add the `struct` for the resource and register it in the corresponding realm or parent resource.
+2.  **Update `client.rs`**: Add CRUD methods for the new resource.
+3.  **Update `inspect.rs`**: Add a function to fetch and save the resource to disk.
+4.  **Update `plan.rs`**: Logic to compare the local and remote versions of the resource.
+5.  **Update `apply.rs`**: Hook the resource into the reconciliation loop.
+6.  **Update `validate.rs`**: (Optional) Add specific validation rules.
+7.  **Update `cli.rs`**: (Optional) Add interactive scaffolding for the new resource.
 
-### Secret Management
-- **Never commit plain-text secrets.**
-- Use `kcd inspect` to automatically generate placeholders like `${KEYCLOAK_..._SECRET}` in YAML files.
-- The tool looks for keys containing "secret", "password", or "value" to identify sensitive data.
-- Ensure any new sensitive fields are added to the heuristics in `src/utils/secrets.rs` if they aren't caught by the current logic.
+---
 
-### Configuration Structure
-Local configuration is organized by realm and then by resource type:
-```
-config/
-└── <realm-name>/
-    ├── realm.yaml
-    ├── clients/
-    ├── users/
-    ├── roles/
-    └── ...
-```
+## 🧪 Testing Strategy
 
-### Contribution Guidelines
-- When adding new Keycloak resources, update `src/models.rs`, `src/client.rs`, and the corresponding logic in `inspect.rs`, `plan.rs`, and `apply.rs`.
-- Ensure new features are accompanied by unit tests in the relevant module or integration tests in `tests/`.
-- Validate changes using `cargo test` before submitting.
+`kcd` employs a multi-layered testing strategy:
+
+### Unit Tests
+Located within the modules themselves (e.g., `src/utils/secrets.rs`). Focused on pure logic like secret masking, path resolution, and YAML parsing.
+
+### Integration Tests
+Located in `tests/`.
+-   **Common**: Shared utilities for setting up temporary workspaces.
+-   **Mocked Tests**: Use `mockito` or similar (if implemented) to simulate Keycloak responses.
+-   **Real Integration**: Requires a live Keycloak instance (configured via environment variables). See `tests/real_integration_test.rs`.
+
+### Benchmarks
+Located in `benches/`. Used to monitor performance for large workspaces with thousands of files.
+
+---
+
+## 🔐 Secret Management Logic
+
+The masking heuristic looks for keys matching these patterns:
+-   Contains `secret` (case-insensitive)
+-   Contains `password`
+-   Matches exactly `value` (for certain component configurations)
+-   Matches exactly `hashedValue`
+
+When detected, the value is replaced by `${KEYCLOAK_<RESOURCE_TYPE>_<RESOURCE_NAME>_<FIELD_NAME>}` and written to the `.secrets` file.
+
+---
+
+## 📜 Coding Conventions
+
+1.  **Asynchronous by Default**: All I/O and API operations must use `tokio`.
+2.  **Error Handling**: Use `anyhow::Context` for descriptive error chains.
+3.  **Formatting**: Run `cargo fmt` before every commit.
+4.  **Clippy**: Ensure `cargo clippy` passes without warnings.
+5.  **Serialization**: Prefer `serde_yaml_ng` for YAML operations to ensure compatibility with modern YAML features.
+
+---
+
+## 🚀 Future Roadmap
+
+-   [ ] Support for custom SPIs and provider configurations.
+-   [ ] Parallel reconciliation (apply changes concurrently for different realms).
+-   [ ] Support for multiple environment profiles (e.g., `prod.yaml`, `staging.yaml`).
+-   [ ] Integration with HashiCorp Vault for secret resolution.

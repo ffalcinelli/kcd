@@ -2,6 +2,7 @@ use crate::client::KeycloakClient;
 use crate::models::KeycloakResource;
 use crate::utils::to_sorted_yaml_with_secrets;
 use anyhow::{Context, Result};
+use console::{style, Emoji};
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use sanitize_filename::sanitize;
 use std::collections::HashMap;
@@ -10,17 +11,21 @@ use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::Mutex;
 
+static ACTION: Emoji<'_, '_> = Emoji("🔍 ", "> ");
+static SUCCESS: Emoji<'_, '_> = Emoji("✅ ", "√ ");
+static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
+
 pub async fn run(
     client: &KeycloakClient,
-    output_dir: PathBuf,
+    workspace_dir: PathBuf,
     realms_to_inspect: &[String],
     yes: bool,
 ) -> Result<()> {
-    if !fs::try_exists(&output_dir)
+    if !fs::try_exists(&workspace_dir)
         .await
         .context("Failed to check output directory")?
     {
-        fs::create_dir_all(&output_dir)
+        fs::create_dir_all(&workspace_dir)
             .await
             .context("Failed to create output directory")?;
     }
@@ -41,8 +46,8 @@ pub async fn run(
     for realm_name in realms {
         let mut realm_client = client.clone();
         realm_client.set_target_realm(realm_name.clone());
-        let realm_dir = output_dir.join(&realm_name);
-        println!("Inspecting realm: {}", realm_name);
+        let realm_dir = workspace_dir.join(&realm_name);
+        println!("\n{} {}", ACTION, style(format!("Inspecting realm: {}", realm_name)).cyan().bold());
         inspect_realm(
             &realm_client,
             &realm_name,
@@ -56,7 +61,7 @@ pub async fn run(
 
     let secrets_lock = all_secrets.lock().await;
     if !secrets_lock.is_empty() {
-        let env_path = output_dir.join(".secrets");
+        let env_path = workspace_dir.join(".secrets");
         let mut env_content = String::new();
         let mut keys: Vec<&String> = secrets_lock.keys().collect();
         keys.sort();
@@ -77,7 +82,7 @@ pub async fn run(
 
         let new_content = format!("{}{}", existing_env, env_content);
         write_if_changed_with_mutex(&env_path, &new_content, yes, Arc::clone(&prompt_mutex)).await?;
-        println!("Exported secrets to .secrets");
+        println!("{} {}", SUCCESS, style("Exported secrets to .secrets").green());
     }
 
     Ok(())
@@ -96,7 +101,7 @@ async fn write_if_changed(path: &Path, content: &str, yes: bool) -> Result<()> {
                 .default(false)
                 .interact()?
             {
-                println!("Skipping {:?}", path);
+                println!("{} {}", WARN, style(format!("Skipping {:?}", path)).yellow());
                 return Ok(());
             }
         }
@@ -119,7 +124,7 @@ async fn write_if_changed_with_mutex(path: &Path, content: &str, yes: bool, prom
                 .default(false)
                 .interact()?
             {
-                println!("Skipping {:?}", path);
+                println!("{} {}", WARN, style(format!("Skipping {:?}", path)).yellow());
                 return Ok(());
             }
         }
@@ -131,16 +136,16 @@ async fn write_if_changed_with_mutex(path: &Path, content: &str, yes: bool, prom
 async fn inspect_realm(
     client: &KeycloakClient,
     realm_name: &str,
-    output_dir: PathBuf,
+    workspace_dir: PathBuf,
     all_secrets: Arc<Mutex<HashMap<String, String>>>,
     yes: bool,
     prompt_mutex: Arc<Mutex<()>>,
 ) -> Result<()> {
-    if !fs::try_exists(&output_dir)
+    if !fs::try_exists(&workspace_dir)
         .await
         .context("Failed to check output directory")?
     {
-        fs::create_dir_all(&output_dir)
+        fs::create_dir_all(&workspace_dir)
             .await
             .context("Failed to create output directory")?;
     }
@@ -153,16 +158,16 @@ async fn inspect_realm(
         .context("Failed to serialize realm")?;
     all_secrets.lock().await.extend(local_secrets);
     
-    let realm_path = output_dir.join("realm.yaml");
+    let realm_path = workspace_dir.join("realm.yaml");
     write_if_changed(&realm_path, &realm_yaml, yes).await?;
-    println!("Exported realm configuration to realm.yaml");
+    println!("  {} {}", SUCCESS, style("Exported realm configuration to realm.yaml").green());
 
     // Fetch clients
     let clients = client
         .get_clients()
         .await
         .context("Failed to fetch clients")?;
-    let clients_dir = output_dir.join("clients");
+    let clients_dir = workspace_dir.join("clients");
     if !fs::try_exists(&clients_dir)
         .await
         .context("Failed to check clients directory")?
@@ -192,11 +197,11 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported clients to clients/");
+    println!("  {} {}", SUCCESS, style("Exported clients to clients/").green());
 
     // Fetch roles
     let roles = client.get_roles().await.context("Failed to fetch roles")?;
-    let roles_dir = output_dir.join("roles");
+    let roles_dir = workspace_dir.join("roles");
     if !fs::try_exists(&roles_dir)
         .await
         .context("Failed to check roles directory")?
@@ -226,14 +231,14 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported roles to roles/");
+    println!("  {} {}", SUCCESS, style("Exported roles to roles/").green());
 
     // Fetch client scopes
     let client_scopes = client
         .get_client_scopes()
         .await
         .context("Failed to fetch client scopes")?;
-    let scopes_dir = output_dir.join("client-scopes");
+    let scopes_dir = workspace_dir.join("client-scopes");
     if !fs::try_exists(&scopes_dir)
         .await
         .context("Failed to check client-scopes directory")?
@@ -263,14 +268,14 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported client scopes to client-scopes/");
+    println!("  {} {}", SUCCESS, style("Exported client scopes to client-scopes/").green());
 
     // Fetch identity providers
     let idps = client
         .get_identity_providers()
         .await
         .context("Failed to fetch identity providers")?;
-    let idps_dir = output_dir.join("identity-providers");
+    let idps_dir = workspace_dir.join("identity-providers");
     if !fs::try_exists(&idps_dir)
         .await
         .context("Failed to check identity-providers directory")?
@@ -300,14 +305,14 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported identity providers to identity-providers/");
+    println!("  {} {}", SUCCESS, style("Exported identity providers to identity-providers/").green());
 
     // Fetch groups
     let groups = client
         .get_groups()
         .await
         .context("Failed to fetch groups")?;
-    let groups_dir = output_dir.join("groups");
+    let groups_dir = workspace_dir.join("groups");
     if !fs::try_exists(&groups_dir)
         .await
         .context("Failed to check groups directory")?
@@ -338,11 +343,11 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported groups to groups/");
+    println!("  {} {}", SUCCESS, style("Exported groups to groups/").green());
 
     // Fetch users
     let users = client.get_users().await.context("Failed to fetch users")?;
-    let users_dir = output_dir.join("users");
+    let users_dir = workspace_dir.join("users");
     if !fs::try_exists(&users_dir)
         .await
         .context("Failed to check users directory")?
@@ -372,14 +377,14 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported users to users/");
+    println!("  {} {}", SUCCESS, style("Exported users to users/").green());
 
     // Fetch authentication flows
     let flows = client
         .get_authentication_flows()
         .await
         .context("Failed to fetch authentication flows")?;
-    let flows_dir = output_dir.join("authentication-flows");
+    let flows_dir = workspace_dir.join("authentication-flows");
     if !fs::try_exists(&flows_dir)
         .await
         .context("Failed to check authentication-flows directory")?
@@ -409,14 +414,14 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported authentication flows to authentication-flows/");
+    println!("  {} {}", SUCCESS, style("Exported authentication flows to authentication-flows/").green());
 
     // Fetch required actions
     let actions = client
         .get_required_actions()
         .await
         .context("Failed to fetch required actions")?;
-    let actions_dir = output_dir.join("required-actions");
+    let actions_dir = workspace_dir.join("required-actions");
     if !fs::try_exists(&actions_dir)
         .await
         .context("Failed to check required-actions directory")?
@@ -446,7 +451,7 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported required actions to required-actions/");
+    println!("  {} {}", SUCCESS, style("Exported required actions to required-actions/").green());
 
     // Fetch components and keys
     let all_components = client
@@ -454,7 +459,7 @@ async fn inspect_realm(
         .await
         .context("Failed to fetch components")?;
 
-    let components_dir = output_dir.join("components");
+    let components_dir = workspace_dir.join("components");
     if !fs::try_exists(&components_dir)
         .await
         .context("Failed to check components directory")?
@@ -464,7 +469,7 @@ async fn inspect_realm(
             .context("Failed to create components directory")?;
     }
 
-    let keys_dir = output_dir.join("keys");
+    let keys_dir = workspace_dir.join("keys");
     if !fs::try_exists(&keys_dir)
         .await
         .context("Failed to check keys directory")?
@@ -506,7 +511,7 @@ async fn inspect_realm(
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!("Exported components to components/ and keys to keys/");
+    println!("  {} {}", SUCCESS, style("Exported components to components/ and keys to keys/").green());
 
     Ok(())
 }

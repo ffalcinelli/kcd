@@ -8,6 +8,10 @@ use app::inspect;
 use app::plan;
 use app::validate;
 use clap::Parser;
+use console::{style, Emoji};
+
+static ACTION: Emoji<'_, '_> = Emoji("🚀 ", ">> ");
+static SEARCH: Emoji<'_, '_> = Emoji("🔍 ", "> ");
 
 async fn init_client(cli: &Cli) -> Result<KeycloakClient> {
     let mut client = KeycloakClient::new(cli.server.clone());
@@ -39,38 +43,40 @@ async fn main() -> Result<()> {
     }
 
     match &cli.command {
-        Commands::Inspect { output, yes } => {
+        Commands::Inspect { workspace, yes } => {
             let client = init_client(&cli).await?;
-            println!("Inspecting Keycloak configuration into {:?}", output);
-            inspect::run(&client, output.clone(), &cli.realms, *yes).await?;
+            println!("{} {}", SEARCH, style(format!("Inspecting Keycloak configuration into {:?}", workspace)).cyan().bold());
+            inspect::run(&client, workspace.clone(), &cli.realms, *yes).await?;
         }
-        Commands::Validate { input } => {
-            println!("Validating Keycloak configuration from {:?}", input);
-            validate::run(input.clone(), &cli.realms)?;
+        Commands::Validate { workspace } => {
+            println!("{} {}", SEARCH, style(format!("Validating Keycloak configuration from {:?}", workspace)).cyan().bold());
+            validate::run(workspace.clone(), &cli.realms)?;
         }
-        Commands::Apply { input } => {
+        Commands::Apply { workspace, yes } => {
             let client = init_client(&cli).await?;
-            println!("Applying Keycloak configuration from {:?}", input);
-            apply::run(&client, input.clone(), &cli.realms).await?;
+            println!("{} {}", ACTION, style(format!("Applying Keycloak configuration from {:?}", workspace)).cyan().bold());
+            apply::run(&client, workspace.clone(), &cli.realms, *yes).await?;
         }
         Commands::Plan {
-            input,
+            workspace,
             changes_only,
+            interactive,
         } => {
             let client = init_client(&cli).await?;
-            println!("Planning Keycloak configuration from {:?}", input);
-            plan::run(&client, input.clone(), *changes_only, &cli.realms).await?;
+            println!("{} {}", SEARCH, style(format!("Planning Keycloak configuration from {:?}", workspace)).cyan().bold());
+            plan::run(&client, workspace.clone(), *changes_only, *interactive, &cli.realms).await?;
         }
-        Commands::Drift { input } => {
+        Commands::Drift { workspace } => {
             let client = init_client(&cli).await?;
-            println!("Checking drift for Keycloak configuration from {:?}", input);
-            plan::run(&client, input.clone(), true, &cli.realms).await?;
+            println!("{} {}", SEARCH, style(format!("Checking drift for Keycloak configuration from {:?}", workspace)).cyan().bold());
+            plan::run(&client, workspace.clone(), true, false, &cli.realms).await?;
         }
-        Commands::Cli { config_dir } => {
-            interactive_cli::run(config_dir.clone()).await?;
+        Commands::Cli { workspace } => {
+            interactive_cli::run(workspace.clone()).await?;
         }
-        Commands::Clean { output, yes } => {
-            clean::run(output.clone(), *yes, &cli.realms).await?;
+        Commands::Clean { workspace, yes } => {
+            println!("{} {}", ACTION, style(format!("Cleaning up Keycloak configuration in {:?}", workspace)).cyan().bold());
+            clean::run(workspace.clone(), *yes, &cli.realms).await?;
         }
     }
 

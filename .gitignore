@@ -27,5 +27,5 @@ target
 perf_test/
 .env
 .secrets
-config
-config/.secrets
+workspace
+workspace/.secrets

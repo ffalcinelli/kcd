@@ -1,34 +1,40 @@
 use anyhow::{Context, Result};
+use console::{style, Emoji};
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use std::path::PathBuf;
 use tokio::fs;
 
-pub async fn run(output_dir: PathBuf, yes: bool, realms_to_clean: &[String]) -> Result<()> {
-    if !output_dir.exists() {
-        println!("Output directory {:?} does not exist, nothing to clean.", output_dir);
+static ACTION: Emoji<'_, '_> = Emoji("🚀 ", ">> ");
+static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
+static SUCCESS: Emoji<'_, '_> = Emoji("🎉 ", "* ");
+static ERROR: Emoji<'_, '_> = Emoji("❌ ", "x ");
+
+pub async fn run(workspace_dir: PathBuf, yes: bool, realms_to_clean: &[String]) -> Result<()> {
+    if !workspace_dir.exists() {
+        println!("{} {}", WARN, style(format!("Output directory {:?} does not exist, nothing to clean.", workspace_dir)).yellow());
         return Ok(());
     }
 
     let targets = if realms_to_clean.is_empty() {
-        vec![output_dir.clone()]
+        vec![workspace_dir.clone()]
     } else {
         realms_to_clean
             .iter()
-            .map(|r| output_dir.join(r))
+            .map(|r| workspace_dir.join(r))
             .filter(|p| p.exists())
             .collect()
     };
 
     if targets.is_empty() {
-        println!("No targets found to clean.");
+        println!("{} {}", WARN, style("No targets found to clean.").yellow());
         return Ok(());
     }
 
     if !yes {
         let msg = if realms_to_clean.is_empty() {
-            format!("Are you sure you want to delete everything in {:?}?", output_dir)
+            format!("Are you sure you want to delete everything in {:?}?", workspace_dir)
         } else {
-            format!("Are you sure you want to delete the following realms in {:?}: {}?", output_dir, realms_to_clean.join(", "))
+            format!("Are you sure you want to delete the following realms in {:?}: {}?", workspace_dir, realms_to_clean.join(", "))
         };
 
         if !Confirm::with_theme(&ColorfulTheme::default())
@@ -36,34 +42,25 @@ pub async fn run(output_dir: PathBuf, yes: bool, realms_to_clean: &[String]) -> 
             .default(false)
             .interact()?
         {
-            println!("Aborted.");
+            println!("{} {}", ERROR, style("Aborted.").red());
             return Ok(());
         }
     }
 
     for target in targets {
-        if target == output_dir && realms_to_clean.is_empty() {
-            // Special case: cleaning the whole directory. 
-            // We might want to keep the directory itself but empty it, 
-            // or just delete it and let inspect recreate it.
-            // Let's delete everything inside it but keep .secrets if it exists?
-            // Actually, usually "clean" means "wipe out everything".
-            
-            println!("Cleaning all configuration in {:?}", output_dir);
-            let mut entries = fs::read_dir(&output_dir).await?;
+        if target == workspace_dir && realms_to_clean.is_empty() {
+            println!("{} {}", ACTION, style(format!("Cleaning all configuration in {:?}", workspace_dir)).cyan());
+            let mut entries = fs::read_dir(&workspace_dir).await?;
             while let Some(entry) = entries.next_entry().await? {
                 let path = entry.path();
                 if path.is_dir() {
                     fs::remove_dir_all(&path).await.context(format!("Failed to remove dir {:?}", path))?;
                 } else {
-                    // Maybe we should keep .secrets? 
-                    // User said "wipe out data from the output folder". 
-                    // Usually that means everything.
                     fs::remove_file(&path).await.context(format!("Failed to remove file {:?}", path))?;
                 }
             }
         } else {
-            println!("Cleaning realm directory {:?}", target);
+            println!("{} {}", ACTION, style(format!("Cleaning realm directory {:?}", target)).cyan());
             if target.is_dir() {
                 fs::remove_dir_all(&target).await.context(format!("Failed to remove dir {:?}", target))?;
             } else {
@@ -72,7 +69,7 @@ pub async fn run(output_dir: PathBuf, yes: bool, realms_to_clean: &[String]) -> 
         }
     }
 
-    println!("Clean completed successfully.");
+    println!("{} {}", SUCCESS, style("Clean completed successfully.").green().bold());
     Ok(())
 }
 
@@ -84,31 +81,31 @@ mod tests {
     #[tokio::test]
     async fn test_clean_all() {
         let dir = tempdir().unwrap();
-        let path = dir.path().to_path_buf();
+        let workspace_dir = dir.path().to_path_buf();
 
-        fs::create_dir(path.join("realm1")).await.unwrap();
-        fs::write(path.join("realm1").join("realm.yaml"), "test").await.unwrap();
-        fs::write(path.join(".secrets"), "test").await.unwrap();
+        fs::create_dir(workspace_dir.join("realm1")).await.unwrap();
+        fs::write(workspace_dir.join("realm1").join("realm.yaml"), "test").await.unwrap();
+        fs::write(workspace_dir.join(".secrets"), "test").await.unwrap();
 
-        run(path.clone(), true, &[]).await.unwrap();
+        run(workspace_dir.clone(), true, &[]).await.unwrap();
 
-        assert!(path.exists());
-        let mut entries = fs::read_dir(&path).await.unwrap();
+        assert!(workspace_dir.exists());
+        let mut entries = fs::read_dir(&workspace_dir).await.unwrap();
         assert!(entries.next_entry().await.unwrap().is_none());
     }
 
     #[tokio::test]
     async fn test_clean_subset() {
         let dir = tempdir().unwrap();
-        let path = dir.path().to_path_buf();
+        let workspace_dir = dir.path().to_path_buf();
 
-        fs::create_dir(path.join("realm1")).await.unwrap();
-        fs::create_dir(path.join("realm2")).await.unwrap();
+        fs::create_dir(workspace_dir.join("realm1")).await.unwrap();
+        fs::create_dir(workspace_dir.join("realm2")).await.unwrap();
 
-        run(path.clone(), true, &["realm1".to_string()]).await.unwrap();
+        run(workspace_dir.clone(), true, &["realm1".to_string()]).await.unwrap();
 
-        assert!(path.exists());
-        assert!(!path.join("realm1").exists());
-        assert!(path.join("realm2").exists());
+        assert!(workspace_dir.exists());
+        assert!(!workspace_dir.join("realm1").exists());
+        assert!(workspace_dir.join("realm2").exists());
     }
 }

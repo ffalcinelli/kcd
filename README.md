@@ -1,163 +1,193 @@
 # Keycloak Continuous Delivery (kcd)
 
+[![CI](https://github.com/fabio-test/kcd/actions/workflows/ci.yml/badge.svg)](https://github.com/fabio-test/kcd/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Rust Version](https://img.shields.io/badge/rust-1.85%2B-blue.svg)
+
 **Disclaimer**: This project is experimentally written almost entirely by AI, so any usage should keep this in mind and that the execution of this software is at your own risk.
 
-A CLI tool to manage Keycloak configurations using local YAML files. It allows you to inspect the current state, validate local files, plan changes, and apply them to a Keycloak server.
+`kcd` is a robust CLI tool for the **declarative management** of Keycloak configurations. It allows you to treat your Keycloak settings as code, enabling version control, automated testing, and seamless continuous delivery of your identity infrastructure.
 
-## Features
+---
 
-- **Inspect**: Fetches current Keycloak configuration and dumps it to local YAML files.
-- **Validate**: Validates the structure and content of local configuration files.
-- **Plan**: Shows a detailed diff between local configuration and the server's state, previewing changes before applying them.
-- **Apply**: Applies local configuration changes to the Keycloak server (Create, Update, Delete).
-- **Drift**: Checks for drift between the local configuration and the server's state, showing only the differences.
-- **Rotate Keys**: Rotates realm keys by creating new key provider components with incremented priority.
-- **Supported Resources**: Realm, Roles, Identity Providers, Clients, Client Scopes, Groups, Users, Authentication Flows, Required Actions, and Components.
+## 📺 Screenshots
 
-## Installation
+### Interactive Plan Mode
+> Previewing changes before applying them with interactive confirmation.
+
+![kcd plan screenshot placeholder](https://raw.githubusercontent.com/ffalcinelli/kcd/main/assets/kcd-plan.png)
+
+```text
+$ kcd plan --interactive
+💡 Calculating diff for realm 'master'...
+
+  Clients:
+    [+] my-new-app (Create)
+    [~] admin-cli (Update)
+        - root_url: "http://localhost:8080" -> "https://idp.example.com"
+    [-] legacy-app (Delete)
+
+? Apply change to client 'my-new-app'? (y/n)
+```
+
+### Interactive CLI Menu
+> Scaffolding resources without writing YAML by hand.
+
+![kcd cli screenshot placeholder](https://raw.githubusercontent.com/ffalcinelli/kcd/main/assets/kcd-cli.png)
+
+```text
+$ kcd cli
+💡 Welcome to kcd interactive CLI!
+? What would you like to do?
+❯ Create User
+  Change User Password
+  Create Client
+  Create Role
+  Create Group
+  Create Identity Provider
+  Create Client Scope
+  Rotate Keys
+  Exit
+```
+
+---
+
+## 🚀 Key Features
+
+- **Declarative State**: Define your desired Keycloak state in human-readable YAML files.
+- **Inspect & Export**: Bootstrap your project by exporting existing Keycloak configurations to local files.
+- **Dry-Run Planning**: Preview exactly what changes will be applied before they happen.
+- **Drift Detection**: Identify discrepancies between your local configuration and the live server.
+- **Secret Masking**: Automatically handles sensitive data (secrets, passwords) by replacing them with environment variable placeholders.
+- **Interactive Scaffolding**: Quickly generate resource templates through an interactive CLI.
+- **Resource Support**: Realms, Roles (Realm & Client), Identity Providers, Clients, Client Scopes, Groups, Users, Authentication Flows, Required Actions, and Components.
+
+---
+
+## 🛠️ Installation
 
 ### Prerequisites
 
-- [Rust](https://www.rust-lang.org/tools/install) and Cargo
+- [Rust](https://www.rust-lang.org/tools/install) (latest stable) and Cargo.
 
 ### Building from Source
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd kcd
-   ```
+```bash
+git clone https://github.com/fabio-test/kcd.git
+cd kcd
+cargo build --release
+sudo cp target/release/kcd /usr/local/bin/
+```
 
-2. Build the project:
-   ```bash
-   cargo build --release
-   ```
+---
 
-3. The binary will be available at `target/release/kcd`. You can also install it directly:
-   ```bash
-   cargo install --path .
-   ```
+## ⚙️ Configuration
 
-## Configuration
-
-The tool uses environment variables for authentication and connection details. You can set these in your shell or use a `.secrets` file in the project root.
+`kcd` uses environment variables for connection and authentication. You can export these in your shell or use a `.secrets` file.
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `KEYCLOAK_URL` | The base URL of your Keycloak server (e.g., `http://localhost:8080`). | |
-| `KEYCLOAK_USER` | Admin username for authentication. | |
-| `KEYCLOAK_PASSWORD` | Admin password for authentication. | |
-| `KEYCLOAK_CLIENT_ID` | Client ID for authentication. | `admin-cli` |
-| `KEYCLOAK_CLIENT_SECRET` | Client Secret for authentication (if using client credentials). | |
+| `KEYCLOAK_URL` | Base URL (e.g., `http://localhost:8080`) | **Required** |
+| `KEYCLOAK_USER` | Admin username | |
+| `KEYCLOAK_PASSWORD` | Admin password | |
+| `KEYCLOAK_CLIENT_ID` | Client ID for auth | `admin-cli` |
+| `KEYCLOAK_CLIENT_SECRET` | Client Secret (if using client credentials) | |
 
-**Note:** The target realms are specified using the `--realms` CLI argument (comma-separated). If omitted, the tool auto-detects realms based on existing directories in the input/output path or queries the server for all realms during inspection.
+### Workspace Structure
 
-## Project Structure
+By default, `kcd` looks for a `workspace/` directory:
 
-The configuration files are organized in a specific directory structure. By default, the tool looks for a `config` directory, but you can specify a custom path using the `--input` or `--output` arguments.
-
-```
-config/
-└── my-realm/                  # Target realm directory
-    ├── realm.yaml             # Realm configuration
-    ├── clients/               # Client configurations
-    │   ├── client-1.yaml
-    │   └── ...
-    ├── roles/                 # Role configurations
-    │   ├── role-1.yaml
-    │   └── ...
-    ├── identity-providers/    # Identity Provider configurations
-    │   ├── google.yaml
-    │   └── ...
-    ├── client-scopes/         # Client Scopes configurations
-    ├── groups/                # Group configurations
-    ├── users/                 # User configurations
-    ├── authentication-flows/  # Authentication Flow configurations
-    ├── required-actions/      # Required Action configurations
-    └── components/            # Component configurations
+```text
+workspace/
+├── .secrets                   # Generated during 'inspect', should be gitignored
+└── my-realm/                  # Realm folder
+    ├── realm.yaml             # Main realm settings
+    ├── clients/
+    │   └── my-app.yaml        # Client configuration
+    ├── roles/
+    │   └── admin.yaml         # Realm role
+    └── users/
+        └── test-user.yaml     # User configuration (managed or scaffolded)
 ```
 
-## Usage
+---
 
-### Inspect
-Download the current configuration from the Keycloak server and save it to the local filesystem.
+## 📖 Command Reference
+
+### `inspect`
+Exports the remote server state to local YAML files.
 ```bash
-kcd inspect --output config/
+# Export everything to 'my-workspace'
+kcd inspect --workspace my-workspace --yes
+
+# Export specific realms
+kcd --realms master,demo inspect
 ```
 
-### Validate
-Validate the local configuration files for syntax and structure errors.
+### `validate`
+Ensures your local YAML files are syntactically correct and follow the Keycloak model.
 ```bash
-kcd validate --input config/
+kcd validate
 ```
 
-### Plan
-Show the differences between the local configuration and the remote Keycloak server. This is useful to preview changes before applying them.
+### `plan`
+Calculates the "diff" between local files and the remote server.
 ```bash
-kcd plan --input config/
+# Standard plan
+kcd plan
+
+# Interactive plan: decide for each change whether to include it
+kcd plan --interactive
+
+# Only show changes (hide 'No changes' messages)
+kcd plan --changes-only
 ```
 
-You can also use the `--changes-only` flag to show only the differences and suppress "No changes" messages.
+### `apply`
+Reconciles the remote state to match your local configuration.
 ```bash
-kcd plan --input config/ --changes-only
+kcd apply --yes
 ```
 
-### Drift
-Check for drift between local configuration and server. This command is equivalent to `plan --changes-only`.
+### `drift`
+A shortcut for `plan --changes-only`. Useful for scheduled CI jobs to detect manual changes on the server.
 ```bash
-kcd drift --input config/
+kcd drift
 ```
 
-### Apply
-Apply the local configuration to the Keycloak server. This will create new resources, update existing ones, and delete resources that are not present in the local configuration.
+### `clean`
+Removes local YAML files that are no longer referenced or are invalid.
 ```bash
-kcd apply --input config/
+kcd clean --yes
 ```
 
-### Interactive CLI
-Launch an interactive terminal menu where you can easily perform common Keycloak management tasks. The CLI strictly honors the declarative approach and modifies local YAML configuration files (acting as scaffolding generators), preparing them for `kcd apply`.
+### `cli`
+An interactive menu to generate resource scaffolds.
 ```bash
-kcd cli --config-dir config/
+kcd cli
 ```
 
-Available Actions:
-- **Create User**: Prompts for user details and generates a `UserRepresentation` YAML file in `config/<realm>/users/`.
-- **Change User Password**: Appends or updates a password credential within a user's local YAML file.
-- **Create Client**: Prompts for Client ID and Public vs. Confidential type, generating the YAML in `config/<realm>/clients/`.
-- **Rotate Keys**: Locally reads Keycloak key components in `config/<realm>/components/`, increments the priority of active key providers, and writes the new YAML files back to disk.
+---
 
+## 🔐 Secret Management
 
-## License
+`kcd` is designed with security in mind. During `inspect`, it detects sensitive fields and replaces them with `${KEYCLOAK_...}` placeholders.
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+**Example `client.yaml`:**
+```yaml
+clientId: my-app
+secret: ${KEYCLOAK_CLIENT_MY_APP_SECRET}
+publicClient: false
+```
 
-## Secret Management
+1. Run `kcd inspect`.
+2. A `.secrets` file is created (contains `KEYCLOAK_CLIENT_MY_APP_SECRET=xyz`).
+3. **DO NOT commit `.secrets`**.
+4. Source the secrets: `set -a; source workspace/.secrets; set +a`.
+5. Run `kcd apply`.
 
-kcd helps securely manage Keycloak secrets (such as client secrets, passwords, or SMTP bind credentials) so they are never stored in plain text in your version-controlled YAML files.
+---
 
-When you run `kcd inspect`, the tool will automatically detect known secret fields using heuristics (`clientSecret`, `password`, `value`, etc.) and replace their plain-text values in the resulting YAML files with environment variable placeholders like `${KEYCLOAK_CLIENT_CLIENTSECRET}`.
+## 📄 License
 
-Simultaneously, `kcd inspect` aggregates the actual secret values into a single `.secrets` file located in the output directory. It's recommended to add `.secrets` to your `.gitignore`.
-
-When executing `kcd plan` or `kcd apply`, kcd parses these placeholders from your YAML files and resolves them by reading your local environment variables. If a required environment variable is missing during execution, the command fails gracefully with a descriptive error.
-
-### Example Secret Workflow
-
-1. Inspect the realm to export the configuration:
-   ```bash
-   kcd inspect --output config/
-   ```
-   This generates your configuration files in `config/` along with a `config/.secrets` file containing your real secrets.
-
-2. Source the `.secrets` file to load secrets into your environment:
-   ```bash
-   set -a; source config/.secrets; set +a
-   ```
-
-3. Make your desired changes to the YAML files. Since the secrets are masked with placeholders (e.g., `${KEYCLOAK_IDP_GOOGLE_CLIENTSECRET}`), it is safe to commit your `config/` directory to source control.
-
-4. Plan and apply your changes (with the secrets loaded in your shell):
-   ```bash
-   kcd plan --input config/
-   kcd apply --input config/
-   ```
+Distributed under the MIT License. See `LICENSE` for more information.
