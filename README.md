@@ -66,6 +66,18 @@ $ kcd cli
 
 ## 🛠️ Installation
 
+### Install Pre-built Binaries
+
+**macOS and Linux:**
+```bash
+curl -LsSf https://raw.githubusercontent.com/ffalcinelli/kcd/main/scripts/install.sh | sh
+```
+
+**Windows:**
+```powershell
+powershell -c "irm https://raw.githubusercontent.com/ffalcinelli/kcd/main/scripts/install.ps1 | iex"
+```
+
 ### Prerequisites
 
 - [Rust](https://www.rust-lang.org/tools/install) (latest stable) and Cargo.
@@ -185,6 +197,17 @@ publicClient: false
 3. **DO NOT commit `.secrets`**.
 4. Source the secrets: `set -a; source workspace/.secrets; set +a`.
 5. Run `kcd apply`.
+
+---
+
+## 📅 Versioning
+
+`kcd` uses [Calendar Versioning (CalVer)](https://calver.org/) with the format `YYMM.MICRO.MODIFIER` (e.g., `2603.1.0`).
+- **YYMM**: The year and month of the release (e.g., `2603` for March 2026).
+- **MICRO**: Increments for each release within the same month.
+- **MODIFIER**: Typically `0`, used for specific hotfixes.
+
+This format provides an immediate understanding of how recent your installed version is.
 
 ---
 
