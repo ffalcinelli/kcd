@@ -24,10 +24,7 @@ pub async fn start_mock_server() -> String {
             "/realms/master/protocol/openid-connect/token",
             post(token_handler),
         )
-        .route(
-            "/admin/realms",
-            axum::routing::get(get_realms_handler),
-        )
+        .route("/admin/realms", axum::routing::get(get_realms_handler))
         .route(
             "/admin/realms/{realm}",
             axum::routing::get(get_realm_handler).put(generic_handler),

@@ -556,10 +556,12 @@ mod tests {
         client.token = Some("mock_token".to_string());
         let result = client.post("http://127.0.0.1:1", &"body").await;
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to send POST request"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to send POST request")
+        );
     }
 
     #[tokio::test]
@@ -568,10 +570,12 @@ mod tests {
         client.token = Some("mock_token".to_string());
         let result = client.delete("http://127.0.0.1:1").await;
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to send DELETE request"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to send DELETE request")
+        );
     }
 }
 

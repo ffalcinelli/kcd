@@ -43,7 +43,9 @@ fn test_invalid_command() {
     cmd.arg("invalid")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("unrecognized subcommand 'invalid'"));
+        .stderr(predicate::str::contains(
+            "unrecognized subcommand 'invalid'",
+        ));
 }
 
 #[test]

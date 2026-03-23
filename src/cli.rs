@@ -548,7 +548,10 @@ mod tests {
             .await
             .unwrap();
 
-        let file_path = workspace_dir.join("master").join("users").join("user2.yaml");
+        let file_path = workspace_dir
+            .join("master")
+            .join("users")
+            .join("user2.yaml");
         let content = fs::read_to_string(&file_path).await.unwrap();
         let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
 
@@ -791,7 +794,9 @@ mod tests {
         let workspace_dir = dir.path();
         let keys_dir = workspace_dir.join("master").join("components");
         fs::create_dir_all(&keys_dir).await.unwrap();
-        fs::write(keys_dir.join("test.txt"), "not a yaml").await.unwrap();
+        fs::write(keys_dir.join("test.txt"), "not a yaml")
+            .await
+            .unwrap();
 
         let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
         assert_eq!(count, 0);
@@ -879,7 +884,9 @@ mod tests {
         };
 
         let yaml = serde_yaml::to_string(&component).unwrap();
-        fs::write(keys_dir.join("not-key.yaml"), yaml).await.unwrap();
+        fs::write(keys_dir.join("not-key.yaml"), yaml)
+            .await
+            .unwrap();
 
         let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
         assert_eq!(count, 0);
@@ -889,8 +896,13 @@ mod tests {
     async fn test_change_user_password_yaml_invalid_yaml() {
         let dir = tempdir().unwrap();
         let workspace_dir = dir.path();
-        let user_path = workspace_dir.join("master").join("users").join("baduser.yaml");
-        fs::create_dir_all(user_path.parent().unwrap()).await.unwrap();
+        let user_path = workspace_dir
+            .join("master")
+            .join("users")
+            .join("baduser.yaml");
+        fs::create_dir_all(user_path.parent().unwrap())
+            .await
+            .unwrap();
         fs::write(&user_path, "not a yaml : [ :").await.unwrap();
 
         let res = change_user_password_yaml(workspace_dir, "master", "baduser", "newpass").await;
