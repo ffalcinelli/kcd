@@ -29,3 +29,6 @@ perf_test/
 .secrets
 workspace
 workspace/.secrets
+*.profraw
+lcov.info
+new-component.yaml

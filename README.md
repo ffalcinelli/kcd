@@ -1,6 +1,7 @@
 # Keycloak Continuous Delivery (kcd)
 
 [![CI](https://github.com/ffalcinelli/kcd/actions/workflows/ci.yml/badge.svg)](https://github.com/ffalcinelli/kcd/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/ffalcinelli/kcd/graph/badge.svg)](https://app.codecov.io/gh/ffalcinelli/kcd)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Rust Version](https://img.shields.io/badge/rust-1.85%2B-blue.svg)
 

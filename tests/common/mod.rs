@@ -24,6 +24,7 @@ pub async fn start_mock_server() -> String {
             "/realms/master/protocol/openid-connect/token",
             post(token_handler),
         )
+        .route("/admin/realms", axum::routing::get(get_realms_handler))
         .route(
             "/admin/realms/{realm}",
             axum::routing::get(get_realm_handler).put(generic_handler),
@@ -37,6 +38,14 @@ pub async fn start_mock_server() -> String {
             axum::routing::get(get_roles_handler).post(generic_handler),
         )
         .route(
+            "/admin/realms/{realm}/identity-provider/instances",
+            axum::routing::get(get_idps_handler).post(generic_handler),
+        )
+        .route(
+            "/admin/realms/{realm}/identity-provider/instances/{alias}",
+            axum::routing::put(generic_handler).delete(generic_handler),
+        )
+        .route(
             "/admin/realms/{realm}/clients/{id}",
             axum::routing::put(generic_handler).delete(generic_handler),
         )
@@ -47,10 +56,6 @@ pub async fn start_mock_server() -> String {
         .route(
             "/admin/realms/{realm}/client-scopes",
             axum::routing::get(get_client_scopes_handler).post(generic_handler),
-        )
-        .route(
-            "/admin/realms/{realm}/identity-provider/instances",
-            axum::routing::get(get_idps_handler).post(generic_handler),
         )
         .route(
             "/admin/realms/{realm}/groups",
@@ -66,7 +71,11 @@ pub async fn start_mock_server() -> String {
         )
         .route(
             "/admin/realms/{realm}/authentication/required-actions",
-            axum::routing::get(get_required_actions_handler).put(generic_handler),
+            axum::routing::get(get_required_actions_handler),
+        )
+        .route(
+            "/admin/realms/{realm}/authentication/register-required-action",
+            axum::routing::post(generic_handler),
         )
         .route(
             "/admin/realms/{realm}/components",
@@ -95,6 +104,10 @@ pub async fn start_mock_server() -> String {
         .route(
             "/admin/realms/{realm}/components/{id}",
             axum::routing::put(generic_handler).delete(generic_handler),
+        )
+        .route(
+            "/admin/realms/{realm}/keys",
+            axum::routing::get(get_keys_handler),
         );
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -115,10 +128,10 @@ async fn token_handler(axum::Form(payload): axum::Form<TokenRequest>) -> impl In
     {
         (
             StatusCode::OK,
-            Json(TokenResponse {
-                access_token: "mock_token".to_string(),
-                expires_in: 300,
-            }),
+            Json(serde_json::json!({
+                "access_token": "mock_token",
+                "expires_in": 300
+            })),
         )
     } else if payload.grant_type == "client_credentials"
         && payload.client_id == "admin-cli"
@@ -126,18 +139,18 @@ async fn token_handler(axum::Form(payload): axum::Form<TokenRequest>) -> impl In
     {
         (
             StatusCode::OK,
-            Json(TokenResponse {
-                access_token: "mock_token".to_string(),
-                expires_in: 300,
-            }),
+            Json(serde_json::json!({
+                "access_token": "mock_token",
+                "expires_in": 300
+            })),
         )
     } else {
         (
             StatusCode::UNAUTHORIZED,
-            Json(TokenResponse {
-                access_token: "invalid".to_string(),
-                expires_in: 0,
-            }),
+            Json(serde_json::json!({
+                "error": "invalid_grant",
+                "error_description": "Invalid user credentials"
+            })),
         )
     }
 }
@@ -145,13 +158,19 @@ async fn token_handler(axum::Form(payload): axum::Form<TokenRequest>) -> impl In
 async fn get_realm_handler(
     axum::extract::Path(realm): axum::extract::Path<String>,
 ) -> impl IntoResponse {
-    if realm == "test-realm" {
+    let display_name = if realm == "test-realm" {
+        "Test Realm".to_string()
+    } else {
+        format!("{} Realm", realm)
+    };
+
+    if realm == "test-realm" || realm == "master" {
         (
             StatusCode::OK,
             Json(serde_json::json!({
-                "realm": "test-realm",
+                "realm": realm,
                 "enabled": true,
-                "displayName": "Test Realm"
+                "displayName": display_name
             })),
         )
     } else {
@@ -170,7 +189,8 @@ async fn get_clients_handler(
                     "id": "1",
                     "clientId": "client-1",
                     "name": "Client 1",
-                    "enabled": true
+                    "enabled": true,
+                    "secret": "client-1-secret"
                 },
                 {
                     "id": "2",
@@ -180,7 +200,7 @@ async fn get_clients_handler(
             ])),
         )
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!([])))
+        (StatusCode::OK, Json(serde_json::json!([])))
     }
 }
 
@@ -195,7 +215,7 @@ async fn get_client_scopes_handler(
             ])),
         )
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!([])))
+        (StatusCode::OK, Json(serde_json::json!([])))
     }
 }
 
@@ -206,11 +226,19 @@ async fn get_idps_handler(
         (
             StatusCode::OK,
             Json(serde_json::json!([
-                { "alias": "google", "providerId": "google", "enabled": true }
+                {
+                    "internalId": "idp-1",
+                    "alias": "google",
+                    "providerId": "google",
+                    "enabled": true,
+                    "config": {
+                        "clientSecret": "idp-secret"
+                    }
+                }
             ])),
         )
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!([])))
+        (StatusCode::OK, Json(serde_json::json!([])))
     }
 }
 
@@ -225,7 +253,7 @@ async fn get_groups_handler(
             ])),
         )
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!([])))
+        (StatusCode::OK, Json(serde_json::json!([])))
     }
 }
 
@@ -240,7 +268,7 @@ async fn get_users_handler(
             ])),
         )
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!([])))
+        (StatusCode::OK, Json(serde_json::json!([])))
     }
 }
 
@@ -255,7 +283,7 @@ async fn get_flows_handler(
             ])),
         )
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!([])))
+        (StatusCode::OK, Json(serde_json::json!([])))
     }
 }
 
@@ -270,7 +298,7 @@ async fn get_required_actions_handler(
             ])),
         )
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!([])))
+        (StatusCode::OK, Json(serde_json::json!([])))
     }
 }
 
@@ -285,7 +313,52 @@ async fn get_components_handler(
             ])),
         )
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!([])))
+        (StatusCode::OK, Json(serde_json::json!([])))
+    }
+}
+
+async fn get_realms_handler() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        Json(serde_json::json!([
+            {
+                "realm": "master",
+                "enabled": true
+            },
+            {
+                "realm": "test-realm",
+                "enabled": true
+            }
+        ])),
+    )
+}
+
+async fn get_keys_handler(
+    axum::extract::Path(realm): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    if realm == "test-realm" {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+        (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "keys": [
+                    {
+                        "kid": "key-1",
+                        "type": "RSA",
+                        "algorithm": "RS256",
+                        "publicKey": "pubkey",
+                        "status": "ACTIVE",
+                        "providerId": "rsa-1",
+                        "validTo": now + 100000 // 100 seconds from now, will trigger warning
+                    }
+                ]
+            })),
+        )
+    } else {
+        (StatusCode::OK, Json(serde_json::json!({"keys": []})))
     }
 }
 
@@ -312,6 +385,6 @@ async fn get_roles_handler(
             ])),
         )
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!([])))
+        (StatusCode::OK, Json(serde_json::json!([])))
     }
 }

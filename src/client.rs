@@ -502,6 +502,10 @@ impl KeycloakClient {
         self.token.as_deref().context("Not authenticated")
     }
 
+    pub fn set_token(&mut self, token: String) {
+        self.token = Some(token);
+    }
+
     async fn check_response(response: Response, context_msg: &str) -> Result<Response> {
         if !response.status().is_success() {
             let status = response.status();
@@ -544,6 +548,34 @@ mod tests {
             "http://localhost:8080/path"
         );
         assert_eq!(redact_url("invalid-url"), "invalid-url");
+    }
+
+    #[tokio::test]
+    async fn test_post_send_failure() {
+        let mut client = KeycloakClient::new("http://127.0.0.1:1".to_string());
+        client.token = Some("mock_token".to_string());
+        let result = client.post("http://127.0.0.1:1", &"body").await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to send POST request")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_send_failure() {
+        let mut client = KeycloakClient::new("http://127.0.0.1:1".to_string());
+        client.token = Some("mock_token".to_string());
+        let result = client.delete("http://127.0.0.1:1").await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to send DELETE request")
+        );
     }
 }
 

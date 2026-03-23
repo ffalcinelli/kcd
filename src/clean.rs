@@ -149,4 +149,22 @@ mod tests {
         assert!(!workspace_dir.join("realm1").exists());
         assert!(workspace_dir.join("realm2").exists());
     }
+
+    #[tokio::test]
+    async fn test_clean_non_existent_workspace() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path().join("non-existent");
+        // Should not fail, just print a warning
+        run(workspace_dir, true, &[]).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_clean_empty_targets() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path().to_path_buf();
+        // workspace exists but we specify a realm that doesn't exist
+        run(workspace_dir, true, &["non-existent-realm".to_string()])
+            .await
+            .unwrap();
+    }
 }
