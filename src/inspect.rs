@@ -203,19 +203,19 @@ async fn inspect_realm(
     let clients = client
         .get_clients()
         .await
-        .context("Failed to fetch clients")?;
-    let clients_dir = workspace_dir.join("clients");
-    if !fs::try_exists(&clients_dir)
+        .with_context(|| format!("Failed to fetch clients for realm '{}'", realm_name))?;
+    let clients_dir = Arc::new(workspace_dir.join("clients"));
+    if !fs::try_exists(&*clients_dir)
         .await
         .context("Failed to check clients directory")?
     {
-        fs::create_dir_all(&clients_dir)
+        fs::create_dir_all(&*clients_dir)
             .await
             .context("Failed to create clients directory")?;
     }
     let mut set = tokio::task::JoinSet::new();
     for client_rep in clients {
-        let clients_dir = clients_dir.clone();
+        let clients_dir = Arc::clone(&clients_dir);
         let all_secrets = Arc::clone(&all_secrets);
         let realm_name = realm_name.to_string();
         let prompt_mutex = Arc::clone(&prompt_mutex);
@@ -241,19 +241,22 @@ async fn inspect_realm(
     );
 
     // Fetch roles
-    let roles = client.get_roles().await.context("Failed to fetch roles")?;
-    let roles_dir = workspace_dir.join("roles");
-    if !fs::try_exists(&roles_dir)
+    let roles = client
+        .get_roles()
+        .await
+        .with_context(|| format!("Failed to fetch roles for realm '{}'", realm_name))?;
+    let roles_dir = Arc::new(workspace_dir.join("roles"));
+    if !fs::try_exists(&*roles_dir)
         .await
         .context("Failed to check roles directory")?
     {
-        fs::create_dir_all(&roles_dir)
+        fs::create_dir_all(&*roles_dir)
             .await
             .context("Failed to create roles directory")?;
     }
     let mut set = tokio::task::JoinSet::new();
     for role in roles {
-        let roles_dir = roles_dir.clone();
+        let roles_dir = Arc::clone(&roles_dir);
         let all_secrets = Arc::clone(&all_secrets);
         let realm_name = realm_name.to_string();
         let prompt_mutex = Arc::clone(&prompt_mutex);
@@ -282,19 +285,19 @@ async fn inspect_realm(
     let client_scopes = client
         .get_client_scopes()
         .await
-        .context("Failed to fetch client scopes")?;
-    let scopes_dir = workspace_dir.join("client-scopes");
-    if !fs::try_exists(&scopes_dir)
+        .with_context(|| format!("Failed to fetch client scopes for realm '{}'", realm_name))?;
+    let scopes_dir = Arc::new(workspace_dir.join("client-scopes"));
+    if !fs::try_exists(&*scopes_dir)
         .await
         .context("Failed to check client-scopes directory")?
     {
-        fs::create_dir_all(&scopes_dir)
+        fs::create_dir_all(&*scopes_dir)
             .await
             .context("Failed to create client-scopes directory")?;
     }
     let mut set = tokio::task::JoinSet::new();
     for scope in client_scopes {
-        let scopes_dir = scopes_dir.clone();
+        let scopes_dir = Arc::clone(&scopes_dir);
         let all_secrets = Arc::clone(&all_secrets);
         let realm_name = realm_name.to_string();
         let prompt_mutex = Arc::clone(&prompt_mutex);
@@ -320,22 +323,24 @@ async fn inspect_realm(
     );
 
     // Fetch identity providers
-    let idps = client
-        .get_identity_providers()
-        .await
-        .context("Failed to fetch identity providers")?;
-    let idps_dir = workspace_dir.join("identity-providers");
-    if !fs::try_exists(&idps_dir)
+    let idps = client.get_identity_providers().await.with_context(|| {
+        format!(
+            "Failed to fetch identity providers for realm '{}'",
+            realm_name
+        )
+    })?;
+    let idps_dir = Arc::new(workspace_dir.join("identity-providers"));
+    if !fs::try_exists(&*idps_dir)
         .await
         .context("Failed to check identity-providers directory")?
     {
-        fs::create_dir_all(&idps_dir)
+        fs::create_dir_all(&*idps_dir)
             .await
             .context("Failed to create identity-providers directory")?;
     }
     let mut set = tokio::task::JoinSet::new();
     for idp in idps {
-        let idps_dir = idps_dir.clone();
+        let idps_dir = Arc::clone(&idps_dir);
         let all_secrets = Arc::clone(&all_secrets);
         let realm_name = realm_name.to_string();
         let prompt_mutex = Arc::clone(&prompt_mutex);
@@ -364,19 +369,19 @@ async fn inspect_realm(
     let groups = client
         .get_groups()
         .await
-        .context("Failed to fetch groups")?;
-    let groups_dir = workspace_dir.join("groups");
-    if !fs::try_exists(&groups_dir)
+        .with_context(|| format!("Failed to fetch groups for realm '{}'", realm_name))?;
+    let groups_dir = Arc::new(workspace_dir.join("groups"));
+    if !fs::try_exists(&*groups_dir)
         .await
         .context("Failed to check groups directory")?
     {
-        fs::create_dir_all(&groups_dir)
+        fs::create_dir_all(&*groups_dir)
             .await
             .context("Failed to create groups directory")?;
     }
     let mut set = tokio::task::JoinSet::new();
     for group in groups {
-        let groups_dir = groups_dir.clone();
+        let groups_dir = Arc::clone(&groups_dir);
         let all_secrets = Arc::clone(&all_secrets);
         let realm_name = realm_name.to_string();
         let prompt_mutex = Arc::clone(&prompt_mutex);
@@ -403,19 +408,22 @@ async fn inspect_realm(
     );
 
     // Fetch users
-    let users = client.get_users().await.context("Failed to fetch users")?;
-    let users_dir = workspace_dir.join("users");
-    if !fs::try_exists(&users_dir)
+    let users = client
+        .get_users()
+        .await
+        .with_context(|| format!("Failed to fetch users for realm '{}'", realm_name))?;
+    let users_dir = Arc::new(workspace_dir.join("users"));
+    if !fs::try_exists(&*users_dir)
         .await
         .context("Failed to check users directory")?
     {
-        fs::create_dir_all(&users_dir)
+        fs::create_dir_all(&*users_dir)
             .await
             .context("Failed to create users directory")?;
     }
     let mut set = tokio::task::JoinSet::new();
     for user in users {
-        let users_dir = users_dir.clone();
+        let users_dir = Arc::clone(&users_dir);
         let all_secrets = Arc::clone(&all_secrets);
         let realm_name = realm_name.to_string();
         let prompt_mutex = Arc::clone(&prompt_mutex);
@@ -441,22 +449,24 @@ async fn inspect_realm(
     );
 
     // Fetch authentication flows
-    let flows = client
-        .get_authentication_flows()
-        .await
-        .context("Failed to fetch authentication flows")?;
-    let flows_dir = workspace_dir.join("authentication-flows");
-    if !fs::try_exists(&flows_dir)
+    let flows = client.get_authentication_flows().await.with_context(|| {
+        format!(
+            "Failed to fetch authentication flows for realm '{}'",
+            realm_name
+        )
+    })?;
+    let flows_dir = Arc::new(workspace_dir.join("authentication-flows"));
+    if !fs::try_exists(&*flows_dir)
         .await
         .context("Failed to check authentication-flows directory")?
     {
-        fs::create_dir_all(&flows_dir)
+        fs::create_dir_all(&*flows_dir)
             .await
             .context("Failed to create authentication-flows directory")?;
     }
     let mut set = tokio::task::JoinSet::new();
     for flow in flows {
-        let flows_dir = flows_dir.clone();
+        let flows_dir = Arc::clone(&flows_dir);
         let all_secrets = Arc::clone(&all_secrets);
         let realm_name = realm_name.to_string();
         let prompt_mutex = Arc::clone(&prompt_mutex);
@@ -482,22 +492,24 @@ async fn inspect_realm(
     );
 
     // Fetch required actions
-    let actions = client
-        .get_required_actions()
-        .await
-        .context("Failed to fetch required actions")?;
-    let actions_dir = workspace_dir.join("required-actions");
-    if !fs::try_exists(&actions_dir)
+    let actions = client.get_required_actions().await.with_context(|| {
+        format!(
+            "Failed to fetch required actions for realm '{}'",
+            realm_name
+        )
+    })?;
+    let actions_dir = Arc::new(workspace_dir.join("required-actions"));
+    if !fs::try_exists(&*actions_dir)
         .await
         .context("Failed to check required-actions directory")?
     {
-        fs::create_dir_all(&actions_dir)
+        fs::create_dir_all(&*actions_dir)
             .await
             .context("Failed to create required-actions directory")?;
     }
     let mut set = tokio::task::JoinSet::new();
     for action in actions {
-        let actions_dir = actions_dir.clone();
+        let actions_dir = Arc::clone(&actions_dir);
         let all_secrets = Arc::clone(&all_secrets);
         let realm_name = realm_name.to_string();
         let prompt_mutex = Arc::clone(&prompt_mutex);
@@ -526,24 +538,24 @@ async fn inspect_realm(
     let all_components = client
         .get_components()
         .await
-        .context("Failed to fetch components")?;
+        .with_context(|| format!("Failed to fetch components for realm '{}'", realm_name))?;
 
-    let components_dir = workspace_dir.join("components");
-    if !fs::try_exists(&components_dir)
+    let components_dir = Arc::new(workspace_dir.join("components"));
+    if !fs::try_exists(&*components_dir)
         .await
         .context("Failed to check components directory")?
     {
-        fs::create_dir_all(&components_dir)
+        fs::create_dir_all(&*components_dir)
             .await
             .context("Failed to create components directory")?;
     }
 
-    let keys_dir = workspace_dir.join("keys");
-    if !fs::try_exists(&keys_dir)
+    let keys_dir = Arc::new(workspace_dir.join("keys"));
+    if !fs::try_exists(&*keys_dir)
         .await
         .context("Failed to check keys directory")?
     {
-        fs::create_dir_all(&keys_dir)
+        fs::create_dir_all(&*keys_dir)
             .await
             .context("Failed to create keys directory")?;
     }
@@ -555,9 +567,9 @@ async fn inspect_realm(
             .as_deref()
             .is_some_and(|pt| pt == "org.keycloak.keys.KeyProvider");
         let target_dir = if is_key {
-            keys_dir.clone()
+            Arc::clone(&keys_dir)
         } else {
-            components_dir.clone()
+            Arc::clone(&components_dir)
         };
 
         let all_secrets = Arc::clone(&all_secrets);

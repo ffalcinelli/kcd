@@ -2,7 +2,6 @@ mod common;
 use app::client::KeycloakClient;
 use app::{apply, plan};
 use common::start_mock_server;
-use serde_json::json;
 use std::fs;
 use tempfile::tempdir;
 

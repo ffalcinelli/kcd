@@ -8,8 +8,8 @@ use app::validate;
 use std::fs;
 use tempfile::tempdir;
 
-#[test]
-fn test_validate() {
+#[tokio::test]
+async fn test_validate() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -28,12 +28,12 @@ fn test_validate() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_ok());
 }
 
-#[test]
-fn test_validate_empty_role_name() {
+#[tokio::test]
+async fn test_validate_empty_role_name() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -72,7 +72,7 @@ fn test_validate_empty_role_name() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -82,8 +82,8 @@ fn test_validate_empty_role_name() {
     );
 }
 
-#[test]
-fn test_validate_duplicate_role_name() {
+#[tokio::test]
+async fn test_validate_duplicate_role_name() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -138,7 +138,7 @@ fn test_validate_duplicate_role_name() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -148,14 +148,14 @@ fn test_validate_duplicate_role_name() {
     );
 }
 
-#[test]
-fn test_validate_missing_realm() {
+#[tokio::test]
+async fn test_validate_missing_realm() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -165,8 +165,8 @@ fn test_validate_missing_realm() {
     );
 }
 
-#[test]
-fn test_validate_empty_client_id() {
+#[tokio::test]
+async fn test_validate_empty_client_id() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -210,7 +210,7 @@ fn test_validate_empty_client_id() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -220,8 +220,8 @@ fn test_validate_empty_client_id() {
     );
 }
 
-#[test]
-fn test_validate_empty_idp_alias() {
+#[tokio::test]
+async fn test_validate_empty_idp_alias() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -265,7 +265,7 @@ fn test_validate_empty_idp_alias() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -275,8 +275,8 @@ fn test_validate_empty_idp_alias() {
     );
 }
 
-#[test]
-fn test_validate_empty_idp_provider_id() {
+#[tokio::test]
+async fn test_validate_empty_idp_provider_id() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -320,7 +320,7 @@ fn test_validate_empty_idp_provider_id() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -330,8 +330,8 @@ fn test_validate_empty_idp_provider_id() {
     );
 }
 
-#[test]
-fn test_validate_empty_client_scope_name() {
+#[tokio::test]
+async fn test_validate_empty_client_scope_name() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -366,7 +366,7 @@ fn test_validate_empty_client_scope_name() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -376,8 +376,8 @@ fn test_validate_empty_client_scope_name() {
     );
 }
 
-#[test]
-fn test_validate_empty_group_name() {
+#[tokio::test]
+async fn test_validate_empty_group_name() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -411,7 +411,7 @@ fn test_validate_empty_group_name() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -421,8 +421,8 @@ fn test_validate_empty_group_name() {
     );
 }
 
-#[test]
-fn test_validate_empty_username() {
+#[tokio::test]
+async fn test_validate_empty_username() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -460,7 +460,7 @@ fn test_validate_empty_username() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -470,8 +470,8 @@ fn test_validate_empty_username() {
     );
 }
 
-#[test]
-fn test_validate_empty_auth_flow_alias() {
+#[tokio::test]
+async fn test_validate_empty_auth_flow_alias() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -508,7 +508,7 @@ fn test_validate_empty_auth_flow_alias() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -518,8 +518,8 @@ fn test_validate_empty_auth_flow_alias() {
     );
 }
 
-#[test]
-fn test_validate_empty_required_action_alias() {
+#[tokio::test]
+async fn test_validate_empty_required_action_alias() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -556,7 +556,7 @@ fn test_validate_empty_required_action_alias() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -566,8 +566,8 @@ fn test_validate_empty_required_action_alias() {
     );
 }
 
-#[test]
-fn test_validate_empty_required_action_provider_id() {
+#[tokio::test]
+async fn test_validate_empty_required_action_provider_id() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -604,7 +604,7 @@ fn test_validate_empty_required_action_provider_id() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -614,8 +614,8 @@ fn test_validate_empty_required_action_provider_id() {
     );
 }
 
-#[test]
-fn test_validate_empty_component_name() {
+#[tokio::test]
+async fn test_validate_empty_component_name() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -652,7 +652,7 @@ fn test_validate_empty_component_name() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -662,8 +662,8 @@ fn test_validate_empty_component_name() {
     );
 }
 
-#[test]
-fn test_validate_missing_component_name() {
+#[tokio::test]
+async fn test_validate_missing_component_name() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -700,7 +700,7 @@ fn test_validate_missing_component_name() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(
         result.is_ok(),
         "Validation should succeed for missing component name. Error: {:?}",
@@ -708,8 +708,8 @@ fn test_validate_missing_component_name() {
     );
 }
 
-#[test]
-fn test_validate_empty_component_provider_id() {
+#[tokio::test]
+async fn test_validate_empty_component_provider_id() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -746,7 +746,7 @@ fn test_validate_empty_component_provider_id() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result
@@ -756,8 +756,8 @@ fn test_validate_empty_component_provider_id() {
     );
 }
 
-#[test]
-fn test_validate_empty_realm_name() {
+#[tokio::test]
+async fn test_validate_empty_realm_name() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
@@ -776,7 +776,7 @@ fn test_validate_empty_realm_name() {
     )
     .unwrap();
 
-    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]);
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
     assert!(result.is_err());
     assert!(
         result

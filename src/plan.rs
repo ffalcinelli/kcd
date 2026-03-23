@@ -79,6 +79,7 @@ pub async fn run(
             interactive,
             Arc::clone(&env_vars),
             &mut changed_files,
+            &realm_name,
         )
         .await?;
     }
@@ -103,6 +104,7 @@ async fn plan_single_realm(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     // 1. Plan Realm
     plan_realm(
@@ -112,6 +114,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -123,6 +126,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -134,6 +138,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -145,6 +150,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -156,6 +162,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -167,6 +174,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -178,6 +186,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -189,6 +198,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -200,6 +210,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -212,6 +223,7 @@ async fn plan_single_realm(
         "components",
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
     plan_components_or_keys(
@@ -222,6 +234,7 @@ async fn plan_single_realm(
         "keys",
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
     check_keys_drift(client, changes_only).await?;
@@ -276,10 +289,14 @@ async fn plan_client_scopes(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let scopes_dir = workspace_dir.join("client-scopes");
     if async_fs::try_exists(&scopes_dir).await? {
-        let existing_scopes = client.get_client_scopes().await?;
+        let existing_scopes = client
+            .get_client_scopes()
+            .await
+            .with_context(|| format!("Failed to get client scopes for realm '{}'", realm_name))?;
         let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
             .into_iter()
             .filter_map(|s| s.get_identity().map(|id| (id, s)))
@@ -355,10 +372,14 @@ async fn plan_groups(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let groups_dir = workspace_dir.join("groups");
     if async_fs::try_exists(&groups_dir).await? {
-        let existing_groups = client.get_groups().await?;
+        let existing_groups = client
+            .get_groups()
+            .await
+            .with_context(|| format!("Failed to get groups for realm '{}'", realm_name))?;
         let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
             .into_iter()
             .filter_map(|g| g.get_identity().map(|id| (id, g)))
@@ -434,10 +455,14 @@ async fn plan_users(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let users_dir = workspace_dir.join("users");
     if async_fs::try_exists(&users_dir).await? {
-        let existing_users = client.get_users().await?;
+        let existing_users = client
+            .get_users()
+            .await
+            .with_context(|| format!("Failed to get users for realm '{}'", realm_name))?;
         let existing_users_map: HashMap<String, UserRepresentation> = existing_users
             .into_iter()
             .filter_map(|u| u.get_identity().map(|id| (id, u)))
@@ -513,10 +538,16 @@ async fn plan_authentication_flows(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let flows_dir = workspace_dir.join("authentication-flows");
     if async_fs::try_exists(&flows_dir).await? {
-        let existing_flows = client.get_authentication_flows().await?;
+        let existing_flows = client.get_authentication_flows().await.with_context(|| {
+            format!(
+                "Failed to get authentication flows for realm '{}'",
+                realm_name
+            )
+        })?;
         let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
             .into_iter()
             .filter_map(|f| f.get_identity().map(|id| (id, f)))
@@ -592,10 +623,13 @@ async fn plan_required_actions(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let actions_dir = workspace_dir.join("required-actions");
     if async_fs::try_exists(&actions_dir).await? {
-        let existing_actions = client.get_required_actions().await?;
+        let existing_actions = client.get_required_actions().await.with_context(|| {
+            format!("Failed to get required actions for realm '{}'", realm_name)
+        })?;
         let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
             existing_actions
                 .into_iter()
@@ -620,10 +654,9 @@ async fn plan_required_actions(
                 let remote = existing_actions_map.get(&identity);
 
                 let changed = if let Some(remote) = remote {
-                    let remote_clone = remote.clone();
                     print_diff(
                         &format!("RequiredAction {}", local_action.get_name()),
-                        Some(&remote_clone),
+                        Some(remote),
                         &local_action,
                         changes_only,
                         "action",
@@ -663,6 +696,7 @@ async fn plan_required_actions(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn plan_components_or_keys(
     client: &KeycloakClient,
     workspace_dir: &Path,
@@ -671,10 +705,14 @@ async fn plan_components_or_keys(
     dir_name: &str,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let components_dir = workspace_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
-        let existing_components = client.get_components().await?;
+        let existing_components = client
+            .get_components()
+            .await
+            .with_context(|| format!("Failed to get components for realm '{}'", realm_name))?;
         let mut by_identity: HashMap<String, ComponentRepresentation> = HashMap::new();
         type ComponentKey = (
             Option<String>,
@@ -792,6 +830,7 @@ async fn plan_realm(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let realm_path = workspace_dir.join("realm.yaml");
     if async_fs::try_exists(&realm_path).await? {
@@ -811,7 +850,9 @@ async fn plan_realm(
                 if e.to_string().contains("404") {
                     None
                 } else {
-                    return Err(e);
+                    return Err(e).with_context(|| {
+                        format!("Failed to get realm '{}' from Keycloak", realm_name)
+                    });
                 }
             }
         };
@@ -846,10 +887,14 @@ async fn plan_roles(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let roles_dir = workspace_dir.join("roles");
     if async_fs::try_exists(&roles_dir).await? {
-        let existing_roles = client.get_roles().await?;
+        let existing_roles = client
+            .get_roles()
+            .await
+            .with_context(|| format!("Failed to get roles for realm '{}'", realm_name))?;
         let existing_roles_map: HashMap<String, RoleRepresentation> = existing_roles
             .into_iter()
             .filter_map(|r| r.get_identity().map(|id| (id, r)))
@@ -927,10 +972,14 @@ async fn plan_clients(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let clients_dir = workspace_dir.join("clients");
     if async_fs::try_exists(&clients_dir).await? {
-        let existing_clients = client.get_clients().await?;
+        let existing_clients = client
+            .get_clients()
+            .await
+            .with_context(|| format!("Failed to get clients for realm '{}'", realm_name))?;
         let existing_clients_map: HashMap<String, ClientRepresentation> = existing_clients
             .into_iter()
             .filter_map(|c| c.get_identity().map(|id| (id, c)))
@@ -1006,10 +1055,16 @@ async fn plan_identity_providers(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let idps_dir = workspace_dir.join("identity-providers");
     if async_fs::try_exists(&idps_dir).await? {
-        let existing_idps = client.get_identity_providers().await?;
+        let existing_idps = client.get_identity_providers().await.with_context(|| {
+            format!(
+                "Failed to get identity providers for realm '{}'",
+                realm_name
+            )
+        })?;
         let existing_idps_map: HashMap<String, IdentityProviderRepresentation> = existing_idps
             .into_iter()
             .filter_map(|i| i.get_identity().map(|id| (id, i)))

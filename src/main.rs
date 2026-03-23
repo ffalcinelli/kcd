@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
                 .cyan()
                 .bold()
             );
-            validate::run(workspace.clone(), &cli.realms)?;
+            validate::run(workspace.clone(), &cli.realms).await?;
         }
         Commands::Apply { workspace, yes } => {
             let client = init_client(&cli).await?;

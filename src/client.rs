@@ -529,6 +529,13 @@ fn redact_url(url_str: &str) -> String {
     }
 }
 
+impl KeycloakClient {
+    pub async fn get_keys(&self) -> Result<crate::models::KeysMetadataRepresentation> {
+        let url = format!("{}/admin/realms/{}/keys", self.base_url, self.target_realm);
+        self.get(&url).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -576,12 +583,5 @@ mod tests {
                 .to_string()
                 .contains("Failed to send DELETE request")
         );
-    }
-}
-
-impl KeycloakClient {
-    pub async fn get_keys(&self) -> Result<crate::models::KeysMetadataRepresentation> {
-        let url = format!("{}/admin/realms/{}/keys", self.base_url, self.target_realm);
-        self.get(&url).await
     }
 }

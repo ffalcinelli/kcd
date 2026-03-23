@@ -237,7 +237,7 @@ mod tests {
             secrets.get("KEYCLOAK_CLIENT_MY_CLIENT_CLIENTSECRET"),
             Some(&"my_super_secret".to_string())
         );
-        assert!(secrets.get("KEYCLOAK_CLIENT_STORETOKEN").is_none());
+        assert!(!secrets.contains_key("KEYCLOAK_CLIENT_STORETOKEN"));
     }
 
     #[test]

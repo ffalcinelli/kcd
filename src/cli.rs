@@ -503,413 +503,6 @@ pub async fn rotate_keys_yaml(workspace_dir: &Path, realm: &str) -> Result<usize
     Ok(rotated_count)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-
-    #[tokio::test]
-    async fn test_create_user_yaml() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-
-        create_user_yaml(
-            workspace_dir,
-            "master",
-            "testuser",
-            Some("test@example.com".to_string()),
-            Some("Test".to_string()),
-            Some("User".to_string()),
-        )
-        .await
-        .unwrap();
-
-        let file_path = workspace_dir
-            .join("master")
-            .join("users")
-            .join("testuser.yaml");
-        assert!(file_path.exists());
-
-        let content = fs::read_to_string(&file_path).await.unwrap();
-        let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
-
-        assert_eq!(user.username.as_deref(), Some("testuser"));
-        assert_eq!(user.email.as_deref(), Some("test@example.com"));
-        assert_eq!(user.first_name.as_deref(), Some("Test"));
-        assert_eq!(user.last_name.as_deref(), Some("User"));
-    }
-
-    #[tokio::test]
-    async fn test_create_user_yaml_partial() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-
-        create_user_yaml(workspace_dir, "master", "user2", None, None, None)
-            .await
-            .unwrap();
-
-        let file_path = workspace_dir
-            .join("master")
-            .join("users")
-            .join("user2.yaml");
-        let content = fs::read_to_string(&file_path).await.unwrap();
-        let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
-
-        assert_eq!(user.username.as_deref(), Some("user2"));
-        assert_eq!(user.email, None);
-        assert_eq!(user.first_name, None);
-        assert_eq!(user.last_name, None);
-    }
-
-    #[tokio::test]
-    async fn test_change_user_password_yaml_existing_password() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-
-        create_user_yaml(workspace_dir, "master", "testuser", None, None, None)
-            .await
-            .unwrap();
-
-        // Add first password
-        change_user_password_yaml(workspace_dir, "master", "testuser", "pass1")
-            .await
-            .unwrap();
-
-        // Change password (should update existing)
-        change_user_password_yaml(workspace_dir, "master", "testuser", "pass2")
-            .await
-            .unwrap();
-
-        let file_path = workspace_dir
-            .join("master")
-            .join("users")
-            .join("testuser.yaml");
-        let content = fs::read_to_string(&file_path).await.unwrap();
-        let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
-
-        let credentials = user.credentials.unwrap();
-        assert_eq!(credentials.len(), 1);
-        assert_eq!(credentials[0].value.as_deref(), Some("pass2"));
-    }
-
-    #[tokio::test]
-    async fn test_change_user_password_yaml() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-
-        create_user_yaml(workspace_dir, "master", "testuser", None, None, None)
-            .await
-            .unwrap();
-
-        change_user_password_yaml(workspace_dir, "master", "testuser", "newpass123")
-            .await
-            .unwrap();
-
-        let file_path = workspace_dir
-            .join("master")
-            .join("users")
-            .join("testuser.yaml");
-        let content = fs::read_to_string(&file_path).await.unwrap();
-        let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
-
-        let credentials = user.credentials.expect("Credentials should not be None");
-        assert_eq!(credentials.len(), 1);
-        assert_eq!(credentials[0].type_.as_deref(), Some("password"));
-        assert_eq!(credentials[0].value.as_deref(), Some("newpass123"));
-    }
-
-    #[tokio::test]
-    async fn test_create_client_yaml() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-
-        create_client_yaml(workspace_dir, "master", "testclient", true)
-            .await
-            .unwrap();
-
-        let file_path = workspace_dir
-            .join("master")
-            .join("clients")
-            .join("testclient.yaml");
-        assert!(file_path.exists());
-
-        let content = fs::read_to_string(&file_path).await.unwrap();
-        let client: ClientRepresentation = serde_yaml::from_str(&content).unwrap();
-
-        assert_eq!(client.client_id.as_deref(), Some("testclient"));
-        assert_eq!(client.public_client, Some(true));
-        assert_eq!(client.service_accounts_enabled, Some(false));
-    }
-
-    #[tokio::test]
-    async fn test_create_role_yaml() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-
-        // Realm role
-        create_role_yaml(
-            workspace_dir,
-            "master",
-            "admin",
-            Some("desc".to_string()),
-            None,
-        )
-        .await
-        .unwrap();
-        let realm_role_path = workspace_dir
-            .join("master")
-            .join("roles")
-            .join("admin.yaml");
-        assert!(realm_role_path.exists());
-        let content = fs::read_to_string(&realm_role_path).await.unwrap();
-        let role: RoleRepresentation = serde_yaml::from_str(&content).unwrap();
-        assert_eq!(role.name, "admin");
-        assert_eq!(role.client_role, false);
-
-        // Client role
-        create_role_yaml(
-            workspace_dir,
-            "master",
-            "editor",
-            None,
-            Some("my-client".to_string()),
-        )
-        .await
-        .unwrap();
-        let client_role_path = workspace_dir
-            .join("master")
-            .join("clients")
-            .join("my-client")
-            .join("roles")
-            .join("editor.yaml");
-        assert!(client_role_path.exists());
-    }
-
-    #[tokio::test]
-    async fn test_create_group_yaml() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-
-        create_group_yaml(workspace_dir, "master", "my-group")
-            .await
-            .unwrap();
-        let file_path = workspace_dir
-            .join("master")
-            .join("groups")
-            .join("my-group.yaml");
-        assert!(file_path.exists());
-    }
-
-    #[tokio::test]
-    async fn test_create_idp_yaml() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-
-        create_idp_yaml(workspace_dir, "master", "google", "google")
-            .await
-            .unwrap();
-        let file_path = workspace_dir
-            .join("master")
-            .join("identity-providers")
-            .join("google.yaml");
-        assert!(file_path.exists());
-    }
-
-    #[tokio::test]
-    async fn test_create_client_scope_yaml() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-
-        create_client_scope_yaml(workspace_dir, "master", "my-scope", "openid-connect")
-            .await
-            .unwrap();
-        let file_path = workspace_dir
-            .join("master")
-            .join("client-scopes")
-            .join("my-scope.yaml");
-        assert!(file_path.exists());
-    }
-
-    #[tokio::test]
-    async fn test_rotate_keys_yaml() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-
-        let keys_dir = workspace_dir.join("master").join("components");
-        fs::create_dir_all(&keys_dir).await.unwrap();
-
-        let original_component = ComponentRepresentation {
-            id: None,
-            name: Some("rsa-generated".to_string()),
-            provider_id: Some("rsa-generated".to_string()),
-            provider_type: Some("org.keycloak.keys.KeyProvider".to_string()),
-            parent_id: Some("master".to_string()),
-            sub_type: None,
-            config: Some({
-                let mut map = HashMap::new();
-                map.insert("priority".to_string(), serde_json::json!(["100"]));
-                map
-            }),
-            extra: HashMap::new(),
-        };
-
-        let original_yaml = serde_yaml::to_string(&original_component).unwrap();
-        fs::write(keys_dir.join("rsa-generated.yaml"), original_yaml)
-            .await
-            .unwrap();
-
-        let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
-        assert_eq!(count, 1);
-
-        let mut entries = fs::read_dir(&keys_dir).await.unwrap();
-        let mut found_rotated = false;
-
-        while let Some(entry) = entries.next_entry().await.unwrap() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with("rsa-generated-rotated-") {
-                found_rotated = true;
-                let content = fs::read_to_string(entry.path()).await.unwrap();
-                let rotated: ComponentRepresentation = serde_yaml::from_str(&content).unwrap();
-
-                let config = rotated.config.unwrap();
-                let priority_array = config.get("priority").unwrap().as_array().unwrap();
-                assert_eq!(priority_array[0].as_str().unwrap(), "110");
-            }
-        }
-
-        assert!(found_rotated, "Did not find a rotated key component file");
-    }
-
-    #[tokio::test]
-    async fn test_rotate_keys_yaml_no_dir() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-        let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
-        assert_eq!(count, 0);
-    }
-
-    #[tokio::test]
-    async fn test_rotate_keys_yaml_no_yaml_files() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-        let keys_dir = workspace_dir.join("master").join("components");
-        fs::create_dir_all(&keys_dir).await.unwrap();
-        fs::write(keys_dir.join("test.txt"), "not a yaml")
-            .await
-            .unwrap();
-
-        let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
-        assert_eq!(count, 0);
-    }
-
-    #[tokio::test]
-    async fn test_rotate_keys_yaml_invalid_priority() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-        let keys_dir = workspace_dir.join("master").join("components");
-        fs::create_dir_all(&keys_dir).await.unwrap();
-
-        let component = ComponentRepresentation {
-            id: None,
-            name: Some("rsa".to_string()),
-            provider_id: Some("rsa".to_string()),
-            provider_type: Some("org.keycloak.keys.KeyProvider".to_string()),
-            parent_id: Some("master".to_string()),
-            sub_type: None,
-            config: Some({
-                let mut map = HashMap::new();
-                map.insert("priority".to_string(), serde_json::json!(["invalid"]));
-                map
-            }),
-            extra: HashMap::new(),
-        };
-
-        let yaml = serde_yaml::to_string(&component).unwrap();
-        fs::write(keys_dir.join("rsa.yaml"), yaml).await.unwrap();
-
-        let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
-        assert_eq!(count, 1); // It still rotates, but priority won't be updated
-
-        let mut entries = fs::read_dir(&keys_dir).await.unwrap();
-        while let Some(entry) = entries.next_entry().await.unwrap() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with("rsa-rotated-") {
-                let content = fs::read_to_string(entry.path()).await.unwrap();
-                let rotated: ComponentRepresentation = serde_yaml::from_str(&content).unwrap();
-                let config = rotated.config.unwrap();
-                let priority_array = config.get("priority").unwrap().as_array().unwrap();
-                assert_eq!(priority_array[0].as_str().unwrap(), "invalid");
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn test_change_user_password_yaml_new_user() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-
-        // Change password for a user that doesn't exist yet
-        change_user_password_yaml(workspace_dir, "master", "newuser", "pass123")
-            .await
-            .unwrap();
-
-        let file_path = workspace_dir
-            .join("master")
-            .join("users")
-            .join("newuser.yaml");
-        assert!(file_path.exists());
-
-        let content = fs::read_to_string(&file_path).await.unwrap();
-        let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
-        let credentials = user.credentials.unwrap();
-        assert_eq!(credentials[0].value.as_deref(), Some("pass123"));
-    }
-
-    #[tokio::test]
-    async fn test_rotate_keys_yaml_not_key_provider() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-        let keys_dir = workspace_dir.join("master").join("components");
-        fs::create_dir_all(&keys_dir).await.unwrap();
-
-        let component = ComponentRepresentation {
-            id: None,
-            name: Some("not-key".to_string()),
-            provider_id: Some("not-key".to_string()),
-            provider_type: Some("something.else".to_string()),
-            parent_id: Some("master".to_string()),
-            sub_type: None,
-            config: None,
-            extra: HashMap::new(),
-        };
-
-        let yaml = serde_yaml::to_string(&component).unwrap();
-        fs::write(keys_dir.join("not-key.yaml"), yaml)
-            .await
-            .unwrap();
-
-        let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
-        assert_eq!(count, 0);
-    }
-
-    #[tokio::test]
-    async fn test_change_user_password_yaml_invalid_yaml() {
-        let dir = tempdir().unwrap();
-        let workspace_dir = dir.path();
-        let user_path = workspace_dir
-            .join("master")
-            .join("users")
-            .join("baduser.yaml");
-        fs::create_dir_all(user_path.parent().unwrap())
-            .await
-            .unwrap();
-        fs::write(&user_path, "not a yaml : [ :").await.unwrap();
-
-        let res = change_user_password_yaml(workspace_dir, "master", "baduser", "newpass").await;
-        assert!(res.is_err());
-    }
-}
-
 async fn create_client_interactive(workspace_dir: &Path) -> Result<()> {
     let theme = ColorfulTheme::default();
 
@@ -1158,4 +751,411 @@ pub async fn create_user_yaml(
         .context("Failed to write user YAML file")?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_create_user_yaml() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        create_user_yaml(
+            workspace_dir,
+            "master",
+            "testuser",
+            Some("test@example.com".to_string()),
+            Some("Test".to_string()),
+            Some("User".to_string()),
+        )
+        .await
+        .unwrap();
+
+        let file_path = workspace_dir
+            .join("master")
+            .join("users")
+            .join("testuser.yaml");
+        assert!(file_path.exists());
+
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
+
+        assert_eq!(user.username.as_deref(), Some("testuser"));
+        assert_eq!(user.email.as_deref(), Some("test@example.com"));
+        assert_eq!(user.first_name.as_deref(), Some("Test"));
+        assert_eq!(user.last_name.as_deref(), Some("User"));
+    }
+
+    #[tokio::test]
+    async fn test_create_user_yaml_partial() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        create_user_yaml(workspace_dir, "master", "user2", None, None, None)
+            .await
+            .unwrap();
+
+        let file_path = workspace_dir
+            .join("master")
+            .join("users")
+            .join("user2.yaml");
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
+
+        assert_eq!(user.username.as_deref(), Some("user2"));
+        assert_eq!(user.email, None);
+        assert_eq!(user.first_name, None);
+        assert_eq!(user.last_name, None);
+    }
+
+    #[tokio::test]
+    async fn test_change_user_password_yaml_existing_password() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        create_user_yaml(workspace_dir, "master", "testuser", None, None, None)
+            .await
+            .unwrap();
+
+        // Add first password
+        change_user_password_yaml(workspace_dir, "master", "testuser", "pass1")
+            .await
+            .unwrap();
+
+        // Change password (should update existing)
+        change_user_password_yaml(workspace_dir, "master", "testuser", "pass2")
+            .await
+            .unwrap();
+
+        let file_path = workspace_dir
+            .join("master")
+            .join("users")
+            .join("testuser.yaml");
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
+
+        let credentials = user.credentials.unwrap();
+        assert_eq!(credentials.len(), 1);
+        assert_eq!(credentials[0].value.as_deref(), Some("pass2"));
+    }
+
+    #[tokio::test]
+    async fn test_change_user_password_yaml() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        create_user_yaml(workspace_dir, "master", "testuser", None, None, None)
+            .await
+            .unwrap();
+
+        change_user_password_yaml(workspace_dir, "master", "testuser", "newpass123")
+            .await
+            .unwrap();
+
+        let file_path = workspace_dir
+            .join("master")
+            .join("users")
+            .join("testuser.yaml");
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
+
+        let credentials = user.credentials.expect("Credentials should not be None");
+        assert_eq!(credentials.len(), 1);
+        assert_eq!(credentials[0].type_.as_deref(), Some("password"));
+        assert_eq!(credentials[0].value.as_deref(), Some("newpass123"));
+    }
+
+    #[tokio::test]
+    async fn test_create_client_yaml() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        create_client_yaml(workspace_dir, "master", "testclient", true)
+            .await
+            .unwrap();
+
+        let file_path = workspace_dir
+            .join("master")
+            .join("clients")
+            .join("testclient.yaml");
+        assert!(file_path.exists());
+
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        let client: ClientRepresentation = serde_yaml::from_str(&content).unwrap();
+
+        assert_eq!(client.client_id.as_deref(), Some("testclient"));
+        assert_eq!(client.public_client, Some(true));
+        assert_eq!(client.service_accounts_enabled, Some(false));
+    }
+
+    #[tokio::test]
+    async fn test_create_role_yaml() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        // Realm role
+        create_role_yaml(
+            workspace_dir,
+            "master",
+            "admin",
+            Some("desc".to_string()),
+            None,
+        )
+        .await
+        .unwrap();
+        let realm_role_path = workspace_dir
+            .join("master")
+            .join("roles")
+            .join("admin.yaml");
+        assert!(realm_role_path.exists());
+        let content = fs::read_to_string(&realm_role_path).await.unwrap();
+        let role: RoleRepresentation = serde_yaml::from_str(&content).unwrap();
+        assert_eq!(role.name, "admin");
+        assert!(!role.client_role);
+
+        // Client role
+        create_role_yaml(
+            workspace_dir,
+            "master",
+            "editor",
+            None,
+            Some("my-client".to_string()),
+        )
+        .await
+        .unwrap();
+        let client_role_path = workspace_dir
+            .join("master")
+            .join("clients")
+            .join("my-client")
+            .join("roles")
+            .join("editor.yaml");
+        assert!(client_role_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_create_group_yaml() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        create_group_yaml(workspace_dir, "master", "my-group")
+            .await
+            .unwrap();
+        let file_path = workspace_dir
+            .join("master")
+            .join("groups")
+            .join("my-group.yaml");
+        assert!(file_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_create_idp_yaml() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        create_idp_yaml(workspace_dir, "master", "google", "google")
+            .await
+            .unwrap();
+        let file_path = workspace_dir
+            .join("master")
+            .join("identity-providers")
+            .join("google.yaml");
+        assert!(file_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_create_client_scope_yaml() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        create_client_scope_yaml(workspace_dir, "master", "my-scope", "openid-connect")
+            .await
+            .unwrap();
+        let file_path = workspace_dir
+            .join("master")
+            .join("client-scopes")
+            .join("my-scope.yaml");
+        assert!(file_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_rotate_keys_yaml() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        let keys_dir = workspace_dir.join("master").join("components");
+        fs::create_dir_all(&keys_dir).await.unwrap();
+
+        let original_component = ComponentRepresentation {
+            id: None,
+            name: Some("rsa-generated".to_string()),
+            provider_id: Some("rsa-generated".to_string()),
+            provider_type: Some("org.keycloak.keys.KeyProvider".to_string()),
+            parent_id: Some("master".to_string()),
+            sub_type: None,
+            config: Some({
+                let mut map = HashMap::new();
+                map.insert("priority".to_string(), serde_json::json!(["100"]));
+                map
+            }),
+            extra: HashMap::new(),
+        };
+
+        let original_yaml = serde_yaml::to_string(&original_component).unwrap();
+        fs::write(keys_dir.join("rsa-generated.yaml"), original_yaml)
+            .await
+            .unwrap();
+
+        let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
+        assert_eq!(count, 1);
+
+        let mut entries = fs::read_dir(&keys_dir).await.unwrap();
+        let mut found_rotated = false;
+
+        while let Some(entry) = entries.next_entry().await.unwrap() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with("rsa-generated-rotated-") {
+                found_rotated = true;
+                let content = fs::read_to_string(entry.path()).await.unwrap();
+                let rotated: ComponentRepresentation = serde_yaml::from_str(&content).unwrap();
+
+                let config = rotated.config.unwrap();
+                let priority_array = config.get("priority").unwrap().as_array().unwrap();
+                assert_eq!(priority_array[0].as_str().unwrap(), "110");
+            }
+        }
+
+        assert!(found_rotated, "Did not find a rotated key component file");
+    }
+
+    #[tokio::test]
+    async fn test_rotate_keys_yaml_no_dir() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+        let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_rotate_keys_yaml_no_yaml_files() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+        let keys_dir = workspace_dir.join("master").join("components");
+        fs::create_dir_all(&keys_dir).await.unwrap();
+        fs::write(keys_dir.join("test.txt"), "not a yaml")
+            .await
+            .unwrap();
+
+        let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_rotate_keys_yaml_invalid_priority() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+        let keys_dir = workspace_dir.join("master").join("components");
+        fs::create_dir_all(&keys_dir).await.unwrap();
+
+        let component = ComponentRepresentation {
+            id: None,
+            name: Some("rsa".to_string()),
+            provider_id: Some("rsa".to_string()),
+            provider_type: Some("org.keycloak.keys.KeyProvider".to_string()),
+            parent_id: Some("master".to_string()),
+            sub_type: None,
+            config: Some({
+                let mut map = HashMap::new();
+                map.insert("priority".to_string(), serde_json::json!(["invalid"]));
+                map
+            }),
+            extra: HashMap::new(),
+        };
+
+        let yaml = serde_yaml::to_string(&component).unwrap();
+        fs::write(keys_dir.join("rsa.yaml"), yaml).await.unwrap();
+
+        let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
+        assert_eq!(count, 1); // It still rotates, but priority won't be updated
+
+        let mut entries = fs::read_dir(&keys_dir).await.unwrap();
+        while let Some(entry) = entries.next_entry().await.unwrap() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with("rsa-rotated-") {
+                let content = fs::read_to_string(entry.path()).await.unwrap();
+                let rotated: ComponentRepresentation = serde_yaml::from_str(&content).unwrap();
+                let config = rotated.config.unwrap();
+                let priority_array = config.get("priority").unwrap().as_array().unwrap();
+                assert_eq!(priority_array[0].as_str().unwrap(), "invalid");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_change_user_password_yaml_new_user() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        // Change password for a user that doesn't exist yet
+        change_user_password_yaml(workspace_dir, "master", "newuser", "pass123")
+            .await
+            .unwrap();
+
+        let file_path = workspace_dir
+            .join("master")
+            .join("users")
+            .join("newuser.yaml");
+        assert!(file_path.exists());
+
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
+        let credentials = user.credentials.unwrap();
+        assert_eq!(credentials[0].value.as_deref(), Some("pass123"));
+    }
+
+    #[tokio::test]
+    async fn test_rotate_keys_yaml_not_key_provider() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+        let keys_dir = workspace_dir.join("master").join("components");
+        fs::create_dir_all(&keys_dir).await.unwrap();
+
+        let component = ComponentRepresentation {
+            id: None,
+            name: Some("not-key".to_string()),
+            provider_id: Some("not-key".to_string()),
+            provider_type: Some("something.else".to_string()),
+            parent_id: Some("master".to_string()),
+            sub_type: None,
+            config: None,
+            extra: HashMap::new(),
+        };
+
+        let yaml = serde_yaml::to_string(&component).unwrap();
+        fs::write(keys_dir.join("not-key.yaml"), yaml)
+            .await
+            .unwrap();
+
+        let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_change_user_password_yaml_invalid_yaml() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+        let user_path = workspace_dir
+            .join("master")
+            .join("users")
+            .join("baduser.yaml");
+        fs::create_dir_all(user_path.parent().unwrap())
+            .await
+            .unwrap();
+        fs::write(&user_path, "not a yaml : [ :").await.unwrap();
+
+        let res = change_user_password_yaml(workspace_dir, "master", "baduser", "newpass").await;
+        assert!(res.is_err());
+    }
 }

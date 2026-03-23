@@ -17,6 +17,9 @@ This document serves as the internal developer guide for `kcd`. It explains the 
 -   `src/models.rs`: Serde-based representations of Keycloak resources. We use `#[serde(flatten)]` with a `HashMap<String, Value>` to maintain forward/backward compatibility with unknown Keycloak fields.
 -   `src/inspect.rs`: Deep-scans the remote Keycloak server and serializes resources into local files.
 -   `src/utils/secrets.rs`: Uses heuristics to find and mask sensitive fields in configuration objects.
+-   `src/clean.rs`: Removes local workspace representations of Keycloak realms and resources.
+-   `src/validate.rs`: Performs local validation of YAML configurations before they are applied.
+-   `src/cli.rs`: Command-line interface definitions and logic for scaffolding new resources.
 
 ---
 
