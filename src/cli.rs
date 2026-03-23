@@ -3,18 +3,14 @@ use crate::models::{
     CredentialRepresentation, GroupRepresentation, IdentityProviderRepresentation,
     RoleRepresentation, UserRepresentation,
 };
+use crate::utils::ui::{ERROR, INFO, SUCCESS_CREATE, WARN};
 use anyhow::{Context, Result};
-use console::{Emoji, style};
+use console::style;
 use dialoguer::{Confirm, Input, Password, Select, theme::ColorfulTheme};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs;
-
-static SUCCESS: Emoji<'_, '_> = Emoji("✨ ", "* ");
-static ERROR: Emoji<'_, '_> = Emoji("❌ ", "x ");
-static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
-static INFO: Emoji<'_, '_> = Emoji("💡 ", "i ");
 
 pub async fn run(workspace_dir: PathBuf) -> Result<()> {
     println!(
@@ -166,7 +162,7 @@ async fn create_role_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for role '{}' in realm '{}'.",
             name, realm
@@ -229,7 +225,7 @@ async fn create_group_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for group '{}' in realm '{}'.",
             name, realm
@@ -283,7 +279,7 @@ async fn create_idp_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for Identity Provider '{}' in realm '{}'.",
             alias, realm
@@ -352,7 +348,7 @@ async fn create_client_scope_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for client scope '{}' in realm '{}'.",
             name, realm
@@ -404,7 +400,7 @@ async fn rotate_keys_interactive(workspace_dir: &Path) -> Result<()> {
     if rotated_count > 0 {
         println!(
             "{} {}",
-            SUCCESS,
+            SUCCESS_CREATE,
             style(format!(
                 "Successfully generated {} rotated key component(s) for realm '{}'.",
                 rotated_count, realm
@@ -501,6 +497,256 @@ pub async fn rotate_keys_yaml(workspace_dir: &Path, realm: &str) -> Result<usize
     }
 
     Ok(rotated_count)
+}
+
+async fn create_client_interactive(workspace_dir: &Path) -> Result<()> {
+    let theme = ColorfulTheme::default();
+
+    let realm: String = Input::with_theme(&theme)
+        .with_prompt("Target Realm")
+        .interact_text()?;
+
+    let client_id: String = Input::with_theme(&theme)
+        .with_prompt("Client ID")
+        .interact_text()?;
+
+    let is_public = Confirm::with_theme(&theme)
+        .with_prompt("Is this a public client? (No for confidential)")
+        .default(true)
+        .interact()?;
+
+    create_client_yaml(workspace_dir, &realm, &client_id, is_public).await?;
+
+    println!(
+        "{} {}",
+        SUCCESS_CREATE,
+        style(format!(
+            "Successfully generated YAML for client '{}' in realm '{}'.",
+            client_id, realm
+        ))
+        .green()
+    );
+    Ok(())
+}
+
+pub async fn create_client_yaml(
+    workspace_dir: &Path,
+    realm: &str,
+    client_id: &str,
+    is_public: bool,
+) -> Result<()> {
+    let client = ClientRepresentation {
+        id: None,
+        client_id: Some(client_id.to_string()),
+        name: None,
+        description: None,
+        enabled: Some(true),
+        protocol: Some("openid-connect".to_string()),
+        redirect_uris: Some(vec!["/*".to_string()]),
+        web_origins: Some(vec!["+".to_string()]),
+        public_client: Some(is_public),
+        bearer_only: Some(false),
+        service_accounts_enabled: Some(!is_public),
+        extra: HashMap::new(),
+    };
+
+    let realm_dir = workspace_dir.join(realm).join("clients");
+    fs::create_dir_all(&realm_dir)
+        .await
+        .context("Failed to create clients directory")?;
+
+    let file_path = realm_dir.join(format!("{}.yaml", client_id));
+    let yaml = serde_yaml::to_string(&client).context("Failed to serialize client to YAML")?;
+
+    fs::write(&file_path, yaml)
+        .await
+        .context("Failed to write client YAML file")?;
+
+    Ok(())
+}
+
+async fn change_user_password_interactive(workspace_dir: &Path) -> Result<()> {
+    let theme = ColorfulTheme::default();
+
+    let realm: String = Input::with_theme(&theme)
+        .with_prompt("Target Realm")
+        .interact_text()?;
+
+    let username: String = Input::with_theme(&theme)
+        .with_prompt("Username")
+        .interact_text()?;
+
+    let new_password = Password::with_theme(&theme)
+        .with_prompt("New Password")
+        .with_confirmation("Confirm Password", "Passwords mismatching")
+        .interact()?;
+
+    change_user_password_yaml(workspace_dir, &realm, &username, &new_password).await?;
+
+    println!(
+        "{} {}",
+        SUCCESS_CREATE,
+        style(format!(
+            "Successfully updated YAML for user '{}' in realm '{}' with new password.",
+            username, realm
+        ))
+        .green()
+    );
+    Ok(())
+}
+
+pub async fn change_user_password_yaml(
+    workspace_dir: &Path,
+    realm: &str,
+    username: &str,
+    new_password: &str,
+) -> Result<()> {
+    let file_path = workspace_dir
+        .join(realm)
+        .join("users")
+        .join(format!("{}.yaml", username));
+
+    if !file_path.exists() {
+        println!(
+            "{} {}",
+            WARN,
+            style(format!(
+                "Warning: User file {:?} does not exist. Creating a new one.",
+                file_path
+            ))
+            .yellow()
+        );
+        create_user_yaml(workspace_dir, realm, username, None, None, None).await?;
+    }
+
+    let yaml_content = fs::read_to_string(&file_path)
+        .await
+        .context("Failed to read user YAML file")?;
+    let mut user: UserRepresentation =
+        serde_yaml::from_str(&yaml_content).context("Failed to parse user YAML file")?;
+
+    let new_cred = CredentialRepresentation {
+        id: None,
+        type_: Some("password".to_string()),
+        value: Some(new_password.to_string()),
+        temporary: Some(false),
+        extra: HashMap::new(),
+    };
+
+    if let Some(credentials) = &mut user.credentials {
+        if let Some(existing) = credentials
+            .iter_mut()
+            .find(|c| c.type_.as_deref() == Some("password"))
+        {
+            existing.value = Some(new_password.to_string());
+        } else {
+            credentials.push(new_cred);
+        }
+    } else {
+        user.credentials = Some(vec![new_cred]);
+    }
+
+    let yaml = serde_yaml::to_string(&user).context("Failed to serialize user to YAML")?;
+    fs::write(&file_path, yaml)
+        .await
+        .context("Failed to write updated user YAML file")?;
+
+    Ok(())
+}
+
+async fn create_user_interactive(workspace_dir: &Path) -> Result<()> {
+    let theme = ColorfulTheme::default();
+
+    let realm: String = Input::with_theme(&theme)
+        .with_prompt("Target Realm")
+        .interact_text()?;
+
+    let username: String = Input::with_theme(&theme)
+        .with_prompt("Username")
+        .interact_text()?;
+
+    let email: String = Input::with_theme(&theme)
+        .with_prompt("Email")
+        .allow_empty(true)
+        .interact_text()?;
+
+    let first_name: String = Input::with_theme(&theme)
+        .with_prompt("First Name")
+        .allow_empty(true)
+        .interact_text()?;
+
+    let last_name: String = Input::with_theme(&theme)
+        .with_prompt("Last Name")
+        .allow_empty(true)
+        .interact_text()?;
+
+    let email_opt = if email.is_empty() { None } else { Some(email) };
+    let first_name_opt = if first_name.is_empty() {
+        None
+    } else {
+        Some(first_name)
+    };
+    let last_name_opt = if last_name.is_empty() {
+        None
+    } else {
+        Some(last_name)
+    };
+
+    create_user_yaml(
+        workspace_dir,
+        &realm,
+        &username,
+        email_opt,
+        first_name_opt,
+        last_name_opt,
+    )
+    .await?;
+
+    println!(
+        "{} {}",
+        SUCCESS_CREATE,
+        style(format!(
+            "Successfully generated YAML for user '{}' in realm '{}'.",
+            username, realm
+        ))
+        .green()
+    );
+    Ok(())
+}
+
+pub async fn create_user_yaml(
+    workspace_dir: &Path,
+    realm: &str,
+    username: &str,
+    email: Option<String>,
+    first_name: Option<String>,
+    last_name: Option<String>,
+) -> Result<()> {
+    let user = UserRepresentation {
+        id: None,
+        username: Some(username.to_string()),
+        enabled: Some(true),
+        first_name,
+        last_name,
+        email,
+        email_verified: Some(false),
+        credentials: None,
+        extra: HashMap::new(),
+    };
+
+    let realm_dir = workspace_dir.join(realm).join("users");
+    fs::create_dir_all(&realm_dir)
+        .await
+        .context("Failed to create users directory")?;
+
+    let file_path = realm_dir.join(format!("{}.yaml", username));
+    let yaml = serde_yaml::to_string(&user).context("Failed to serialize user to YAML")?;
+
+    fs::write(&file_path, yaml)
+        .await
+        .context("Failed to write user YAML file")?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -664,7 +910,7 @@ mod tests {
         let content = fs::read_to_string(&realm_role_path).await.unwrap();
         let role: RoleRepresentation = serde_yaml::from_str(&content).unwrap();
         assert_eq!(role.name, "admin");
-        assert_eq!(role.client_role, false);
+        assert!(!role.client_role);
 
         // Client role
         create_role_yaml(
@@ -908,254 +1154,4 @@ mod tests {
         let res = change_user_password_yaml(workspace_dir, "master", "baduser", "newpass").await;
         assert!(res.is_err());
     }
-}
-
-async fn create_client_interactive(workspace_dir: &Path) -> Result<()> {
-    let theme = ColorfulTheme::default();
-
-    let realm: String = Input::with_theme(&theme)
-        .with_prompt("Target Realm")
-        .interact_text()?;
-
-    let client_id: String = Input::with_theme(&theme)
-        .with_prompt("Client ID")
-        .interact_text()?;
-
-    let is_public = Confirm::with_theme(&theme)
-        .with_prompt("Is this a public client? (No for confidential)")
-        .default(true)
-        .interact()?;
-
-    create_client_yaml(workspace_dir, &realm, &client_id, is_public).await?;
-
-    println!(
-        "{} {}",
-        SUCCESS,
-        style(format!(
-            "Successfully generated YAML for client '{}' in realm '{}'.",
-            client_id, realm
-        ))
-        .green()
-    );
-    Ok(())
-}
-
-pub async fn create_client_yaml(
-    workspace_dir: &Path,
-    realm: &str,
-    client_id: &str,
-    is_public: bool,
-) -> Result<()> {
-    let client = ClientRepresentation {
-        id: None,
-        client_id: Some(client_id.to_string()),
-        name: None,
-        description: None,
-        enabled: Some(true),
-        protocol: Some("openid-connect".to_string()),
-        redirect_uris: Some(vec!["/*".to_string()]),
-        web_origins: Some(vec!["+".to_string()]),
-        public_client: Some(is_public),
-        bearer_only: Some(false),
-        service_accounts_enabled: Some(!is_public),
-        extra: HashMap::new(),
-    };
-
-    let realm_dir = workspace_dir.join(realm).join("clients");
-    fs::create_dir_all(&realm_dir)
-        .await
-        .context("Failed to create clients directory")?;
-
-    let file_path = realm_dir.join(format!("{}.yaml", client_id));
-    let yaml = serde_yaml::to_string(&client).context("Failed to serialize client to YAML")?;
-
-    fs::write(&file_path, yaml)
-        .await
-        .context("Failed to write client YAML file")?;
-
-    Ok(())
-}
-
-async fn change_user_password_interactive(workspace_dir: &Path) -> Result<()> {
-    let theme = ColorfulTheme::default();
-
-    let realm: String = Input::with_theme(&theme)
-        .with_prompt("Target Realm")
-        .interact_text()?;
-
-    let username: String = Input::with_theme(&theme)
-        .with_prompt("Username")
-        .interact_text()?;
-
-    let new_password = Password::with_theme(&theme)
-        .with_prompt("New Password")
-        .with_confirmation("Confirm Password", "Passwords mismatching")
-        .interact()?;
-
-    change_user_password_yaml(workspace_dir, &realm, &username, &new_password).await?;
-
-    println!(
-        "{} {}",
-        SUCCESS,
-        style(format!(
-            "Successfully updated YAML for user '{}' in realm '{}' with new password.",
-            username, realm
-        ))
-        .green()
-    );
-    Ok(())
-}
-
-pub async fn change_user_password_yaml(
-    workspace_dir: &Path,
-    realm: &str,
-    username: &str,
-    new_password: &str,
-) -> Result<()> {
-    let file_path = workspace_dir
-        .join(realm)
-        .join("users")
-        .join(format!("{}.yaml", username));
-
-    if !file_path.exists() {
-        println!(
-            "{} {}",
-            WARN,
-            style(format!(
-                "Warning: User file {:?} does not exist. Creating a new one.",
-                file_path
-            ))
-            .yellow()
-        );
-        create_user_yaml(workspace_dir, realm, username, None, None, None).await?;
-    }
-
-    let yaml_content = fs::read_to_string(&file_path)
-        .await
-        .context("Failed to read user YAML file")?;
-    let mut user: UserRepresentation =
-        serde_yaml::from_str(&yaml_content).context("Failed to parse user YAML file")?;
-
-    let new_cred = CredentialRepresentation {
-        id: None,
-        type_: Some("password".to_string()),
-        value: Some(new_password.to_string()),
-        temporary: Some(false),
-        extra: HashMap::new(),
-    };
-
-    if let Some(credentials) = &mut user.credentials {
-        if let Some(existing) = credentials
-            .iter_mut()
-            .find(|c| c.type_.as_deref() == Some("password"))
-        {
-            existing.value = Some(new_password.to_string());
-        } else {
-            credentials.push(new_cred);
-        }
-    } else {
-        user.credentials = Some(vec![new_cred]);
-    }
-
-    let yaml = serde_yaml::to_string(&user).context("Failed to serialize user to YAML")?;
-    fs::write(&file_path, yaml)
-        .await
-        .context("Failed to write updated user YAML file")?;
-
-    Ok(())
-}
-
-async fn create_user_interactive(workspace_dir: &Path) -> Result<()> {
-    let theme = ColorfulTheme::default();
-
-    let realm: String = Input::with_theme(&theme)
-        .with_prompt("Target Realm")
-        .interact_text()?;
-
-    let username: String = Input::with_theme(&theme)
-        .with_prompt("Username")
-        .interact_text()?;
-
-    let email: String = Input::with_theme(&theme)
-        .with_prompt("Email")
-        .allow_empty(true)
-        .interact_text()?;
-
-    let first_name: String = Input::with_theme(&theme)
-        .with_prompt("First Name")
-        .allow_empty(true)
-        .interact_text()?;
-
-    let last_name: String = Input::with_theme(&theme)
-        .with_prompt("Last Name")
-        .allow_empty(true)
-        .interact_text()?;
-
-    let email_opt = if email.is_empty() { None } else { Some(email) };
-    let first_name_opt = if first_name.is_empty() {
-        None
-    } else {
-        Some(first_name)
-    };
-    let last_name_opt = if last_name.is_empty() {
-        None
-    } else {
-        Some(last_name)
-    };
-
-    create_user_yaml(
-        workspace_dir,
-        &realm,
-        &username,
-        email_opt,
-        first_name_opt,
-        last_name_opt,
-    )
-    .await?;
-
-    println!(
-        "{} {}",
-        SUCCESS,
-        style(format!(
-            "Successfully generated YAML for user '{}' in realm '{}'.",
-            username, realm
-        ))
-        .green()
-    );
-    Ok(())
-}
-
-pub async fn create_user_yaml(
-    workspace_dir: &Path,
-    realm: &str,
-    username: &str,
-    email: Option<String>,
-    first_name: Option<String>,
-    last_name: Option<String>,
-) -> Result<()> {
-    let user = UserRepresentation {
-        id: None,
-        username: Some(username.to_string()),
-        enabled: Some(true),
-        first_name,
-        last_name,
-        email,
-        email_verified: Some(false),
-        credentials: None,
-        extra: HashMap::new(),
-    };
-
-    let realm_dir = workspace_dir.join(realm).join("users");
-    fs::create_dir_all(&realm_dir)
-        .await
-        .context("Failed to create users directory")?;
-
-    let file_path = realm_dir.join(format!("{}.yaml", username));
-    let yaml = serde_yaml::to_string(&user).context("Failed to serialize user to YAML")?;
-
-    fs::write(&file_path, yaml)
-        .await
-        .context("Failed to write user YAML file")?;
-
-    Ok(())
 }

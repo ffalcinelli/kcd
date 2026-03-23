@@ -70,7 +70,7 @@ async fn test_plan_edge_cases() {
 
     // 6. Test with invalid YAML
     fs::write(realm_dir.join("invalid.yaml"), "invalid: [yaml").unwrap();
-    let res = plan::run(
+    let _res = plan::run(
         &client,
         workspace_dir.clone(),
         false,

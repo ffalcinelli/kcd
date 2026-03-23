@@ -1,4 +1,5 @@
 pub mod secrets;
+pub mod ui;
 use anyhow::Context;
 use serde::Serialize;
 

@@ -2,7 +2,6 @@ mod common;
 use app::client::KeycloakClient;
 use app::models::ClientRepresentation;
 use common::start_mock_server;
-use tokio;
 
 #[tokio::test]
 async fn test_login_password_grant() {

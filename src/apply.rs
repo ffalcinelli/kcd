@@ -6,18 +6,14 @@ use crate::models::{
     UserRepresentation,
 };
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::{ACTION, SUCCESS_CREATE, SUCCESS_UPDATE, WARN};
 use anyhow::{Context, Result};
-use console::{Emoji, style};
+use console::style;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
 use tokio::task::JoinSet;
-
-static ACTION: Emoji<'_, '_> = Emoji("🚀 ", ">> ");
-static SUCCESS_CREATE: Emoji<'_, '_> = Emoji("✨ ", "+ ");
-static SUCCESS_UPDATE: Emoji<'_, '_> = Emoji("🔄 ", "~ ");
-static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
 
 pub async fn run(
     client: &KeycloakClient,
@@ -114,6 +110,7 @@ pub async fn run(
             realm_dir,
             Arc::clone(&env_vars),
             Arc::clone(&planned_files),
+            &realm_name,
         )
         .await?;
     }
@@ -131,86 +128,214 @@ async fn apply_single_realm(
     workspace_dir: PathBuf,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     apply_realm(
         client,
         &workspace_dir,
         Arc::clone(&env_vars),
         Arc::clone(&planned_files),
+        realm_name,
     )
     .await?;
-    apply_roles(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    apply_identity_providers(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    apply_clients(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    apply_client_scopes(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    apply_groups(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    apply_users(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    apply_authentication_flows(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    apply_required_actions(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    apply_components_or_keys(
-        client,
-        &workspace_dir,
-        "components",
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    apply_components_or_keys(
-        client,
-        &workspace_dir,
-        "keys",
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
+
+    let mut set = JoinSet::new();
+
+    // Roles
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            apply_roles(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Identity Providers
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            apply_identity_providers(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Clients
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            apply_clients(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Client Scopes
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            apply_client_scopes(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Groups
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            apply_groups(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Users
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            apply_users(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Authentication Flows
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            apply_authentication_flows(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Required Actions
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            apply_required_actions(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Components
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            apply_components_or_keys(
+                &client,
+                &workspace_dir,
+                "components",
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Keys
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            apply_components_or_keys(
+                &client,
+                &workspace_dir,
+                "keys",
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    while let Some(res) = set.join_next().await {
+        res??;
+    }
 
     Ok(())
 }
@@ -220,6 +345,7 @@ async fn apply_realm(
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 1. Apply Realm
     let realm_path = workspace_dir.join("realm.yaml");
@@ -237,7 +363,7 @@ async fn apply_realm(
         client
             .update_realm(&realm_rep)
             .await
-            .context("Failed to update realm")?;
+            .with_context(|| format!("Failed to update realm '{}'", realm_name))?;
         println!(
             "  {} {}",
             SUCCESS_UPDATE,
@@ -252,16 +378,20 @@ async fn apply_roles(
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 2. Apply Roles
     let roles_dir = workspace_dir.join("roles");
     if async_fs::try_exists(&roles_dir).await? {
-        let existing_roles = client.get_roles().await?;
+        let existing_roles = client
+            .get_roles()
+            .await
+            .with_context(|| format!("Failed to get roles for realm '{}'", realm_name))?;
         let existing_roles_map: HashMap<String, String> = existing_roles
             .into_iter()
             .filter_map(|r| {
                 let identity = r.get_identity();
-                let id = r.id.clone();
+                let id = r.id;
                 match (identity, id) {
                     (Some(identity), Some(id)) => Some((identity, id)),
                     _ => None,
@@ -284,6 +414,7 @@ async fn apply_roles(
                 let client = client.clone();
                 let existing_roles_map = existing_roles_map.clone();
                 let env_vars = Arc::clone(&env_vars);
+                let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
@@ -297,10 +428,13 @@ async fn apply_roles(
 
                     if let Some(id) = existing_roles_map.get(&identity) {
                         role_rep.id = Some(id.clone()); // Use remote ID
-                        client
-                            .update_role(id, &role_rep)
-                            .await
-                            .context(format!("Failed to update role {}", role_rep.get_name()))?;
+                        client.update_role(id, &role_rep).await.with_context(|| {
+                            format!(
+                                "Failed to update role '{}' in realm '{}'",
+                                role_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                         println!(
                             "  {} {}",
                             SUCCESS_UPDATE,
@@ -308,10 +442,13 @@ async fn apply_roles(
                         );
                     } else {
                         role_rep.id = None; // Don't send ID on create
-                        client
-                            .create_role(&role_rep)
-                            .await
-                            .context(format!("Failed to create role {}", role_rep.get_name()))?;
+                        client.create_role(&role_rep).await.with_context(|| {
+                            format!(
+                                "Failed to create role '{}' in realm '{}'",
+                                role_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                         println!(
                             "  {} {}",
                             SUCCESS_CREATE,
@@ -334,11 +471,17 @@ async fn apply_identity_providers(
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 4. Apply Identity Providers
     let idps_dir = workspace_dir.join("identity-providers");
     if async_fs::try_exists(&idps_dir).await? {
-        let existing_idps = client.get_identity_providers().await?;
+        let existing_idps = client.get_identity_providers().await.with_context(|| {
+            format!(
+                "Failed to get identity providers for realm '{}'",
+                realm_name
+            )
+        })?;
         let existing_idps_map: HashMap<String, IdentityProviderRepresentation> = existing_idps
             .into_iter()
             .filter_map(|i| i.get_identity().map(|id| (id, i)))
@@ -359,6 +502,7 @@ async fn apply_identity_providers(
                 let client = client.clone();
                 let existing_idps_map = existing_idps_map.clone();
                 let env_vars = Arc::clone(&env_vars);
+                let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
@@ -376,10 +520,13 @@ async fn apply_identity_providers(
                             client
                                 .update_identity_provider(&identity, &idp_rep)
                                 .await
-                                .context(format!(
-                                    "Failed to update identity provider {}",
-                                    idp_rep.get_name()
-                                ))?;
+                                .with_context(|| {
+                                    format!(
+                                        "Failed to update identity provider '{}' in realm '{}'",
+                                        idp_rep.get_name(),
+                                        realm_name
+                                    )
+                                })?;
                             println!(
                                 "  {} {}",
                                 SUCCESS_UPDATE,
@@ -392,10 +539,13 @@ async fn apply_identity_providers(
                         client
                             .create_identity_provider(&idp_rep)
                             .await
-                            .context(format!(
-                                "Failed to create identity provider {}",
-                                idp_rep.get_name()
-                            ))?;
+                            .with_context(|| {
+                                format!(
+                                    "Failed to create identity provider '{}' in realm '{}'",
+                                    idp_rep.get_name(),
+                                    realm_name
+                                )
+                            })?;
                         println!(
                             "  {} {}",
                             SUCCESS_CREATE,
@@ -419,11 +569,15 @@ async fn apply_clients(
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 3. Apply Clients
     let clients_dir = workspace_dir.join("clients");
     if async_fs::try_exists(&clients_dir).await? {
-        let existing_clients = client.get_clients().await?;
+        let existing_clients = client
+            .get_clients()
+            .await
+            .with_context(|| format!("Failed to get clients for realm '{}'", realm_name))?;
         let existing_clients_map: HashMap<String, ClientRepresentation> = existing_clients
             .into_iter()
             .filter_map(|c| c.get_identity().map(|id| (id, c)))
@@ -444,6 +598,7 @@ async fn apply_clients(
                 let client = client.clone();
                 let existing_clients_map = existing_clients_map.clone();
                 let env_vars = Arc::clone(&env_vars);
+                let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
@@ -461,10 +616,13 @@ async fn apply_clients(
                             client
                                 .update_client(id, &client_rep)
                                 .await
-                                .context(format!(
-                                    "Failed to update client {}",
-                                    client_rep.get_name()
-                                ))?;
+                                .with_context(|| {
+                                    format!(
+                                        "Failed to update client '{}' in realm '{}'",
+                                        client_rep.get_name(),
+                                        realm_name
+                                    )
+                                })?;
                             println!(
                                 "  {} {}",
                                 SUCCESS_UPDATE,
@@ -473,10 +631,13 @@ async fn apply_clients(
                         }
                     } else {
                         client_rep.id = None; // Don't send ID on create
-                        client.create_client(&client_rep).await.context(format!(
-                            "Failed to create client {}",
-                            client_rep.get_name()
-                        ))?;
+                        client.create_client(&client_rep).await.with_context(|| {
+                            format!(
+                                "Failed to create client '{}' in realm '{}'",
+                                client_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                         println!(
                             "  {} {}",
                             SUCCESS_CREATE,
@@ -499,11 +660,15 @@ async fn apply_client_scopes(
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 5. Apply Client Scopes
     let scopes_dir = workspace_dir.join("client-scopes");
     if async_fs::try_exists(&scopes_dir).await? {
-        let existing_scopes = client.get_client_scopes().await?;
+        let existing_scopes = client
+            .get_client_scopes()
+            .await
+            .with_context(|| format!("Failed to get client scopes for realm '{}'", realm_name))?;
         let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
             .into_iter()
             .filter_map(|s| s.get_identity().map(|id| (id, s)))
@@ -535,10 +700,13 @@ async fn apply_client_scopes(
                         client
                             .update_client_scope(id, &scope_rep)
                             .await
-                            .context(format!(
-                                "Failed to update client scope {}",
-                                scope_rep.get_name()
-                            ))?;
+                            .with_context(|| {
+                                format!(
+                                    "Failed to update client scope '{}' in realm '{}'",
+                                    scope_rep.get_name(),
+                                    realm_name
+                                )
+                            })?;
                         println!(
                             "  {} {}",
                             SUCCESS_UPDATE,
@@ -550,10 +718,13 @@ async fn apply_client_scopes(
                     client
                         .create_client_scope(&scope_rep)
                         .await
-                        .context(format!(
-                            "Failed to create client scope {}",
-                            scope_rep.get_name()
-                        ))?;
+                        .with_context(|| {
+                            format!(
+                                "Failed to create client scope '{}' in realm '{}'",
+                                scope_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                     println!(
                         "  {} {}",
                         SUCCESS_CREATE,
@@ -571,11 +742,15 @@ async fn apply_groups(
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 6. Apply Groups
     let groups_dir = workspace_dir.join("groups");
     if async_fs::try_exists(&groups_dir).await? {
-        let existing_groups = client.get_groups().await?;
+        let existing_groups = client
+            .get_groups()
+            .await
+            .with_context(|| format!("Failed to get groups for realm '{}'", realm_name))?;
         let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
             .into_iter()
             .filter_map(|g| g.get_identity().map(|id| (id, g)))
@@ -603,10 +778,13 @@ async fn apply_groups(
                 if let Some(existing) = existing_groups_map.get(&identity) {
                     if let Some(id) = &existing.id {
                         group_rep.id = Some(id.clone());
-                        client
-                            .update_group(id, &group_rep)
-                            .await
-                            .context(format!("Failed to update group {}", group_rep.get_name()))?;
+                        client.update_group(id, &group_rep).await.with_context(|| {
+                            format!(
+                                "Failed to update group '{}' in realm '{}'",
+                                group_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                         println!(
                             "  {} {}",
                             SUCCESS_UPDATE,
@@ -615,10 +793,13 @@ async fn apply_groups(
                     }
                 } else {
                     group_rep.id = None;
-                    client
-                        .create_group(&group_rep)
-                        .await
-                        .context(format!("Failed to create group {}", group_rep.get_name()))?;
+                    client.create_group(&group_rep).await.with_context(|| {
+                        format!(
+                            "Failed to create group '{}' in realm '{}'",
+                            group_rep.get_name(),
+                            realm_name
+                        )
+                    })?;
                     println!(
                         "  {} {}",
                         SUCCESS_CREATE,
@@ -636,11 +817,15 @@ async fn apply_users(
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 7. Apply Users
     let users_dir = workspace_dir.join("users");
     if async_fs::try_exists(&users_dir).await? {
-        let existing_users = client.get_users().await?;
+        let existing_users = client
+            .get_users()
+            .await
+            .with_context(|| format!("Failed to get users for realm '{}'", realm_name))?;
         let existing_users_map: HashMap<String, UserRepresentation> = existing_users
             .into_iter()
             .filter_map(|u| u.get_identity().map(|id| (id, u)))
@@ -668,10 +853,13 @@ async fn apply_users(
                 if let Some(existing) = existing_users_map.get(&identity) {
                     if let Some(id) = &existing.id {
                         user_rep.id = Some(id.clone());
-                        client
-                            .update_user(id, &user_rep)
-                            .await
-                            .context(format!("Failed to update user {}", user_rep.get_name()))?;
+                        client.update_user(id, &user_rep).await.with_context(|| {
+                            format!(
+                                "Failed to update user '{}' in realm '{}'",
+                                user_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                         println!(
                             "  {} {}",
                             SUCCESS_UPDATE,
@@ -680,10 +868,13 @@ async fn apply_users(
                     }
                 } else {
                     user_rep.id = None;
-                    client
-                        .create_user(&user_rep)
-                        .await
-                        .context(format!("Failed to create user {}", user_rep.get_name()))?;
+                    client.create_user(&user_rep).await.with_context(|| {
+                        format!(
+                            "Failed to create user '{}' in realm '{}'",
+                            user_rep.get_name(),
+                            realm_name
+                        )
+                    })?;
                     println!(
                         "  {} {}",
                         SUCCESS_CREATE,
@@ -701,11 +892,17 @@ async fn apply_authentication_flows(
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 8. Apply Authentication Flows
     let flows_dir = workspace_dir.join("authentication-flows");
     if async_fs::try_exists(&flows_dir).await? {
-        let existing_flows = client.get_authentication_flows().await?;
+        let existing_flows = client.get_authentication_flows().await.with_context(|| {
+            format!(
+                "Failed to get authentication flows for realm '{}'",
+                realm_name
+            )
+        })?;
         let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
             .into_iter()
             .filter_map(|f| f.get_identity().map(|id| (id, f)))
@@ -736,10 +933,13 @@ async fn apply_authentication_flows(
                         client
                             .update_authentication_flow(id, &flow_rep)
                             .await
-                            .context(format!(
-                                "Failed to update authentication flow {}",
-                                flow_rep.get_name()
-                            ))?;
+                            .with_context(|| {
+                                format!(
+                                    "Failed to update authentication flow '{}' in realm '{}'",
+                                    flow_rep.get_name(),
+                                    realm_name
+                                )
+                            })?;
                         println!(
                             "  {} {}",
                             SUCCESS_UPDATE,
@@ -755,10 +955,13 @@ async fn apply_authentication_flows(
                     client
                         .create_authentication_flow(&flow_rep)
                         .await
-                        .context(format!(
-                            "Failed to create authentication flow {}",
-                            flow_rep.get_name()
-                        ))?;
+                        .with_context(|| {
+                            format!(
+                                "Failed to create authentication flow '{}' in realm '{}'",
+                                flow_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                     println!(
                         "  {} {}",
                         SUCCESS_CREATE,
@@ -780,11 +983,14 @@ async fn apply_required_actions(
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 9. Apply Required Actions
     let actions_dir = workspace_dir.join("required-actions");
     if async_fs::try_exists(&actions_dir).await? {
-        let existing_actions = client.get_required_actions().await?;
+        let existing_actions = client.get_required_actions().await.with_context(|| {
+            format!("Failed to get required actions for realm '{}'", realm_name)
+        })?;
         let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
             existing_actions
                 .into_iter()
@@ -815,10 +1021,13 @@ async fn apply_required_actions(
                     client
                         .update_required_action(&identity, &action_rep)
                         .await
-                        .context(format!(
-                            "Failed to update required action {}",
-                            action_rep.get_name()
-                        ))?;
+                        .with_context(|| {
+                            format!(
+                                "Failed to update required action '{}' in realm '{}'",
+                                action_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                     println!(
                         "  {} {}",
                         SUCCESS_UPDATE,
@@ -829,17 +1038,23 @@ async fn apply_required_actions(
                     client
                         .register_required_action(&action_rep)
                         .await
-                        .context(format!(
-                            "Failed to register required action {}",
-                            action_rep.get_name()
-                        ))?;
+                        .with_context(|| {
+                            format!(
+                                "Failed to register required action '{}' in realm '{}'",
+                                action_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                     client
                         .update_required_action(&identity, &action_rep)
                         .await
-                        .context(format!(
-                            "Failed to configure registered required action {}",
-                            action_rep.get_name()
-                        ))?;
+                        .with_context(|| {
+                            format!(
+                                "Failed to configure registered required action '{}' in realm '{}'",
+                                action_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                     println!(
                         "  {} {}",
                         SUCCESS_CREATE,
@@ -862,10 +1077,14 @@ async fn apply_components_or_keys(
     dir_name: &str,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     let components_dir = workspace_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
-        let existing_components = client.get_components().await?;
+        let existing_components = client
+            .get_components()
+            .await
+            .with_context(|| format!("Failed to get components/keys for realm '{}'", realm_name))?;
         let mut by_identity: HashMap<String, ComponentRepresentation> = HashMap::new();
         type ComponentKey = (
             Option<String>,
@@ -929,10 +1148,13 @@ async fn apply_components_or_keys(
                         client
                             .update_component(id, &component_rep)
                             .await
-                            .context(format!(
-                                "Failed to update component {}",
-                                component_rep.get_name()
-                            ))?;
+                            .with_context(|| {
+                                format!(
+                                    "Failed to update component '{}' in realm '{}'",
+                                    component_rep.get_name(),
+                                    realm_name
+                                )
+                            })?;
                         println!(
                             "  {} {}",
                             SUCCESS_UPDATE,
@@ -944,10 +1166,13 @@ async fn apply_components_or_keys(
                     client
                         .create_component(&component_rep)
                         .await
-                        .context(format!(
-                            "Failed to create component {}",
-                            component_rep.get_name()
-                        ))?;
+                        .with_context(|| {
+                            format!(
+                                "Failed to create component '{}' in realm '{}'",
+                                component_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                     println!(
                         "  {} {}",
                         SUCCESS_CREATE,
