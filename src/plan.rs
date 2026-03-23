@@ -6,8 +6,9 @@ use crate::models::{
     UserRepresentation,
 };
 
+use crate::utils::ui::{CHECK, MEMO, SEARCH, SPARKLE, WARN};
 use anyhow::{Context, Result};
-use console::{Emoji, Style, style};
+use console::{Style, style};
 use serde::Serialize;
 use similar::{ChangeTag, TextDiff};
 use std::collections::HashMap;
@@ -15,9 +16,6 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs as async_fs;
-
-static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
-static ACTION: Emoji<'_, '_> = Emoji("🔍 ", "> ");
 
 pub async fn run(
     client: &KeycloakClient,
@@ -67,7 +65,7 @@ pub async fn run(
         let realm_dir = workspace_dir.join(&realm_name);
         println!(
             "\n{} {}",
-            ACTION,
+            SEARCH,
             style(format!("Planning changes for realm: {}", realm_name))
                 .cyan()
                 .bold()
@@ -267,7 +265,7 @@ fn print_diff<T: Serialize>(
     let changed = diff.ratio() < 1.0;
 
     if changed {
-        println!("\n{} Changes for {}:", Emoji("📝", ""), name);
+        println!("\n{} Changes for {}:", MEMO, name);
         for change in diff.iter_all_changes() {
             let (sign, style) = match change.tag() {
                 ChangeTag::Delete => ("-", Style::new().red()),
@@ -277,7 +275,7 @@ fn print_diff<T: Serialize>(
             print!("{}{}", style.apply_to(sign).bold(), style.apply_to(change));
         }
     } else if !changes_only {
-        println!("{} No changes for {}", Emoji("✅", ""), name);
+        println!("{} No changes for {}", CHECK, name);
     }
     Ok(changed)
 }
@@ -333,7 +331,7 @@ async fn plan_client_scopes(
                 } else {
                     println!(
                         "\n{} Will create ClientScope: {}",
-                        Emoji("✨", ""),
+                        SPARKLE,
                         local_scope.get_name()
                     );
                     print_diff(
@@ -416,7 +414,7 @@ async fn plan_groups(
                 } else {
                     println!(
                         "\n{} Will create Group: {}",
-                        Emoji("✨", ""),
+                        SPARKLE,
                         local_group.get_name()
                     );
                     print_diff(
@@ -497,11 +495,7 @@ async fn plan_users(
                         "user",
                     )?
                 } else {
-                    println!(
-                        "\n{} Will create User: {}",
-                        Emoji("✨", ""),
-                        local_user.get_name()
-                    );
+                    println!("\n{} Will create User: {}", SPARKLE, local_user.get_name());
                     print_diff(
                         &format!("User {}", local_user.get_name()),
                         None::<&UserRepresentation>,
@@ -584,7 +578,7 @@ async fn plan_authentication_flows(
                 } else {
                     println!(
                         "\n{} Will create AuthenticationFlow: {}",
-                        Emoji("✨", ""),
+                        SPARKLE,
                         local_flow.get_name()
                     );
                     print_diff(
@@ -664,7 +658,7 @@ async fn plan_required_actions(
                 } else {
                     println!(
                         "\n{} Will create RequiredAction: {}",
-                        Emoji("✨", ""),
+                        SPARKLE,
                         local_action.get_name()
                     );
                     print_diff(
@@ -786,7 +780,7 @@ async fn plan_components_or_keys(
                 } else {
                     println!(
                         "\n{} Will create Component: {}",
-                        Emoji("✨", ""),
+                        SPARKLE,
                         local_component.get_name()
                     );
                     let prefix = if dir_name == "keys" {
@@ -931,11 +925,7 @@ async fn plan_roles(
                         "role",
                     )?
                 } else {
-                    println!(
-                        "\n{} Will create Role: {}",
-                        Emoji("✨", ""),
-                        local_role.get_name()
-                    );
+                    println!("\n{} Will create Role: {}", SPARKLE, local_role.get_name());
                     print_diff(
                         &format!("Role {}", local_role.get_name()),
                         None::<&RoleRepresentation>,
@@ -1016,7 +1006,7 @@ async fn plan_clients(
                 } else {
                     println!(
                         "\n{} Will create Client: {}",
-                        Emoji("✨", ""),
+                        SPARKLE,
                         local_client.get_name()
                     );
                     print_diff(
@@ -1101,7 +1091,7 @@ async fn plan_identity_providers(
                 } else {
                     println!(
                         "\n{} Will create IdentityProvider: {}",
-                        Emoji("✨", ""),
+                        SPARKLE,
                         local_idp.get_name()
                     );
                     print_diff(
@@ -1161,7 +1151,7 @@ async fn check_keys_drift(client: &KeycloakClient, changes_only: bool) -> Result
                         let provider_id = key.provider_id.as_deref().unwrap_or("unknown");
                         println!(
                             "{} Warning: Active key (providerId: {}) is near expiration or expired! Consider rotating keys.",
-                            Emoji("⚠️", ""),
+                            WARN,
                             style(provider_id).yellow()
                         );
                     }

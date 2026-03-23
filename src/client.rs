@@ -1,6 +1,6 @@
 use crate::models::{
     AuthenticationFlowRepresentation, ClientRepresentation, ClientScopeRepresentation,
-    ComponentRepresentation, GroupRepresentation, IdentityProviderRepresentation,
+    ComponentRepresentation, GroupRepresentation, IdentityProviderRepresentation, KeycloakResource,
     RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation,
     UserRepresentation,
 };
@@ -38,98 +38,109 @@ impl KeycloakClient {
         self.target_realm = target_realm;
     }
 
+    fn realm_admin_url(&self) -> String {
+        format!("{}/admin/realms/{}", self.base_url, self.target_realm)
+    }
+
+    fn resource_url<T: KeycloakResource>(&self) -> String {
+        if T::api_path() == "realms" {
+            format!("{}/admin/realms", self.base_url)
+        } else {
+            format!("{}/{}", self.realm_admin_url(), T::api_path())
+        }
+    }
+
+    fn object_url<T: KeycloakResource>(&self, id: &str) -> String {
+        if T::api_path() == "realms" {
+            format!("{}/admin/realms/{}", self.base_url, id)
+        } else {
+            format!("{}/{}", self.realm_admin_url(), T::object_path(id))
+        }
+    }
+
+    pub async fn get_resources<T: KeycloakResource + for<'a> Deserialize<'a>>(
+        &self,
+    ) -> Result<Vec<T>> {
+        self.get(&self.resource_url::<T>()).await
+    }
+
+    pub async fn get_resource<T: KeycloakResource + for<'a> Deserialize<'a>>(
+        &self,
+        id: &str,
+    ) -> Result<T> {
+        self.get(&self.object_url::<T>(id)).await
+    }
+
+    pub async fn create_resource<T: KeycloakResource + Serialize>(&self, res: &T) -> Result<()> {
+        self.post(&self.resource_url::<T>(), res).await
+    }
+
+    pub async fn update_resource<T: KeycloakResource + Serialize>(
+        &self,
+        id: &str,
+        res: &T,
+    ) -> Result<()> {
+        self.put(&self.object_url::<T>(id), res).await
+    }
+
+    pub async fn delete_resource<T: KeycloakResource>(&self, id: &str) -> Result<()> {
+        self.delete(&self.object_url::<T>(id)).await
+    }
+
     pub async fn get_realms(&self) -> Result<Vec<RealmRepresentation>> {
-        let url = format!("{}/admin/realms", self.base_url);
-        self.get(&url).await
+        self.get_resources().await
     }
 
     pub async fn get_realm(&self) -> Result<RealmRepresentation> {
-        let url = format!("{}/admin/realms/{}", self.base_url, self.target_realm);
-        self.get(&url).await
+        self.get_resource(&self.target_realm.clone()).await
     }
 
     pub async fn get_clients(&self) -> Result<Vec<ClientRepresentation>> {
-        let url = format!(
-            "{}/admin/realms/{}/clients",
-            self.base_url, self.target_realm
-        );
-        self.get(&url).await
+        self.get_resources().await
     }
 
     pub async fn get_roles(&self) -> Result<Vec<RoleRepresentation>> {
-        let url = format!("{}/admin/realms/{}/roles", self.base_url, self.target_realm);
-        self.get(&url).await
+        self.get_resources().await
     }
 
     pub async fn get_identity_providers(&self) -> Result<Vec<IdentityProviderRepresentation>> {
-        let url = format!(
-            "{}/admin/realms/{}/identity-provider/instances",
-            self.base_url, self.target_realm
-        );
-        self.get(&url).await
+        self.get_resources().await
     }
 
     pub async fn update_realm(&self, realm_rep: &RealmRepresentation) -> Result<()> {
-        let url = format!("{}/admin/realms/{}", self.base_url, self.target_realm);
-        self.put(&url, realm_rep).await
+        self.update_resource(&self.target_realm.clone(), realm_rep)
+            .await
     }
 
     pub async fn create_client(&self, client_rep: &ClientRepresentation) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/clients",
-            self.base_url, self.target_realm
-        );
-        self.post(&url, client_rep).await
+        self.create_resource(client_rep).await
     }
 
     pub async fn update_client(&self, id: &str, client_rep: &ClientRepresentation) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/clients/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.put(&url, client_rep).await
+        self.update_resource(id, client_rep).await
     }
 
     pub async fn delete_client(&self, id: &str) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/clients/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.delete(&url).await
+        self.delete_resource::<ClientRepresentation>(id).await
     }
 
     pub async fn create_role(&self, role_rep: &RoleRepresentation) -> Result<()> {
-        let url = format!("{}/admin/realms/{}/roles", self.base_url, self.target_realm);
-        self.post(&url, role_rep).await
+        self.create_resource(role_rep).await
     }
 
     pub async fn update_role(&self, id: &str, role_rep: &RoleRepresentation) -> Result<()> {
-        // Keycloak API for updating role by ID: PUT /admin/realms/{realm}/roles-by-id/{role-id}
-        let url = format!(
-            "{}/admin/realms/{}/roles-by-id/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.put(&url, role_rep).await
+        self.update_resource(id, role_rep).await
     }
 
     pub async fn delete_role(&self, id: &str) -> Result<()> {
-        // Keycloak API for deleting role by ID: DELETE /admin/realms/{realm}/roles-by-id/{role-id}
-        let url = format!(
-            "{}/admin/realms/{}/roles-by-id/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.delete(&url).await
+        self.delete_resource::<RoleRepresentation>(id).await
     }
 
     pub async fn create_identity_provider(
         &self,
         idp_rep: &IdentityProviderRepresentation,
     ) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/identity-provider/instances",
-            self.base_url, self.target_realm
-        );
-        self.post(&url, idp_rep).await
+        self.create_resource(idp_rep).await
     }
 
     pub async fn update_identity_provider(
@@ -137,35 +148,20 @@ impl KeycloakClient {
         alias: &str,
         idp_rep: &IdentityProviderRepresentation,
     ) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/identity-provider/instances/{}",
-            self.base_url, self.target_realm, alias
-        );
-        self.put(&url, idp_rep).await
+        self.update_resource(alias, idp_rep).await
     }
 
     pub async fn delete_identity_provider(&self, alias: &str) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/identity-provider/instances/{}",
-            self.base_url, self.target_realm, alias
-        );
-        self.delete(&url).await
+        self.delete_resource::<IdentityProviderRepresentation>(alias)
+            .await
     }
 
     pub async fn get_client_scopes(&self) -> Result<Vec<ClientScopeRepresentation>> {
-        let url = format!(
-            "{}/admin/realms/{}/client-scopes",
-            self.base_url, self.target_realm
-        );
-        self.get(&url).await
+        self.get_resources().await
     }
 
     pub async fn create_client_scope(&self, scope_rep: &ClientScopeRepresentation) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/client-scopes",
-            self.base_url, self.target_realm
-        );
-        self.post(&url, scope_rep).await
+        self.create_resource(scope_rep).await
     }
 
     pub async fn update_client_scope(
@@ -173,96 +169,54 @@ impl KeycloakClient {
         id: &str,
         scope_rep: &ClientScopeRepresentation,
     ) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/client-scopes/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.put(&url, scope_rep).await
+        self.update_resource(id, scope_rep).await
     }
 
     pub async fn delete_client_scope(&self, id: &str) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/client-scopes/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.delete(&url).await
+        self.delete_resource::<ClientScopeRepresentation>(id).await
     }
 
     pub async fn get_groups(&self) -> Result<Vec<GroupRepresentation>> {
-        let url = format!(
-            "{}/admin/realms/{}/groups",
-            self.base_url, self.target_realm
-        );
-        self.get(&url).await
+        self.get_resources().await
     }
 
     pub async fn create_group(&self, group_rep: &GroupRepresentation) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/groups",
-            self.base_url, self.target_realm
-        );
-        self.post(&url, group_rep).await
+        self.create_resource(group_rep).await
     }
 
     pub async fn update_group(&self, id: &str, group_rep: &GroupRepresentation) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/groups/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.put(&url, group_rep).await
+        self.update_resource(id, group_rep).await
     }
 
     pub async fn delete_group(&self, id: &str) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/groups/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.delete(&url).await
+        self.delete_resource::<GroupRepresentation>(id).await
     }
 
     pub async fn get_users(&self) -> Result<Vec<UserRepresentation>> {
-        let url = format!("{}/admin/realms/{}/users", self.base_url, self.target_realm);
-        self.get(&url).await
+        self.get_resources().await
     }
 
     pub async fn create_user(&self, user_rep: &UserRepresentation) -> Result<()> {
-        let url = format!("{}/admin/realms/{}/users", self.base_url, self.target_realm);
-        self.post(&url, user_rep).await
+        self.create_resource(user_rep).await
     }
 
     pub async fn update_user(&self, id: &str, user_rep: &UserRepresentation) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/users/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.put(&url, user_rep).await
+        self.update_resource(id, user_rep).await
     }
 
     pub async fn delete_user(&self, id: &str) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/users/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.delete(&url).await
+        self.delete_resource::<UserRepresentation>(id).await
     }
 
     pub async fn get_authentication_flows(&self) -> Result<Vec<AuthenticationFlowRepresentation>> {
-        let url = format!(
-            "{}/admin/realms/{}/authentication/flows",
-            self.base_url, self.target_realm
-        );
-        self.get(&url).await
+        self.get_resources().await
     }
 
     pub async fn create_authentication_flow(
         &self,
         flow_rep: &AuthenticationFlowRepresentation,
     ) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/authentication/flows",
-            self.base_url, self.target_realm
-        );
-        self.post(&url, flow_rep).await
+        self.create_resource(flow_rep).await
     }
 
     pub async fn update_authentication_flow(
@@ -270,27 +224,16 @@ impl KeycloakClient {
         id: &str,
         flow_rep: &AuthenticationFlowRepresentation,
     ) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/authentication/flows/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.put(&url, flow_rep).await
+        self.update_resource(id, flow_rep).await
     }
 
     pub async fn delete_authentication_flow(&self, id: &str) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/authentication/flows/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.delete(&url).await
+        self.delete_resource::<AuthenticationFlowRepresentation>(id)
+            .await
     }
 
     pub async fn get_required_actions(&self) -> Result<Vec<RequiredActionProviderRepresentation>> {
-        let url = format!(
-            "{}/admin/realms/{}/authentication/required-actions",
-            self.base_url, self.target_realm
-        );
-        self.get(&url).await
+        self.get_resources().await
     }
 
     pub async fn update_required_action(
@@ -298,11 +241,7 @@ impl KeycloakClient {
         alias: &str,
         action_rep: &RequiredActionProviderRepresentation,
     ) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/authentication/required-actions/{}",
-            self.base_url, self.target_realm, alias
-        );
-        self.put(&url, action_rep).await
+        self.update_resource(alias, action_rep).await
     }
 
     pub async fn register_required_action(
@@ -335,27 +274,16 @@ impl KeycloakClient {
     }
 
     pub async fn delete_required_action(&self, alias: &str) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/authentication/required-actions/{}",
-            self.base_url, self.target_realm, alias
-        );
-        self.delete(&url).await
+        self.delete_resource::<RequiredActionProviderRepresentation>(alias)
+            .await
     }
 
     pub async fn get_components(&self) -> Result<Vec<ComponentRepresentation>> {
-        let url = format!(
-            "{}/admin/realms/{}/components",
-            self.base_url, self.target_realm
-        );
-        self.get(&url).await
+        self.get_resources().await
     }
 
     pub async fn create_component(&self, component_rep: &ComponentRepresentation) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/components",
-            self.base_url, self.target_realm
-        );
-        self.post(&url, component_rep).await
+        self.create_resource(component_rep).await
     }
 
     pub async fn update_component(
@@ -363,19 +291,11 @@ impl KeycloakClient {
         id: &str,
         component_rep: &ComponentRepresentation,
     ) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/components/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.put(&url, component_rep).await
+        self.update_resource(id, component_rep).await
     }
 
     pub async fn delete_component(&self, id: &str) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/components/{}",
-            self.base_url, self.target_realm, id
-        );
-        self.delete(&url).await
+        self.delete_resource::<ComponentRepresentation>(id).await
     }
 
     async fn get<T: for<'a> Deserialize<'a>>(&self, url: &str) -> Result<T> {

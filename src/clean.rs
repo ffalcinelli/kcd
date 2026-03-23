@@ -1,13 +1,9 @@
+use crate::utils::ui::{ACTION, ERROR, SUCCESS, WARN};
 use anyhow::{Context, Result};
-use console::{Emoji, style};
+use console::style;
 use dialoguer::{Confirm, theme::ColorfulTheme};
 use std::path::PathBuf;
 use tokio::fs;
-
-static ACTION: Emoji<'_, '_> = Emoji("🚀 ", ">> ");
-static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
-static SUCCESS: Emoji<'_, '_> = Emoji("🎉 ", "* ");
-static ERROR: Emoji<'_, '_> = Emoji("❌ ", "x ");
 
 pub async fn run(workspace_dir: PathBuf, yes: bool, realms_to_clean: &[String]) -> Result<()> {
     if !workspace_dir.exists() {

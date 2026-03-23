@@ -6,12 +6,10 @@ use app::cli as interactive_cli;
 use app::client::KeycloakClient;
 use app::inspect;
 use app::plan;
+use app::utils::ui::{ACTION, SEARCH};
 use app::validate;
 use clap::Parser;
-use console::{Emoji, style};
-
-static ACTION: Emoji<'_, '_> = Emoji("🚀 ", ">> ");
-static SEARCH: Emoji<'_, '_> = Emoji("🔍 ", "> ");
+use console::style;
 
 async fn init_client(cli: &Cli) -> Result<KeycloakClient> {
     let mut client = KeycloakClient::new(cli.server.clone());

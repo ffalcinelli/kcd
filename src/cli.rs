@@ -3,18 +3,14 @@ use crate::models::{
     CredentialRepresentation, GroupRepresentation, IdentityProviderRepresentation,
     RoleRepresentation, UserRepresentation,
 };
+use crate::utils::ui::{ERROR, INFO, SUCCESS_CREATE, WARN};
 use anyhow::{Context, Result};
-use console::{Emoji, style};
+use console::style;
 use dialoguer::{Confirm, Input, Password, Select, theme::ColorfulTheme};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs;
-
-static SUCCESS: Emoji<'_, '_> = Emoji("✨ ", "* ");
-static ERROR: Emoji<'_, '_> = Emoji("❌ ", "x ");
-static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
-static INFO: Emoji<'_, '_> = Emoji("💡 ", "i ");
 
 pub async fn run(workspace_dir: PathBuf) -> Result<()> {
     println!(
@@ -166,7 +162,7 @@ async fn create_role_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for role '{}' in realm '{}'.",
             name, realm
@@ -229,7 +225,7 @@ async fn create_group_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for group '{}' in realm '{}'.",
             name, realm
@@ -283,7 +279,7 @@ async fn create_idp_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for Identity Provider '{}' in realm '{}'.",
             alias, realm
@@ -352,7 +348,7 @@ async fn create_client_scope_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for client scope '{}' in realm '{}'.",
             name, realm
@@ -404,7 +400,7 @@ async fn rotate_keys_interactive(workspace_dir: &Path) -> Result<()> {
     if rotated_count > 0 {
         println!(
             "{} {}",
-            SUCCESS,
+            SUCCESS_CREATE,
             style(format!(
                 "Successfully generated {} rotated key component(s) for realm '{}'.",
                 rotated_count, realm
@@ -523,7 +519,7 @@ async fn create_client_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for client '{}' in realm '{}'.",
             client_id, realm
@@ -589,7 +585,7 @@ async fn change_user_password_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully updated YAML for user '{}' in realm '{}' with new password.",
             username, realm
@@ -708,7 +704,7 @@ async fn create_user_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for user '{}' in realm '{}'.",
             username, realm

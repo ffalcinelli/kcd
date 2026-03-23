@@ -55,6 +55,7 @@ $ kcd cli
 
 ## 🚀 Key Features
 
+- **Blazing Fast Performance**: Utilizes Rust's `tokio` for highly concurrent API interactions and parallel I/O operations.
 - **Declarative State**: Define your desired Keycloak state in human-readable YAML files.
 - **Inspect & Export**: Bootstrap your project by exporting existing Keycloak configurations to local files.
 - **Dry-Run Planning**: Preview exactly what changes will be applied before they happen.

@@ -4,17 +4,13 @@ use crate::models::{
     RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation,
     UserRepresentation,
 };
+use crate::utils::ui::{CHECK, SEARCH, SUCCESS, WARN};
 use anyhow::{Context, Result};
-use console::{Emoji, style};
+use console::style;
 use serde::de::DeserializeOwned;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tokio::fs;
-
-static CHECK: Emoji<'_, '_> = Emoji("✅ ", "√ ");
-static SEARCH: Emoji<'_, '_> = Emoji("🔍 ", "> ");
-static SUCCESS: Emoji<'_, '_> = Emoji("🎉 ", "* ");
-static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
 
 async fn read_yaml_files<T: DeserializeOwned>(
     dir: &Path,

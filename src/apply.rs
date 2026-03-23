@@ -6,18 +6,14 @@ use crate::models::{
     UserRepresentation,
 };
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::{ACTION, SUCCESS_CREATE, SUCCESS_UPDATE, WARN};
 use anyhow::{Context, Result};
-use console::{Emoji, style};
+use console::style;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
 use tokio::task::JoinSet;
-
-static ACTION: Emoji<'_, '_> = Emoji("🚀 ", ">> ");
-static SUCCESS_CREATE: Emoji<'_, '_> = Emoji("✨ ", "+ ");
-static SUCCESS_UPDATE: Emoji<'_, '_> = Emoji("🔄 ", "~ ");
-static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
 
 pub async fn run(
     client: &KeycloakClient,
