@@ -1,5 +1,5 @@
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::post};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tokio::net::TcpListener;
 
 #[derive(Deserialize, Debug)]
@@ -10,12 +10,6 @@ pub struct TokenRequest {
     pub username: Option<String>,
     pub password: Option<String>,
     pub client_secret: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct TokenResponse {
-    pub access_token: String,
-    pub expires_in: i32,
 }
 
 pub async fn start_mock_server() -> String {

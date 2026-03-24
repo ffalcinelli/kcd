@@ -62,6 +62,8 @@ pub async fn run(workspace_dir: PathBuf, yes: bool, realms_to_clean: &[String]) 
         }
     }
 
+    let mut join_set = tokio::task::JoinSet::new();
+
     for target in targets {
         if target == workspace_dir && realms_to_clean.is_empty() {
             println!(
@@ -72,15 +74,19 @@ pub async fn run(workspace_dir: PathBuf, yes: bool, realms_to_clean: &[String]) 
             let mut entries = fs::read_dir(&workspace_dir).await?;
             while let Some(entry) = entries.next_entry().await? {
                 let path = entry.path();
-                if path.is_dir() {
-                    fs::remove_dir_all(&path)
-                        .await
-                        .context(format!("Failed to remove dir {:?}", path))?;
-                } else {
-                    fs::remove_file(&path)
-                        .await
-                        .context(format!("Failed to remove file {:?}", path))?;
-                }
+                let file_type = entry.file_type().await?;
+                join_set.spawn(async move {
+                    if file_type.is_dir() {
+                        fs::remove_dir_all(&path)
+                            .await
+                            .context(format!("Failed to remove dir {:?}", path))?;
+                    } else {
+                        fs::remove_file(&path)
+                            .await
+                            .context(format!("Failed to remove file {:?}", path))?;
+                    }
+                    Ok::<(), anyhow::Error>(())
+                });
             }
         } else {
             println!(
@@ -88,16 +94,24 @@ pub async fn run(workspace_dir: PathBuf, yes: bool, realms_to_clean: &[String]) 
                 ACTION,
                 style(format!("Cleaning realm directory {:?}", target)).cyan()
             );
-            if target.is_dir() {
-                fs::remove_dir_all(&target)
-                    .await
-                    .context(format!("Failed to remove dir {:?}", target))?;
-            } else {
-                fs::remove_file(&target)
-                    .await
-                    .context(format!("Failed to remove file {:?}", target))?;
-            }
+            join_set.spawn(async move {
+                let metadata = fs::metadata(&target).await?;
+                if metadata.is_dir() {
+                    fs::remove_dir_all(&target)
+                        .await
+                        .context(format!("Failed to remove dir {:?}", target))?;
+                } else {
+                    fs::remove_file(&target)
+                        .await
+                        .context(format!("Failed to remove file {:?}", target))?;
+                }
+                Ok::<(), anyhow::Error>(())
+            });
         }
+    }
+
+    while let Some(res) = join_set.join_next().await {
+        res??;
     }
 
     println!(

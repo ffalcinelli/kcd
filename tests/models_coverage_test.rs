@@ -46,7 +46,7 @@ fn test_models_resource_trait() {
         service_accounts_enabled: None,
         extra: HashMap::new(),
     };
-    assert_eq!(client.get_identity(), Some("id2".to_string()));
+    assert_eq!(client.get_identity(), Some("cid".to_string()));
     assert_eq!(client.get_name(), "cid".to_string());
 
     let role = RoleRepresentation {
@@ -58,7 +58,7 @@ fn test_models_resource_trait() {
         client_role: false,
         extra: HashMap::new(),
     };
-    assert_eq!(role.get_identity(), Some("id3".to_string()));
+    assert_eq!(role.get_identity(), Some("rname".to_string()));
     assert_eq!(role.get_name(), "rname".to_string());
 
     let group = GroupRepresentation {
@@ -68,7 +68,7 @@ fn test_models_resource_trait() {
         sub_groups: None,
         extra: HashMap::new(),
     };
-    assert_eq!(group.get_identity(), Some("id4".to_string()));
+    assert_eq!(group.get_identity(), Some("gname".to_string()));
     assert_eq!(group.get_name(), "gname".to_string());
 
     let user = UserRepresentation {
@@ -82,7 +82,7 @@ fn test_models_resource_trait() {
         credentials: None,
         extra: HashMap::new(),
     };
-    assert_eq!(user.get_identity(), Some("id5".to_string()));
+    assert_eq!(user.get_identity(), Some("uname".to_string()));
     assert_eq!(user.get_name(), "uname".to_string());
 
     let scope = ClientScopeRepresentation {
@@ -93,7 +93,7 @@ fn test_models_resource_trait() {
         attributes: None,
         extra: HashMap::new(),
     };
-    assert_eq!(scope.get_identity(), Some("id6".to_string()));
+    assert_eq!(scope.get_identity(), Some("sname".to_string()));
     assert_eq!(scope.get_name(), "sname".to_string());
 
     let flow = AuthenticationFlowRepresentation {
@@ -106,7 +106,7 @@ fn test_models_resource_trait() {
         authentication_executions: None,
         extra: HashMap::new(),
     };
-    assert_eq!(flow.get_identity(), Some("id7".to_string()));
+    assert_eq!(flow.get_identity(), Some("falias".to_string()));
     assert_eq!(flow.get_name(), "falias".to_string());
 
     let action = RequiredActionProviderRepresentation {
@@ -132,6 +132,6 @@ fn test_models_resource_trait() {
         config: None,
         extra: HashMap::new(),
     };
-    assert_eq!(comp.get_identity(), Some("id8".to_string()));
+    assert_eq!(comp.get_identity(), Some("cname".to_string()));
     assert_eq!(comp.get_name(), "cname".to_string());
 }

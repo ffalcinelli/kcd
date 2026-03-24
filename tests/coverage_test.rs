@@ -70,7 +70,7 @@ async fn test_plan_edge_cases() {
 
     // 6. Test with invalid YAML
     fs::write(realm_dir.join("invalid.yaml"), "invalid: [yaml").unwrap();
-    let res = plan::run(
+    let _res = plan::run(
         &client,
         workspace_dir.clone(),
         false,
@@ -258,4 +258,38 @@ async fn test_clean_edge_cases() {
         .await
         .unwrap();
     assert!(!file_path.exists());
+}
+
+#[tokio::test]
+async fn test_validate_edge_cases() {
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+
+    // 1. Test run with non-existent directory
+    let res = app::validate::run(workspace_dir.join("non-existent"), &[]).await;
+    assert!(res.is_err());
+
+    // 2. Test run with empty directory (no realms)
+    fs::create_dir_all(&workspace_dir).unwrap();
+    let res = app::validate::run(workspace_dir.clone(), &[]).await;
+    assert!(res.is_ok());
+
+    // 3. Test auto-discovery of realms for validation
+    let realm_dir = workspace_dir.join("test-realm");
+    fs::create_dir(&realm_dir).unwrap();
+    let realm = RealmRepresentation {
+        realm: "test-realm".to_string(),
+        enabled: Some(true),
+        display_name: Some("Test Realm".to_string()),
+        extra: std::collections::HashMap::new(),
+    };
+    fs::write(
+        realm_dir.join("realm.yaml"),
+        serde_yaml::to_string(&realm).unwrap(),
+    )
+    .unwrap();
+
+    app::validate::run(workspace_dir.clone(), &[])
+        .await
+        .unwrap();
 }

@@ -8,42 +8,57 @@ use anyhow::{Context, Result};
 use console::{Emoji, style};
 use serde::de::DeserializeOwned;
 use std::collections::HashSet;
-use std::fs;
 use std::path::{Path, PathBuf};
+use tokio::fs;
+use tokio::task::JoinSet;
 
 static CHECK: Emoji<'_, '_> = Emoji("✅ ", "√ ");
 static SEARCH: Emoji<'_, '_> = Emoji("🔍 ", "> ");
 static SUCCESS: Emoji<'_, '_> = Emoji("🎉 ", "* ");
 static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
 
-fn read_yaml_files<T: DeserializeOwned>(dir: &Path, file_type: &str) -> Result<Vec<(PathBuf, T)>> {
+async fn read_yaml_files<T: DeserializeOwned + Send + 'static>(
+    dir: &Path,
+    file_type: &str,
+) -> Result<Vec<(PathBuf, T)>> {
     let mut results = Vec::new();
-    if dir.exists() {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
+    if fs::try_exists(dir).await? {
+        let mut entries = fs::read_dir(dir).await?;
+        let mut join_set = JoinSet::new();
+        let file_type_str = file_type.to_string();
+
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)
-                    .context(format!("Failed to read {} file {:?}", file_type, path))?;
-                let item: T = serde_yaml::from_str(&content)
-                    .context(format!("Failed to parse {} file {:?}", file_type, path))?;
-                results.push((path, item));
+                let ft = file_type_str.clone();
+                join_set.spawn(async move {
+                    let content = fs::read_to_string(&path)
+                        .await
+                        .context(format!("Failed to read {} file {:?}", ft, path))?;
+                    let item: T = serde_yaml::from_str(&content)
+                        .context(format!("Failed to parse {} file {:?}", ft, path))?;
+                    Ok::<(PathBuf, T), anyhow::Error>((path, item))
+                });
             }
+        }
+
+        while let Some(res) = join_set.join_next().await {
+            results.push(res??);
         }
     }
     Ok(results)
 }
 
-pub fn run(workspace_dir: PathBuf, realms_to_validate: &[String]) -> Result<()> {
-    if !workspace_dir.exists() {
+pub async fn run(workspace_dir: PathBuf, realms_to_validate: &[String]) -> Result<()> {
+    if !fs::try_exists(&workspace_dir).await? {
         anyhow::bail!("Input directory {:?} does not exist", workspace_dir);
     }
 
     let realms = if realms_to_validate.is_empty() {
         let mut dirs = Vec::new();
-        for entry in fs::read_dir(&workspace_dir)? {
-            let entry = entry?;
-            if entry.file_type()?.is_dir() {
+        let mut entries = fs::read_dir(&workspace_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            if entry.file_type().await?.is_dir() {
                 dirs.push(entry.file_name().to_string_lossy().to_string());
             }
         }
@@ -74,7 +89,7 @@ pub fn run(workspace_dir: PathBuf, realms_to_validate: &[String]) -> Result<()> 
                 .bold()
         );
         let realm_dir = workspace_dir.join(realm_name);
-        validate_realm(realm_dir)?;
+        validate_realm(realm_dir).await?;
         println!(
             "  {} {}",
             SUCCESS,
@@ -86,13 +101,15 @@ pub fn run(workspace_dir: PathBuf, realms_to_validate: &[String]) -> Result<()> 
     Ok(())
 }
 
-fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
+async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     // 1. Validate Realm
     let realm_path = workspace_dir.join("realm.yaml");
-    if !realm_path.exists() {
+    if !fs::try_exists(&realm_path).await? {
         anyhow::bail!("realm.yaml not found in {:?}", workspace_dir);
     }
-    let realm_content = fs::read_to_string(&realm_path).context("Failed to read realm.yaml")?;
+    let realm_content = fs::read_to_string(&realm_path)
+        .await
+        .context("Failed to read realm.yaml")?;
     let realm: RealmRepresentation =
         serde_yaml::from_str(&realm_content).context("Failed to parse realm.yaml")?;
 
@@ -109,7 +126,7 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     // 2. Validate Roles
     let roles_dir = workspace_dir.join("roles");
     let mut role_names = HashSet::new();
-    let roles: Vec<(PathBuf, RoleRepresentation)> = read_yaml_files(&roles_dir, "role")?;
+    let roles: Vec<(PathBuf, RoleRepresentation)> = read_yaml_files(&roles_dir, "role").await?;
 
     for (path, role) in &roles {
         if role.name.is_empty() {
@@ -129,7 +146,8 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
 
     // 3. Validate Clients
     let clients_dir = workspace_dir.join("clients");
-    let clients: Vec<(PathBuf, ClientRepresentation)> = read_yaml_files(&clients_dir, "client")?;
+    let clients: Vec<(PathBuf, ClientRepresentation)> =
+        read_yaml_files(&clients_dir, "client").await?;
 
     for (path, client) in &clients {
         if client.client_id.is_none() || client.client_id.as_deref().unwrap_or("").is_empty() {
@@ -145,7 +163,8 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
 
     // 4. Validate Identity Providers
     let idps_dir = workspace_dir.join("identity-providers");
-    let idps: Vec<(PathBuf, IdentityProviderRepresentation)> = read_yaml_files(&idps_dir, "idp")?;
+    let idps: Vec<(PathBuf, IdentityProviderRepresentation)> =
+        read_yaml_files(&idps_dir, "idp").await?;
 
     for (path, idp) in &idps {
         if idp.alias.is_none() || idp.alias.as_deref().unwrap_or("").is_empty() {
@@ -168,7 +187,7 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     // 5. Validate Client Scopes
     let scopes_dir = workspace_dir.join("client-scopes");
     let scopes: Vec<(PathBuf, ClientScopeRepresentation)> =
-        read_yaml_files(&scopes_dir, "client-scope")?;
+        read_yaml_files(&scopes_dir, "client-scope").await?;
     for (path, scope) in &scopes {
         if scope.name.as_deref().unwrap_or("").is_empty() {
             anyhow::bail!("Client Scope name is missing or empty in {:?}", path);
@@ -183,7 +202,7 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
 
     // 6. Validate Groups
     let groups_dir = workspace_dir.join("groups");
-    let groups: Vec<(PathBuf, GroupRepresentation)> = read_yaml_files(&groups_dir, "group")?;
+    let groups: Vec<(PathBuf, GroupRepresentation)> = read_yaml_files(&groups_dir, "group").await?;
     for (path, group) in &groups {
         if group.name.as_deref().unwrap_or("").is_empty() {
             anyhow::bail!("Group name is missing or empty in {:?}", path);
@@ -198,7 +217,7 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
 
     // 7. Validate Users
     let users_dir = workspace_dir.join("users");
-    let users: Vec<(PathBuf, UserRepresentation)> = read_yaml_files(&users_dir, "user")?;
+    let users: Vec<(PathBuf, UserRepresentation)> = read_yaml_files(&users_dir, "user").await?;
     for (path, user) in &users {
         if user.username.as_deref().unwrap_or("").is_empty() {
             anyhow::bail!("User username is missing or empty in {:?}", path);
@@ -214,7 +233,7 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     // 8. Validate Authentication Flows
     let flows_dir = workspace_dir.join("authentication-flows");
     let flows: Vec<(PathBuf, AuthenticationFlowRepresentation)> =
-        read_yaml_files(&flows_dir, "authentication-flow")?;
+        read_yaml_files(&flows_dir, "authentication-flow").await?;
     for (path, flow) in &flows {
         if flow.alias.as_deref().unwrap_or("").is_empty() {
             anyhow::bail!(
@@ -233,7 +252,7 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     // 9. Validate Required Actions
     let actions_dir = workspace_dir.join("required-actions");
     let actions: Vec<(PathBuf, RequiredActionProviderRepresentation)> =
-        read_yaml_files(&actions_dir, "required-action")?;
+        read_yaml_files(&actions_dir, "required-action").await?;
     for (path, action) in &actions {
         if action.alias.as_deref().unwrap_or("").is_empty() {
             anyhow::bail!("Required Action alias is missing or empty in {:?}", path);
@@ -255,9 +274,9 @@ fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     // 10. Validate Components and Keys
     for dir_name in ["components", "keys"].iter() {
         let dir = workspace_dir.join(dir_name);
-        if fs::exists(&dir)? {
+        if fs::try_exists(&dir).await? {
             let components: Vec<(PathBuf, ComponentRepresentation)> =
-                read_yaml_files(&dir, dir_name)?;
+                read_yaml_files(&dir, dir_name).await?;
             for (path, component) in &components {
                 if let Some(name) = &component.name
                     && name.is_empty()
