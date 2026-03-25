@@ -1,5 +1,5 @@
-use super::SUCCESS;
 use crate::models::GroupRepresentation;
+use crate::utils::ui::SUCCESS_CREATE;
 use anyhow::{Context, Result};
 use console::style;
 use dialoguer::{Input, theme::ColorfulTheme};
@@ -22,7 +22,7 @@ pub async fn create_group_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for group '{}' in realm '{}'.",
             name, realm
@@ -41,12 +41,12 @@ pub async fn create_group_yaml(workspace_dir: &Path, realm: &str, name: &str) ->
         extra: HashMap::new(),
     };
 
-    let groups_dir = workspace_dir.join(realm).join("groups");
-    fs::create_dir_all(&groups_dir)
+    let realm_dir = workspace_dir.join(realm).join("groups");
+    fs::create_dir_all(&realm_dir)
         .await
         .context("Failed to create groups directory")?;
 
-    let file_path = groups_dir.join(format!("{}.yaml", name));
+    let file_path = realm_dir.join(format!("{}.yaml", name));
     let yaml = serde_yaml::to_string(&group).context("Failed to serialize group to YAML")?;
 
     fs::write(&file_path, yaml)
@@ -69,10 +69,15 @@ mod tests {
         create_group_yaml(workspace_dir, "master", "my-group")
             .await
             .unwrap();
+
         let file_path = workspace_dir
             .join("master")
             .join("groups")
             .join("my-group.yaml");
         assert!(file_path.exists());
+
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        let group: GroupRepresentation = serde_yaml::from_str(&content).unwrap();
+        assert_eq!(group.name.as_deref(), Some("my-group"));
     }
 }

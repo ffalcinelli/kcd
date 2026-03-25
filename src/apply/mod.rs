@@ -10,17 +10,14 @@ pub mod scopes;
 pub mod users;
 
 use crate::client::KeycloakClient;
+use crate::utils::ui::{ACTION, SUCCESS_CREATE, SUCCESS_UPDATE, WARN};
 use anyhow::Result;
-use console::{Emoji, style};
+use console::style;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
-
-pub static ACTION: Emoji<'_, '_> = Emoji("🚀 ", ">> ");
-pub static SUCCESS_CREATE: Emoji<'_, '_> = Emoji("✨ ", "+ ");
-pub static SUCCESS_UPDATE: Emoji<'_, '_> = Emoji("🔄 ", "~ ");
-pub static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
+use tokio::task::JoinSet;
 
 pub async fn run(
     client: &KeycloakClient,
@@ -117,6 +114,7 @@ pub async fn run(
             realm_dir,
             Arc::clone(&env_vars),
             Arc::clone(&planned_files),
+            &realm_name,
         )
         .await?;
     }
@@ -134,86 +132,215 @@ async fn apply_single_realm(
     workspace_dir: PathBuf,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     realm::apply_realm(
         client,
         &workspace_dir,
         Arc::clone(&env_vars),
         Arc::clone(&planned_files),
-    )
-    .await?;
-    roles::apply_roles(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    idps::apply_identity_providers(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    clients::apply_clients(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    scopes::apply_client_scopes(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    groups::apply_groups(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    users::apply_users(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    flows::apply_authentication_flows(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    actions::apply_required_actions(
-        client,
-        &workspace_dir,
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    components::apply_components_or_keys(
-        client,
-        &workspace_dir,
-        "components",
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
-    )
-    .await?;
-    components::apply_components_or_keys(
-        client,
-        &workspace_dir,
-        "keys",
-        Arc::clone(&env_vars),
-        Arc::clone(&planned_files),
+        realm_name,
     )
     .await?;
 
+    let mut set = JoinSet::new();
+
+    // Roles
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            roles::apply_roles(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Identity Providers
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            idps::apply_identity_providers(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Clients
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            clients::apply_clients(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Client Scopes
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            scopes::apply_client_scopes(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Groups
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            groups::apply_groups(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Users
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            users::apply_users(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Authentication Flows
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            flows::apply_authentication_flows(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Required Actions
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            actions::apply_required_actions(
+                &client,
+                &workspace_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Components
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            components::apply_components_or_keys(
+                &client,
+                &workspace_dir,
+                "components",
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    // Keys
+    {
+        let client = client.clone();
+        let workspace_dir = workspace_dir.clone();
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            components::apply_components_or_keys(
+                &client,
+                &workspace_dir,
+                "keys",
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    while let Some(res) = set.join_next().await {
+        res??;
+    }
+
     Ok(())
 }
+

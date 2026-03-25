@@ -1,6 +1,7 @@
 use crate::client::KeycloakClient;
 use crate::models::{ClientScopeRepresentation, KeycloakResource};
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::{SUCCESS_CREATE, SUCCESS_UPDATE};
 use anyhow::{Context, Result};
 use console::style;
 use std::collections::{HashMap, HashSet};
@@ -9,18 +10,20 @@ use std::sync::Arc;
 use tokio::fs as async_fs;
 use tokio::task::JoinSet;
 
-use super::{SUCCESS_CREATE, SUCCESS_UPDATE};
-
 pub async fn apply_client_scopes(
     client: &KeycloakClient,
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 5. Apply Client Scopes
     let scopes_dir = workspace_dir.join("client-scopes");
     if async_fs::try_exists(&scopes_dir).await? {
-        let existing_scopes = client.get_client_scopes().await?;
+        let existing_scopes = client
+            .get_client_scopes()
+            .await
+            .with_context(|| format!("Failed to get client scopes for realm '{}'", realm_name))?;
         let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
             .into_iter()
             .filter_map(|s| s.get_identity().map(|id| (id, s)))
@@ -41,6 +44,7 @@ pub async fn apply_client_scopes(
                 let client = client.clone();
                 let existing_scopes_map = Arc::clone(&existing_scopes_map);
                 let env_vars = Arc::clone(&env_vars);
+                let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
@@ -59,10 +63,13 @@ pub async fn apply_client_scopes(
                             client
                                 .update_client_scope(id, &scope_rep)
                                 .await
-                                .context(format!(
-                                    "Failed to update client scope {}",
-                                    scope_rep.get_name()
-                                ))?;
+                                .with_context(|| {
+                                    format!(
+                                        "Failed to update client scope '{}' in realm '{}'",
+                                        scope_rep.get_name(),
+                                        realm_name
+                                    )
+                                })?;
                             println!(
                                 "  {} {}",
                                 SUCCESS_UPDATE,
@@ -75,10 +82,13 @@ pub async fn apply_client_scopes(
                         client
                             .create_client_scope(&scope_rep)
                             .await
-                            .context(format!(
-                                "Failed to create client scope {}",
-                                scope_rep.get_name()
-                            ))?;
+                            .with_context(|| {
+                                format!(
+                                    "Failed to create client scope '{}' in realm '{}'",
+                                    scope_rep.get_name(),
+                                    realm_name
+                                )
+                            })?;
                         println!(
                             "  {} {}",
                             SUCCESS_CREATE,
@@ -190,6 +200,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());
@@ -211,6 +222,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());

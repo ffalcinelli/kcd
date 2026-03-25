@@ -1,5 +1,5 @@
-use super::{SUCCESS, WARN};
 use crate::models::{CredentialRepresentation, UserRepresentation};
+use crate::utils::ui::{SUCCESS_CREATE, WARN};
 use anyhow::{Context, Result};
 use console::style;
 use dialoguer::{Input, Password, theme::ColorfulTheme};
@@ -27,7 +27,7 @@ pub async fn change_user_password_interactive(workspace_dir: &Path) -> Result<()
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully updated YAML for user '{}' in realm '{}' with new password.",
             username, realm
@@ -146,7 +146,7 @@ pub async fn create_user_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for user '{}' in realm '{}'.",
             username, realm

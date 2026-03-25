@@ -16,6 +16,7 @@ pub async fn plan_realm(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let realm_path = workspace_dir.join("realm.yaml");
     if async_fs::try_exists(&realm_path).await? {
@@ -35,7 +36,9 @@ pub async fn plan_realm(
                 if e.to_string().contains("404") {
                     None
                 } else {
-                    return Err(e);
+                    return Err(e).with_context(|| {
+                        format!("Failed to get realm '{}' from Keycloak", realm_name)
+                    });
                 }
             }
         };

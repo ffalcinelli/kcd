@@ -16,11 +16,14 @@ pub async fn apply_required_actions(
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 9. Apply Required Actions
     let actions_dir = workspace_dir.join("required-actions");
     if async_fs::try_exists(&actions_dir).await? {
-        let existing_actions = client.get_required_actions().await?;
+        let existing_actions = client.get_required_actions().await.with_context(|| {
+            format!("Failed to get required actions for realm '{}'", realm_name)
+        })?;
         let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
             existing_actions
                 .into_iter()
@@ -42,6 +45,7 @@ pub async fn apply_required_actions(
                 let client = client.clone();
                 let existing_actions_map = Arc::clone(&existing_actions_map);
                 let env_vars = Arc::clone(&env_vars);
+                let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
@@ -59,10 +63,13 @@ pub async fn apply_required_actions(
                         client
                             .update_required_action(&identity, &action_rep)
                             .await
-                            .context(format!(
-                                "Failed to update required action {}",
-                                action_rep.get_name()
-                            ))?;
+                            .with_context(|| {
+                                format!(
+                                    "Failed to update required action '{}' in realm '{}'",
+                                    action_rep.get_name(),
+                                    realm_name
+                                )
+                            })?;
                         println!(
                             "  {} {}",
                             SUCCESS_UPDATE,
@@ -74,17 +81,23 @@ pub async fn apply_required_actions(
                         client
                             .register_required_action(&action_rep)
                             .await
-                            .context(format!(
-                                "Failed to register required action {}",
-                                action_rep.get_name()
-                            ))?;
+                            .with_context(|| {
+                                format!(
+                                    "Failed to register required action '{}' in realm '{}'",
+                                    action_rep.get_name(),
+                                    realm_name
+                                )
+                            })?;
                         client
                             .update_required_action(&identity, &action_rep)
                             .await
-                            .context(format!(
-                                "Failed to configure registered required action {}",
-                                action_rep.get_name()
-                            ))?;
+                            .with_context(|| {
+                                format!(
+                                    "Failed to configure registered required action '{}' in realm '{}'",
+                                    action_rep.get_name(),
+                                    realm_name
+                                )
+                            })?;
                         println!(
                             "  {} {}",
                             SUCCESS_CREATE,
@@ -205,6 +218,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());
@@ -230,6 +244,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());
@@ -255,6 +270,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());
@@ -272,6 +288,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());

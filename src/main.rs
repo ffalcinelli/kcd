@@ -10,6 +10,7 @@ async fn main() -> Result<()> {
 
     let mut cli = Cli::parse();
 
+    // Load skipped fields from environment if not provided
     if cli.password.is_none() {
         cli.password = std::env::var("KEYCLOAK_PASSWORD").ok();
     }

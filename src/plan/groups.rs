@@ -1,8 +1,8 @@
 use crate::client::KeycloakClient;
 use crate::models::{GroupRepresentation, KeycloakResource};
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::SPARKLE;
 use anyhow::{Context, Result};
-use console::Emoji;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,10 +17,14 @@ pub async fn plan_groups(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let groups_dir = workspace_dir.join("groups");
     if async_fs::try_exists(&groups_dir).await? {
-        let existing_groups = client.get_groups().await?;
+        let existing_groups = client
+            .get_groups()
+            .await
+            .with_context(|| format!("Failed to get groups for realm '{}'", realm_name))?;
         let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
             .into_iter()
             .filter_map(|g| g.get_identity().map(|id| (id, g)))
@@ -76,7 +80,7 @@ pub async fn plan_groups(
             } else {
                 println!(
                     "\n{} Will create Group: {}",
-                    Emoji("✨", ""),
+                    SPARKLE,
                     local_group.get_name()
                 );
                 print_diff(

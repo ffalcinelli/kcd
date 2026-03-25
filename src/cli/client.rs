@@ -1,5 +1,5 @@
-use super::SUCCESS;
 use crate::models::{ClientRepresentation, ClientScopeRepresentation};
+use crate::utils::ui::SUCCESS_CREATE;
 use anyhow::{Context, Result};
 use console::style;
 use dialoguer::{Confirm, Input, theme::ColorfulTheme};
@@ -27,7 +27,7 @@ pub async fn create_client_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for client '{}' in realm '{}'.",
             client_id, realm
@@ -93,7 +93,7 @@ pub async fn create_client_scope_interactive(workspace_dir: &Path) -> Result<()>
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for client scope '{}' in realm '{}'.",
             name, realm

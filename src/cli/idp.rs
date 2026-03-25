@@ -1,5 +1,5 @@
-use super::SUCCESS;
 use crate::models::IdentityProviderRepresentation;
+use crate::utils::ui::SUCCESS_CREATE;
 use anyhow::{Context, Result};
 use console::style;
 use dialoguer::{Input, theme::ColorfulTheme};
@@ -15,11 +15,11 @@ pub async fn create_idp_interactive(workspace_dir: &Path) -> Result<()> {
         .interact_text()?;
 
     let alias: String = Input::with_theme(&theme)
-        .with_prompt("Alias (e.g., google)")
+        .with_prompt("IDP Alias (e.g. google, github)")
         .interact_text()?;
 
     let provider_id: String = Input::with_theme(&theme)
-        .with_prompt("Provider ID (e.g., google, github, oidc)")
+        .with_prompt("Provider ID (e.g. oidc, saml, google)")
         .default(alias.clone())
         .interact_text()?;
 
@@ -27,7 +27,7 @@ pub async fn create_idp_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for Identity Provider '{}' in realm '{}'.",
             alias, realm
@@ -61,12 +61,12 @@ pub async fn create_idp_yaml(
         extra: HashMap::new(),
     };
 
-    let idp_dir = workspace_dir.join(realm).join("identity-providers");
-    fs::create_dir_all(&idp_dir)
+    let realm_dir = workspace_dir.join(realm).join("identity-providers");
+    fs::create_dir_all(&realm_dir)
         .await
         .context("Failed to create identity-providers directory")?;
 
-    let file_path = idp_dir.join(format!("{}.yaml", alias));
+    let file_path = realm_dir.join(format!("{}.yaml", alias));
     let yaml = serde_yaml::to_string(&idp).context("Failed to serialize IDP to YAML")?;
 
     fs::write(&file_path, yaml)
@@ -89,10 +89,15 @@ mod tests {
         create_idp_yaml(workspace_dir, "master", "google", "google")
             .await
             .unwrap();
+
         let file_path = workspace_dir
             .join("master")
             .join("identity-providers")
             .join("google.yaml");
         assert!(file_path.exists());
+
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        let idp: IdentityProviderRepresentation = serde_yaml::from_str(&content).unwrap();
+        assert_eq!(idp.alias.as_deref(), Some("google"));
     }
 }

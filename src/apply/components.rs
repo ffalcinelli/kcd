@@ -17,10 +17,16 @@ pub async fn apply_components_or_keys(
     dir_name: &str,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     let components_dir = workspace_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
-        let existing_components = client.get_components().await?;
+        let existing_components = client.get_components().await.with_context(|| {
+            format!(
+                "Failed to get components/keys for realm '{}'",
+                realm_name
+            )
+        })?;
         let mut by_identity: HashMap<String, ComponentRepresentation> = HashMap::new();
         type ComponentKey = (
             Option<String>,
@@ -60,6 +66,7 @@ pub async fn apply_components_or_keys(
                 let by_identity = Arc::clone(&by_identity);
                 let by_details = Arc::clone(&by_details);
                 let env_vars = Arc::clone(&env_vars);
+                let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
@@ -93,10 +100,13 @@ pub async fn apply_components_or_keys(
                             client
                                 .update_component(id, &component_rep)
                                 .await
-                                .context(format!(
-                                    "Failed to update component {}",
-                                    component_rep.get_name()
-                                ))?;
+                                .with_context(|| {
+                                    format!(
+                                        "Failed to update component '{}' in realm '{}'",
+                                        component_rep.get_name(),
+                                        realm_name
+                                    )
+                                })?;
                             println!(
                                 "  {} {}",
                                 SUCCESS_UPDATE,
@@ -109,10 +119,13 @@ pub async fn apply_components_or_keys(
                         client
                             .create_component(&component_rep)
                             .await
-                            .context(format!(
-                                "Failed to create component {}",
-                                component_rep.get_name()
-                            ))?;
+                            .with_context(|| {
+                                format!(
+                                    "Failed to create component '{}' in realm '{}'",
+                                    component_rep.get_name(),
+                                    realm_name
+                                )
+                            })?;
                         println!(
                             "  {} {}",
                             SUCCESS_CREATE,
@@ -228,6 +241,7 @@ mod tests {
             "components",
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());
@@ -250,6 +264,7 @@ mod tests {
             "components",
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());

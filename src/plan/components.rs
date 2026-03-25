@@ -1,8 +1,9 @@
 use crate::client::KeycloakClient;
 use crate::models::{ComponentRepresentation, KeycloakResource};
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::{SPARKLE, WARN};
 use anyhow::{Context, Result};
-use console::{Emoji, style};
+use console::style;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -19,10 +20,14 @@ pub async fn plan_components_or_keys(
     dir_name: &str,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let components_dir = workspace_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
-        let existing_components = client.get_components().await?;
+        let existing_components = client
+            .get_components()
+            .await
+            .with_context(|| format!("Failed to get components for realm '{}'", realm_name))?;
         let mut by_identity: HashMap<String, ComponentRepresentation> = HashMap::new();
         type ComponentKey = (
             Option<String>,
@@ -57,14 +62,15 @@ pub async fn plan_components_or_keys(
                 let env_vars = env_vars.clone();
                 let by_identity = by_identity.clone();
                 let by_details = by_details.clone();
+                let realm_name = realm_name.to_string();
 
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
-                        .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+                        .with_context(|| format!("Failed to parse YAML file {:?} in realm '{}'", path, realm_name))?;
                     substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                     let local_component: ComponentRepresentation = serde_json::from_value(val)
-                        .with_context(|| format!("Failed to deserialize YAML file: {:?}", path))?;
+                        .with_context(|| format!("Failed to deserialize YAML file {:?} in realm '{}'", path, realm_name))?;
 
                     let remote = if let Some(identity) = local_component.get_identity() {
                         by_identity
@@ -124,7 +130,7 @@ pub async fn plan_components_or_keys(
             } else {
                 println!(
                     "\n{} Will create Component: {}",
-                    Emoji("✨", ""),
+                    SPARKLE,
                     local_component.get_name()
                 );
                 let prefix = if dir_name == "keys" {
@@ -159,7 +165,7 @@ pub async fn plan_components_or_keys(
     Ok(())
 }
 
-pub async fn check_keys_drift(client: &KeycloakClient, changes_only: bool) -> Result<()> {
+pub async fn check_keys_drift(client: &KeycloakClient, changes_only: bool, realm_name: &str) -> Result<()> {
     if !changes_only {
         return Ok(());
     }
@@ -184,9 +190,10 @@ pub async fn check_keys_drift(client: &KeycloakClient, changes_only: bool) -> Re
                     if valid_to > 0 && valid_to - now < thirty_days {
                         let provider_id = key.provider_id.as_deref().unwrap_or("unknown");
                         println!(
-                            "{} Warning: Active key (providerId: {}) is near expiration or expired! Consider rotating keys.",
-                            Emoji("⚠️", ""),
-                            style(provider_id).yellow()
+                            "{} Warning: Active key (providerId: {}) in realm '{}' is near expiration or expired! Consider rotating keys.",
+                            WARN,
+                            style(provider_id).yellow(),
+                            realm_name
                         );
                     }
                 }

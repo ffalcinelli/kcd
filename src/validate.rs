@@ -4,18 +4,14 @@ use crate::models::{
     RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation,
     UserRepresentation,
 };
+use crate::utils::ui::{CHECK, SEARCH, SUCCESS, WARN};
 use anyhow::{Context, Result};
-use console::{Emoji, style};
+use console::style;
 use serde::de::DeserializeOwned;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::task::JoinSet;
-
-static CHECK: Emoji<'_, '_> = Emoji("✅ ", "√ ");
-static SEARCH: Emoji<'_, '_> = Emoji("🔍 ", "> ");
-static SUCCESS: Emoji<'_, '_> = Emoji("🎉 ", "* ");
-static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
 
 async fn read_yaml_files<T: DeserializeOwned + Send + 'static>(
     dir: &Path,
@@ -278,10 +274,10 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
             let components: Vec<(PathBuf, ComponentRepresentation)> =
                 read_yaml_files(&dir, dir_name).await?;
             for (path, component) in &components {
-                if let Some(name) = &component.name
-                    && name.is_empty()
-                {
-                    anyhow::bail!("Component name is empty in {:?}", path);
+                if let Some(name) = &component.name {
+                    if name.is_empty() {
+                        anyhow::bail!("Component name is empty in {:?}", path);
+                    }
                 }
                 if component.provider_id.as_deref().unwrap_or("").is_empty() {
                     anyhow::bail!("Component providerId is missing or empty in {:?}", path);

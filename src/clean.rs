@@ -1,13 +1,9 @@
+use crate::utils::ui::{ACTION, ERROR, SUCCESS, WARN};
 use anyhow::{Context, Result};
-use console::{Emoji, style};
+use console::style;
 use dialoguer::{Confirm, theme::ColorfulTheme};
 use std::path::PathBuf;
 use tokio::fs;
-
-static ACTION: Emoji<'_, '_> = Emoji("🚀 ", ">> ");
-static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
-static SUCCESS: Emoji<'_, '_> = Emoji("🎉 ", "* ");
-static ERROR: Emoji<'_, '_> = Emoji("❌ ", "x ");
 
 pub async fn run(workspace_dir: PathBuf, yes: bool, realms_to_clean: &[String]) -> Result<()> {
     if !workspace_dir.exists() {
@@ -62,7 +58,7 @@ pub async fn run(workspace_dir: PathBuf, yes: bool, realms_to_clean: &[String]) 
         }
     }
 
-    let mut join_set = tokio::task::JoinSet::new();
+    let mut set = tokio::task::JoinSet::new();
 
     for target in targets {
         if target == workspace_dir && realms_to_clean.is_empty() {
@@ -75,17 +71,16 @@ pub async fn run(workspace_dir: PathBuf, yes: bool, realms_to_clean: &[String]) 
             while let Some(entry) = entries.next_entry().await? {
                 let path = entry.path();
                 let file_type = entry.file_type().await?;
-                join_set.spawn(async move {
+                set.spawn(async move {
                     if file_type.is_dir() {
                         fs::remove_dir_all(&path)
                             .await
-                            .context(format!("Failed to remove dir {:?}", path))?;
+                            .context(format!("Failed to remove dir {:?}", path))
                     } else {
                         fs::remove_file(&path)
                             .await
-                            .context(format!("Failed to remove file {:?}", path))?;
+                            .context(format!("Failed to remove file {:?}", path))
                     }
-                    Ok::<(), anyhow::Error>(())
                 });
             }
         } else {
@@ -94,24 +89,25 @@ pub async fn run(workspace_dir: PathBuf, yes: bool, realms_to_clean: &[String]) 
                 ACTION,
                 style(format!("Cleaning realm directory {:?}", target)).cyan()
             );
-            join_set.spawn(async move {
-                let metadata = fs::metadata(&target).await?;
+            set.spawn(async move {
+                let metadata = fs::metadata(&target)
+                    .await
+                    .context(format!("Failed to get metadata for {:?}", target))?;
                 if metadata.is_dir() {
                     fs::remove_dir_all(&target)
                         .await
-                        .context(format!("Failed to remove dir {:?}", target))?;
+                        .context(format!("Failed to remove dir {:?}", target))
                 } else {
                     fs::remove_file(&target)
                         .await
-                        .context(format!("Failed to remove file {:?}", target))?;
+                        .context(format!("Failed to remove file {:?}", target))
                 }
-                Ok::<(), anyhow::Error>(())
             });
         }
     }
 
-    while let Some(res) = join_set.join_next().await {
-        res??;
+    while let Some(res) = set.join_next().await {
+        res.context("Join error")??;
     }
 
     println!(

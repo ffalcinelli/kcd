@@ -68,7 +68,7 @@ fn test_models_resource_trait() {
         sub_groups: None,
         extra: HashMap::new(),
     };
-    assert_eq!(group.get_identity(), Some("gname".to_string()));
+    assert_eq!(group.get_identity(), Some("/gname".to_string()));
     assert_eq!(group.get_name(), "gname".to_string());
 
     let user = UserRepresentation {
@@ -132,6 +132,6 @@ fn test_models_resource_trait() {
         config: None,
         extra: HashMap::new(),
     };
-    assert_eq!(comp.get_identity(), Some("cname".to_string()));
+    assert_eq!(comp.get_identity(), Some("id8".to_string()));
     assert_eq!(comp.get_name(), "cname".to_string());
 }

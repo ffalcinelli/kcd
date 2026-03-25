@@ -1,6 +1,7 @@
 use crate::client::KeycloakClient;
 use crate::models::{GroupRepresentation, KeycloakResource};
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::{SUCCESS_CREATE, SUCCESS_UPDATE};
 use anyhow::{Context, Result};
 use console::style;
 use std::collections::{HashMap, HashSet};
@@ -9,18 +10,20 @@ use std::sync::Arc;
 use tokio::fs as async_fs;
 use tokio::task::JoinSet;
 
-use super::{SUCCESS_CREATE, SUCCESS_UPDATE};
-
 pub async fn apply_groups(
     client: &KeycloakClient,
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 6. Apply Groups
     let groups_dir = workspace_dir.join("groups");
     if async_fs::try_exists(&groups_dir).await? {
-        let existing_groups = client.get_groups().await?;
+        let existing_groups = client
+            .get_groups()
+            .await
+            .with_context(|| format!("Failed to get groups for realm '{}'", realm_name))?;
         let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
             .into_iter()
             .filter_map(|g| g.get_identity().map(|id| (id, g)))
@@ -41,6 +44,7 @@ pub async fn apply_groups(
                 let client = client.clone();
                 let existing_groups_map = Arc::clone(&existing_groups_map);
                 let env_vars = Arc::clone(&env_vars);
+                let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
@@ -55,10 +59,13 @@ pub async fn apply_groups(
                     if let Some(existing) = existing_groups_map.get(&identity) {
                         if let Some(id) = &existing.id {
                             group_rep.id = Some(id.clone());
-                            client.update_group(id, &group_rep).await.context(format!(
-                                "Failed to update group {}",
-                                group_rep.get_name()
-                            ))?;
+                            client.update_group(id, &group_rep).await.with_context(|| {
+                                format!(
+                                    "Failed to update group '{}' in realm '{}'",
+                                    group_rep.get_name(),
+                                    realm_name
+                                )
+                            })?;
                             println!(
                                 "  {} {}",
                                 SUCCESS_UPDATE,
@@ -67,10 +74,13 @@ pub async fn apply_groups(
                         }
                     } else {
                         group_rep.id = None;
-                        client
-                            .create_group(&group_rep)
-                            .await
-                            .context(format!("Failed to create group {}", group_rep.get_name()))?;
+                        client.create_group(&group_rep).await.with_context(|| {
+                            format!(
+                                "Failed to create group '{}' in realm '{}'",
+                                group_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                         println!(
                             "  {} {}",
                             SUCCESS_CREATE,
@@ -174,13 +184,14 @@ mod tests {
         // 1. Test update failure
         call_count.store(0, std::sync::atomic::Ordering::SeqCst);
         let group_existing = groups_dir.join("existing.yaml");
-        fs::write(group_existing, "name: Existing Group\nid: existing-id").unwrap();
+        fs::write(group_existing, "name: Existing Group\nid: existing-id\npath: /existing-group").unwrap();
 
         let res = apply_groups(
             &client,
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());
@@ -202,6 +213,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());

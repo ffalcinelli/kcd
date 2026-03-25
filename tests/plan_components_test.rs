@@ -22,6 +22,7 @@ async fn test_plan_components_no_dir() {
         "non-existent",
         env_vars,
         &mut changed_files,
+        "master",
     )
     .await;
     assert!(res.is_ok());
@@ -31,7 +32,7 @@ async fn test_plan_components_no_dir() {
 async fn test_check_keys_drift_fail() {
     // Client that will fail to connect
     let client = KeycloakClient::new("http://localhost:1".to_string());
-    let res = check_keys_drift(&client, true).await;
+    let res = check_keys_drift(&client, true, "master").await;
     // check_keys_drift ignores error if not available
     assert!(res.is_ok());
 }
@@ -58,6 +59,7 @@ async fn test_plan_components_with_invalid_yaml() {
         "components",
         env_vars,
         &mut changed_files,
+        "master",
     )
     .await;
     assert!(res.is_err());

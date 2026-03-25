@@ -12,7 +12,7 @@ impl DockerComposeGuard {
     fn new() -> Self {
         println!("Starting Keycloak with docker compose...");
         let status = Command::new("docker")
-            .args(&["compose", "up", "-d", "--wait"])
+            .args(["compose", "up", "-d", "--wait"])
             .status()
             .expect("Failed to execute docker compose up");
 
@@ -27,7 +27,7 @@ impl Drop for DockerComposeGuard {
     fn drop(&mut self) {
         println!("Tearing down Keycloak...");
         let _ = Command::new("docker")
-            .args(&["compose", "down", "-v"])
+            .args(["compose", "down", "-v"])
             .status();
     }
 }

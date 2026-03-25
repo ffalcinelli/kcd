@@ -1,8 +1,8 @@
 use crate::client::KeycloakClient;
 use crate::models::{ClientScopeRepresentation, KeycloakResource};
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::SPARKLE;
 use anyhow::{Context, Result};
-use console::Emoji;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,10 +17,14 @@ pub async fn plan_client_scopes(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let scopes_dir = workspace_dir.join("client-scopes");
     if async_fs::try_exists(&scopes_dir).await? {
-        let existing_scopes = client.get_client_scopes().await?;
+        let existing_scopes = client
+            .get_client_scopes()
+            .await
+            .with_context(|| format!("Failed to get client scopes for realm '{}'", realm_name))?;
         let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
             .into_iter()
             .filter_map(|s| s.get_identity().map(|id| (id, s)))
@@ -79,7 +83,7 @@ pub async fn plan_client_scopes(
             } else {
                 println!(
                     "\n{} Will create ClientScope: {}",
-                    Emoji("✨", ""),
+                    SPARKLE,
                     local_scope.get_name()
                 );
                 print_diff(

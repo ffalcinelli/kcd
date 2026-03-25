@@ -16,11 +16,17 @@ pub async fn apply_authentication_flows(
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 8. Apply Authentication Flows
     let flows_dir = workspace_dir.join("authentication-flows");
     if async_fs::try_exists(&flows_dir).await? {
-        let existing_flows = client.get_authentication_flows().await?;
+        let existing_flows = client.get_authentication_flows().await.with_context(|| {
+            format!(
+                "Failed to get authentication flows for realm '{}'",
+                realm_name
+            )
+        })?;
         let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
             .into_iter()
             .filter_map(|f| f.get_identity().map(|id| (id, f)))
@@ -41,6 +47,7 @@ pub async fn apply_authentication_flows(
                 let client = client.clone();
                 let existing_flows_map = Arc::clone(&existing_flows_map);
                 let env_vars = Arc::clone(&env_vars);
+                let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
@@ -59,10 +66,13 @@ pub async fn apply_authentication_flows(
                             client
                                 .update_authentication_flow(id, &flow_rep)
                                 .await
-                                .context(format!(
-                                    "Failed to update authentication flow {}",
-                                    flow_rep.get_name()
-                                ))?;
+                                .with_context(|| {
+                                    format!(
+                                        "Failed to update authentication flow '{}' in realm '{}'",
+                                        flow_rep.get_name(),
+                                        realm_name
+                                    )
+                                })?;
                             println!(
                                 "  {} {}",
                                 SUCCESS_UPDATE,
@@ -78,10 +88,13 @@ pub async fn apply_authentication_flows(
                         client
                             .create_authentication_flow(&flow_rep)
                             .await
-                            .context(format!(
-                                "Failed to create authentication flow {}",
-                                flow_rep.get_name()
-                            ))?;
+                            .with_context(|| {
+                                format!(
+                                    "Failed to create authentication flow '{}' in realm '{}'",
+                                    flow_rep.get_name(),
+                                    realm_name
+                                )
+                            })?;
                         println!(
                             "  {} {}",
                             SUCCESS_CREATE,
@@ -199,6 +212,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());
@@ -220,6 +234,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());

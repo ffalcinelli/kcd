@@ -237,7 +237,7 @@ mod tests {
             secrets.get("KEYCLOAK_CLIENT_MY_CLIENT_CLIENTSECRET"),
             Some(&"my_super_secret".to_string())
         );
-        assert!(secrets.get("KEYCLOAK_CLIENT_STORETOKEN").is_none());
+        assert!(!secrets.contains_key("KEYCLOAK_CLIENT_STORETOKEN"));
     }
 
     #[test]
@@ -398,5 +398,14 @@ mod tests {
         assert_eq!(obfuscate_string("abc"), "***");
         assert_eq!(obfuscate_string("abcd"), "a***d");
         assert_eq!(obfuscate_string("secret"), "s***t");
+        assert_eq!(obfuscate_string("🦀"), "***");
+        assert_eq!(obfuscate_string("🦀🦀"), "***");
+        assert_eq!(obfuscate_string("🦀🦀🦀"), "***");
+        assert_eq!(obfuscate_string("🦀🦀🦀🦀"), "🦀***🦀");
+        assert_eq!(obfuscate_string("a🦀"), "***");
+        assert_eq!(obfuscate_string("a🦀b"), "***");
+        assert_eq!(obfuscate_string("a🦀b🦀"), "a***🦀");
+        assert_eq!(obfuscate_string("   "), "***");
+        assert_eq!(obfuscate_string("    "), " *** ");
     }
 }

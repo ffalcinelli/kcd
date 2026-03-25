@@ -5,15 +5,11 @@ pub mod keys;
 pub mod role;
 pub mod user;
 
+use crate::utils::ui::{ERROR, INFO};
 use anyhow::Result;
-use console::{Emoji, style};
+use console::style;
 use dialoguer::{Select, theme::ColorfulTheme};
 use std::path::PathBuf;
-
-pub static SUCCESS: Emoji<'_, '_> = Emoji("✨ ", "* ");
-pub static ERROR: Emoji<'_, '_> = Emoji("❌ ", "x ");
-pub static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
-pub static INFO: Emoji<'_, '_> = Emoji("💡 ", "i ");
 
 pub async fn run(workspace_dir: PathBuf) -> Result<()> {
     println!(

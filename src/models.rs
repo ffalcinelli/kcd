@@ -5,6 +5,19 @@ use std::collections::HashMap;
 pub trait KeycloakResource {
     fn get_identity(&self) -> Option<String>;
     fn get_name(&self) -> String;
+    fn api_path() -> &'static str;
+    fn dir_name() -> &'static str;
+    fn object_path(id: &str) -> String {
+        format!("{}/{}", Self::api_path(), id)
+    }
+    fn get_filename(&self) -> String {
+        self.get_name()
+    }
+}
+
+pub trait ResourceMeta {
+    fn label() -> &'static str;
+    fn secret_prefix() -> &'static str;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -24,6 +37,12 @@ impl KeycloakResource for RealmRepresentation {
     }
     fn get_name(&self) -> String {
         self.realm.clone()
+    }
+    fn api_path() -> &'static str {
+        "realms"
+    }
+    fn dir_name() -> &'static str {
+        "realms"
     }
 }
 
@@ -83,6 +102,21 @@ impl KeycloakResource for IdentityProviderRepresentation {
     fn get_name(&self) -> String {
         self.alias.clone().unwrap_or_else(|| "unknown".to_string())
     }
+    fn api_path() -> &'static str {
+        "identity-provider/instances"
+    }
+    fn dir_name() -> &'static str {
+        "identity-providers"
+    }
+}
+
+impl ResourceMeta for IdentityProviderRepresentation {
+    fn label() -> &'static str {
+        "identity providers"
+    }
+    fn secret_prefix() -> &'static str {
+        "idp"
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -126,6 +160,21 @@ impl KeycloakResource for ClientRepresentation {
             .or_else(|| self.name.clone())
             .unwrap_or_else(|| "unknown".to_string())
     }
+    fn api_path() -> &'static str {
+        "clients"
+    }
+    fn dir_name() -> &'static str {
+        "clients"
+    }
+}
+
+impl ResourceMeta for ClientRepresentation {
+    fn label() -> &'static str {
+        "clients"
+    }
+    fn secret_prefix() -> &'static str {
+        "client"
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -152,6 +201,24 @@ impl KeycloakResource for RoleRepresentation {
     fn get_name(&self) -> String {
         self.name.clone()
     }
+    fn api_path() -> &'static str {
+        "roles"
+    }
+    fn dir_name() -> &'static str {
+        "roles"
+    }
+    fn object_path(id: &str) -> String {
+        format!("roles-by-id/{}", id)
+    }
+}
+
+impl ResourceMeta for RoleRepresentation {
+    fn label() -> &'static str {
+        "roles"
+    }
+    fn secret_prefix() -> &'static str {
+        "role"
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -177,6 +244,21 @@ impl KeycloakResource for ClientScopeRepresentation {
     fn get_name(&self) -> String {
         self.name.clone().unwrap_or_else(|| "unknown".to_string())
     }
+    fn api_path() -> &'static str {
+        "client-scopes"
+    }
+    fn dir_name() -> &'static str {
+        "client-scopes"
+    }
+}
+
+impl ResourceMeta for ClientScopeRepresentation {
+    fn label() -> &'static str {
+        "client scopes"
+    }
+    fn secret_prefix() -> &'static str {
+        "client_scope"
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -195,10 +277,32 @@ pub struct GroupRepresentation {
 
 impl KeycloakResource for GroupRepresentation {
     fn get_identity(&self) -> Option<String> {
-        self.name.clone().or_else(|| self.id.clone())
+        self.path.clone().or_else(|| self.id.clone()).or_else(|| self.name.clone())
     }
     fn get_name(&self) -> String {
         self.name.clone().unwrap_or_else(|| "unknown".to_string())
+    }
+    fn api_path() -> &'static str {
+        "groups"
+    }
+    fn dir_name() -> &'static str {
+        "groups"
+    }
+    fn get_filename(&self) -> String {
+        format!(
+            "{}-{}",
+            self.get_name(),
+            self.id.as_deref().unwrap_or("unknown")
+        )
+    }
+}
+
+impl ResourceMeta for GroupRepresentation {
+    fn label() -> &'static str {
+        "groups"
+    }
+    fn secret_prefix() -> &'static str {
+        "group"
     }
 }
 
@@ -246,6 +350,21 @@ impl KeycloakResource for UserRepresentation {
         self.username
             .clone()
             .unwrap_or_else(|| "unknown".to_string())
+    }
+    fn api_path() -> &'static str {
+        "users"
+    }
+    fn dir_name() -> &'static str {
+        "users"
+    }
+}
+
+impl ResourceMeta for UserRepresentation {
+    fn label() -> &'static str {
+        "users"
+    }
+    fn secret_prefix() -> &'static str {
+        "user"
     }
 }
 
@@ -302,6 +421,21 @@ impl KeycloakResource for AuthenticationFlowRepresentation {
     fn get_name(&self) -> String {
         self.alias.clone().unwrap_or_else(|| "unknown".to_string())
     }
+    fn api_path() -> &'static str {
+        "authentication/flows"
+    }
+    fn dir_name() -> &'static str {
+        "authentication-flows"
+    }
+}
+
+impl ResourceMeta for AuthenticationFlowRepresentation {
+    fn label() -> &'static str {
+        "authentication flows"
+    }
+    fn secret_prefix() -> &'static str {
+        "flow"
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -331,6 +465,21 @@ impl KeycloakResource for RequiredActionProviderRepresentation {
     fn get_name(&self) -> String {
         self.alias.clone().unwrap_or_else(|| "unknown".to_string())
     }
+    fn api_path() -> &'static str {
+        "authentication/required-actions"
+    }
+    fn dir_name() -> &'static str {
+        "required-actions"
+    }
+}
+
+impl ResourceMeta for RequiredActionProviderRepresentation {
+    fn label() -> &'static str {
+        "required actions"
+    }
+    fn secret_prefix() -> &'static str {
+        "action"
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -355,10 +504,32 @@ pub struct ComponentRepresentation {
 
 impl KeycloakResource for ComponentRepresentation {
     fn get_identity(&self) -> Option<String> {
-        self.name.clone().or_else(|| self.id.clone())
+        self.id.clone().or_else(|| self.name.clone())
     }
     fn get_name(&self) -> String {
         self.name.clone().unwrap_or_else(|| "unknown".to_string())
+    }
+    fn api_path() -> &'static str {
+        "components"
+    }
+    fn dir_name() -> &'static str {
+        "components"
+    }
+    fn get_filename(&self) -> String {
+        format!(
+            "{}-{}",
+            self.get_name(),
+            self.id.as_deref().unwrap_or("unknown")
+        )
+    }
+}
+
+impl ResourceMeta for ComponentRepresentation {
+    fn label() -> &'static str {
+        "components"
+    }
+    fn secret_prefix() -> &'static str {
+        "component"
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::client::KeycloakClient;
 use crate::models::{ClientRepresentation, KeycloakResource};
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::{SUCCESS_CREATE, SUCCESS_UPDATE};
 use anyhow::{Context, Result};
 use console::style;
 use std::collections::{HashMap, HashSet};
@@ -9,18 +10,20 @@ use std::sync::Arc;
 use tokio::fs as async_fs;
 use tokio::task::JoinSet;
 
-use super::{SUCCESS_CREATE, SUCCESS_UPDATE};
-
 pub async fn apply_clients(
     client: &KeycloakClient,
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 3. Apply Clients
     let clients_dir = workspace_dir.join("clients");
     if async_fs::try_exists(&clients_dir).await? {
-        let existing_clients = client.get_clients().await?;
+        let existing_clients = client
+            .get_clients()
+            .await
+            .with_context(|| format!("Failed to get clients for realm '{}'", realm_name))?;
         let existing_clients_map: HashMap<String, ClientRepresentation> = existing_clients
             .into_iter()
             .filter_map(|c| c.get_identity().map(|id| (id, c)))
@@ -41,6 +44,7 @@ pub async fn apply_clients(
                 let client = client.clone();
                 let existing_clients_map = existing_clients_map.clone();
                 let env_vars = Arc::clone(&env_vars);
+                let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
@@ -58,10 +62,13 @@ pub async fn apply_clients(
                             client
                                 .update_client(id, &client_rep)
                                 .await
-                                .context(format!(
-                                    "Failed to update client {}",
-                                    client_rep.get_name()
-                                ))?;
+                                .with_context(|| {
+                                    format!(
+                                        "Failed to update client '{}' in realm '{}'",
+                                        client_rep.get_name(),
+                                        realm_name
+                                    )
+                                })?;
                             println!(
                                 "  {} {}",
                                 SUCCESS_UPDATE,
@@ -70,10 +77,13 @@ pub async fn apply_clients(
                         }
                     } else {
                         client_rep.id = None; // Don't send ID on create
-                        client.create_client(&client_rep).await.context(format!(
-                            "Failed to create client {}",
-                            client_rep.get_name()
-                        ))?;
+                        client.create_client(&client_rep).await.with_context(|| {
+                            format!(
+                                "Failed to create client '{}' in realm '{}'",
+                                client_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                         println!(
                             "  {} {}",
                             SUCCESS_CREATE,
@@ -192,6 +202,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());
@@ -213,6 +224,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());
@@ -230,6 +242,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());

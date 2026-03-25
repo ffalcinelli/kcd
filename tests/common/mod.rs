@@ -116,21 +116,15 @@ pub async fn start_mock_server() -> String {
 }
 
 async fn token_handler(axum::Form(payload): axum::Form<TokenRequest>) -> impl IntoResponse {
-    if payload.grant_type == "password"
+    let is_password_grant = payload.grant_type == "password"
         && payload.username.as_deref() == Some("admin")
-        && payload.password.as_deref() == Some("admin")
-    {
-        (
-            StatusCode::OK,
-            Json(serde_json::json!({
-                "access_token": "mock_token",
-                "expires_in": 300
-            })),
-        )
-    } else if payload.grant_type == "client_credentials"
+        && payload.password.as_deref() == Some("admin");
+
+    let is_client_credentials_grant = payload.grant_type == "client_credentials"
         && payload.client_id == "admin-cli"
-        && payload.client_secret.as_deref() == Some("secret")
-    {
+        && payload.client_secret.as_deref() == Some("secret");
+
+    if is_password_grant || is_client_credentials_grant {
         (
             StatusCode::OK,
             Json(serde_json::json!({

@@ -1,8 +1,8 @@
 use crate::client::KeycloakClient;
 use crate::models::{AuthenticationFlowRepresentation, KeycloakResource};
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::SPARKLE;
 use anyhow::{Context, Result};
-use console::Emoji;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,10 +17,16 @@ pub async fn plan_authentication_flows(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let flows_dir = workspace_dir.join("authentication-flows");
     if async_fs::try_exists(&flows_dir).await? {
-        let existing_flows = client.get_authentication_flows().await?;
+        let existing_flows = client.get_authentication_flows().await.with_context(|| {
+            format!(
+                "Failed to get authentication flows for realm '{}'",
+                realm_name
+            )
+        })?;
         let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
             .into_iter()
             .filter_map(|f| f.get_identity().map(|id| (id, f)))
@@ -79,7 +85,7 @@ pub async fn plan_authentication_flows(
             } else {
                 println!(
                     "\n{} Will create AuthenticationFlow: {}",
-                    Emoji("✨", ""),
+                    SPARKLE,
                     local_flow.get_name()
                 );
                 print_diff(

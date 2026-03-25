@@ -1,6 +1,7 @@
 use crate::client::KeycloakClient;
 use crate::models::RealmRepresentation;
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::SUCCESS_UPDATE;
 use anyhow::{Context, Result};
 use console::style;
 use std::collections::{HashMap, HashSet};
@@ -8,13 +9,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
 
-use super::SUCCESS_UPDATE;
-
 pub async fn apply_realm(
     client: &KeycloakClient,
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 1. Apply Realm
     let realm_path = workspace_dir.join("realm.yaml");
@@ -32,7 +32,7 @@ pub async fn apply_realm(
         client
             .update_realm(&realm_rep)
             .await
-            .context("Failed to update realm")?;
+            .with_context(|| format!("Failed to update realm '{}'", realm_name))?;
         println!(
             "  {} {}",
             SUCCESS_UPDATE,

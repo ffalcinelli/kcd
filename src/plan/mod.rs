@@ -11,9 +11,10 @@ pub mod users;
 
 use crate::client::KeycloakClient;
 use crate::utils::secrets::obfuscate_secrets;
+use crate::utils::ui::{ACTION, CHECK, MEMO, WARN};
 
 use anyhow::Result;
-use console::{Emoji, Style, style};
+use console::{Style, style};
 use serde::Serialize;
 use similar::{ChangeTag, TextDiff};
 use std::collections::HashMap;
@@ -21,9 +22,6 @@ use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
-
-pub static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
-pub static ACTION: Emoji<'_, '_> = Emoji("🔍 ", "> ");
 
 pub async fn run(
     client: &KeycloakClient,
@@ -85,6 +83,7 @@ pub async fn run(
             interactive,
             Arc::clone(&env_vars),
             &mut changed_files,
+            &realm_name,
         )
         .await?;
     }
@@ -109,6 +108,7 @@ async fn plan_single_realm(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     realm::plan_realm(
         client,
@@ -117,6 +117,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -127,6 +128,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -137,6 +139,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -147,6 +150,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -157,6 +161,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -167,6 +172,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -177,6 +183,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -187,6 +194,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -197,6 +205,7 @@ async fn plan_single_realm(
         interactive,
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
 
@@ -208,6 +217,7 @@ async fn plan_single_realm(
         "components",
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
     components::plan_components_or_keys(
@@ -218,9 +228,10 @@ async fn plan_single_realm(
         "keys",
         Arc::clone(&env_vars),
         changed_files,
+        realm_name,
     )
     .await?;
-    components::check_keys_drift(client, changes_only).await?;
+    components::check_keys_drift(client, changes_only, realm_name).await?;
 
     Ok(())
 }
@@ -248,7 +259,7 @@ pub fn print_diff<T: Serialize>(
     let changed = diff.ratio() < 1.0;
 
     if changed {
-        println!("\n{} Changes for {}:", Emoji("📝", ""), name);
+        println!("\n{} Changes for {}:", MEMO, name);
         for change in diff.iter_all_changes() {
             let (sign, style) = match change.tag() {
                 ChangeTag::Delete => ("-", Style::new().red()),
@@ -258,7 +269,7 @@ pub fn print_diff<T: Serialize>(
             print!("{}{}", style.apply_to(sign).bold(), style.apply_to(change));
         }
     } else if !changes_only {
-        println!("{} No changes for {}", Emoji("✅", ""), name);
+        println!("{} No changes for {}", CHECK, name);
     }
     Ok(changed)
 }

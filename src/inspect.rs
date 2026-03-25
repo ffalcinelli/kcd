@@ -1,8 +1,13 @@
 use crate::client::KeycloakClient;
-use crate::models::KeycloakResource;
+use crate::models::{
+    AuthenticationFlowRepresentation, ClientRepresentation, ClientScopeRepresentation,
+    ComponentRepresentation, GroupRepresentation, IdentityProviderRepresentation, KeycloakResource,
+    RequiredActionProviderRepresentation, ResourceMeta, RoleRepresentation, UserRepresentation,
+};
 use crate::utils::to_sorted_yaml_with_secrets;
+use crate::utils::ui::{CHECK, SEARCH, SUCCESS, WARN};
 use anyhow::{Context, Result};
-use console::{Emoji, style};
+use console::style;
 use dialoguer::{Confirm, theme::ColorfulTheme};
 use sanitize_filename::sanitize;
 use std::collections::HashMap;
@@ -10,10 +15,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::Mutex;
-
-static ACTION: Emoji<'_, '_> = Emoji("🔍 ", "> ");
-static SUCCESS: Emoji<'_, '_> = Emoji("✅ ", "√ ");
-static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "! ");
 
 pub async fn run(
     client: &KeycloakClient,
@@ -49,7 +50,7 @@ pub async fn run(
         let realm_dir = workspace_dir.join(&realm_name);
         println!(
             "\n{} {}",
-            ACTION,
+            SEARCH,
             style(format!("Inspecting realm: {}", realm_name))
                 .cyan()
                 .bold()
@@ -91,7 +92,7 @@ pub async fn run(
             .await?;
         println!(
             "{} {}",
-            SUCCESS,
+            CHECK,
             style("Exported secrets to .secrets").green()
         );
     }
@@ -136,6 +137,78 @@ async fn write_if_changed_with_mutex(
     Ok(())
 }
 
+async fn inspect_resources<T>(
+    client: &KeycloakClient,
+    realm_name: &str,
+    target_dir: Arc<PathBuf>,
+    all_secrets: Arc<Mutex<HashMap<String, String>>>,
+    yes: bool,
+    prompt_mutex: Arc<Mutex<()>>,
+) -> Result<()>
+where
+    T: KeycloakResource
+        + ResourceMeta
+        + serde::Serialize
+        + for<'de> serde::Deserialize<'de>
+        + Send
+        + Sync
+        + 'static,
+{
+    let resources = client
+        .get_resources::<T>()
+        .await
+        .with_context(|| format!("Failed to fetch {} for realm '{}'", T::label(), realm_name))?;
+
+    if !fs::try_exists(&*target_dir)
+        .await
+        .context(format!("Failed to check {} directory", T::label()))?
+    {
+        fs::create_dir_all(&*target_dir)
+            .await
+            .context(format!("Failed to create {} directory", T::label()))?;
+    }
+
+    let mut set = tokio::task::JoinSet::new();
+    for res in resources {
+        let target_dir = Arc::clone(&target_dir);
+        let all_secrets = Arc::clone(&all_secrets);
+        let realm_name = realm_name.to_string();
+        let prompt_mutex = Arc::clone(&prompt_mutex);
+        set.spawn(async move {
+            let filename = format!("{}.yaml", sanitize(res.get_filename()));
+            let path = target_dir.join(filename);
+            let mut local_secrets = HashMap::new();
+            let prefix = format!("realm_{}_{}", realm_name, T::secret_prefix());
+            let yaml = to_sorted_yaml_with_secrets(&res, &prefix, &mut local_secrets).context(
+                format!("Failed to serialize {} {}", T::label(), res.get_name()),
+            )?;
+            all_secrets.lock().await.extend(local_secrets);
+            write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
+    }
+    {
+        let _lock = prompt_mutex.lock().await;
+        println!(
+            "  {} {}",
+            SUCCESS,
+            style(format!(
+                "Exported {} to {}/",
+                T::label(),
+                target_dir
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or_default()
+            ))
+            .green()
+        );
+    }
+
+    Ok(())
+}
+
 async fn inspect_realm(
     client: &KeycloakClient,
     realm_name: &str,
@@ -153,16 +226,17 @@ async fn inspect_realm(
             .context("Failed to create output directory")?;
     }
 
-    let mut master_set = tokio::task::JoinSet::new();
+    let mut set = tokio::task::JoinSet::new();
+    let workspace_dir = Arc::new(workspace_dir);
 
-    // Fetch realm configuration
+    // Fetch realm configuration in parallel
     {
         let client = client.clone();
         let realm_name = realm_name.to_string();
-        let workspace_dir = workspace_dir.clone();
+        let workspace_dir = Arc::clone(&workspace_dir);
         let all_secrets = Arc::clone(&all_secrets);
         let prompt_mutex = Arc::clone(&prompt_mutex);
-        master_set.spawn(async move {
+        set.spawn(async move {
             let realm = client.get_realm().await.context("Failed to fetch realm")?;
             let mut local_secrets = HashMap::new();
             let realm_prefix = format!("realm_{}", realm_name);
@@ -171,497 +245,141 @@ async fn inspect_realm(
             all_secrets.lock().await.extend(local_secrets);
 
             let realm_path = workspace_dir.join("realm.yaml");
-            write_if_changed_with_mutex(&realm_path, &realm_yaml, yes, prompt_mutex).await?;
-            println!(
-                "  {} {}",
-                SUCCESS,
-                style("Exported realm configuration to realm.yaml").green()
-            );
+            write_if_changed_with_mutex(&realm_path, &realm_yaml, yes, Arc::clone(&prompt_mutex)).await?;
+            {
+                let _lock = prompt_mutex.lock().await;
+                println!(
+                    "  {} {}",
+                    SUCCESS,
+                    style("Exported realm configuration to realm.yaml").green()
+                );
+            }
             Ok::<(), anyhow::Error>(())
         });
     }
 
-    // Fetch clients
-    {
-        let client = client.clone();
-        let realm_name = realm_name.to_string();
-        let workspace_dir = workspace_dir.clone();
-        let all_secrets = Arc::clone(&all_secrets);
-        let prompt_mutex = Arc::clone(&prompt_mutex);
-        master_set.spawn(async move {
-            let clients = client
-                .get_clients()
-                .await
-                .context("Failed to fetch clients")?;
-            let clients_dir = workspace_dir.join("clients");
-            if !fs::try_exists(&clients_dir)
-                .await
-                .context("Failed to check clients directory")?
-            {
-                fs::create_dir_all(&clients_dir)
-                    .await
-                    .context("Failed to create clients directory")?;
-            }
-            let mut set = tokio::task::JoinSet::new();
-            for client_rep in clients {
-                let clients_dir = clients_dir.clone();
-                let all_secrets = Arc::clone(&all_secrets);
-                let realm_name = realm_name.clone();
-                let prompt_mutex = Arc::clone(&prompt_mutex);
-                set.spawn(async move {
-                    let name = client_rep.get_name();
-                    let filename = format!("{}.yaml", sanitize(&name));
-                    let path = clients_dir.join(filename);
-                    let mut local_secrets = HashMap::new();
-                    let prefix = format!("realm_{}_client", realm_name);
-                    let yaml =
-                        to_sorted_yaml_with_secrets(&client_rep, &prefix, &mut local_secrets)
-                            .context("Failed to serialize client")?;
-                    all_secrets.lock().await.extend(local_secrets);
-                    write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
-                });
-            }
-            while let Some(res) = set.join_next().await {
-                res.context("Task panicked")??;
-            }
-            println!(
-                "  {} {}",
-                SUCCESS,
-                style("Exported clients to clients/").green()
-            );
-            Ok(())
-        });
-    }
+    // Fetch resources in parallel
+    spawn_inspect::<ClientRepresentation>(
+        &mut set,
+        client,
+        realm_name,
+        &workspace_dir,
+        &all_secrets,
+        yes,
+        &prompt_mutex,
+    );
+    spawn_inspect::<RoleRepresentation>(
+        &mut set,
+        client,
+        realm_name,
+        &workspace_dir,
+        &all_secrets,
+        yes,
+        &prompt_mutex,
+    );
+    spawn_inspect::<ClientScopeRepresentation>(
+        &mut set,
+        client,
+        realm_name,
+        &workspace_dir,
+        &all_secrets,
+        yes,
+        &prompt_mutex,
+    );
+    spawn_inspect::<IdentityProviderRepresentation>(
+        &mut set,
+        client,
+        realm_name,
+        &workspace_dir,
+        &all_secrets,
+        yes,
+        &prompt_mutex,
+    );
+    spawn_inspect::<GroupRepresentation>(
+        &mut set,
+        client,
+        realm_name,
+        &workspace_dir,
+        &all_secrets,
+        yes,
+        &prompt_mutex,
+    );
+    spawn_inspect::<UserRepresentation>(
+        &mut set,
+        client,
+        realm_name,
+        &workspace_dir,
+        &all_secrets,
+        yes,
+        &prompt_mutex,
+    );
+    spawn_inspect::<AuthenticationFlowRepresentation>(
+        &mut set,
+        client,
+        realm_name,
+        &workspace_dir,
+        &all_secrets,
+        yes,
+        &prompt_mutex,
+    );
+    spawn_inspect::<RequiredActionProviderRepresentation>(
+        &mut set,
+        client,
+        realm_name,
+        &workspace_dir,
+        &all_secrets,
+        yes,
+        &prompt_mutex,
+    );
+    spawn_inspect::<ComponentRepresentation>(
+        &mut set,
+        client,
+        realm_name,
+        &workspace_dir,
+        &all_secrets,
+        yes,
+        &prompt_mutex,
+    );
 
-    // Fetch roles
-    {
-        let client = client.clone();
-        let realm_name = realm_name.to_string();
-        let workspace_dir = workspace_dir.clone();
-        let all_secrets = Arc::clone(&all_secrets);
-        let prompt_mutex = Arc::clone(&prompt_mutex);
-        master_set.spawn(async move {
-            let roles = client.get_roles().await.context("Failed to fetch roles")?;
-            let roles_dir = workspace_dir.join("roles");
-            if !fs::try_exists(&roles_dir)
-                .await
-                .context("Failed to check roles directory")?
-            {
-                fs::create_dir_all(&roles_dir)
-                    .await
-                    .context("Failed to create roles directory")?;
-            }
-            let mut set = tokio::task::JoinSet::new();
-            for role in roles {
-                let roles_dir = roles_dir.clone();
-                let all_secrets = Arc::clone(&all_secrets);
-                let realm_name = realm_name.clone();
-                let prompt_mutex = Arc::clone(&prompt_mutex);
-                set.spawn(async move {
-                    let name = role.get_name();
-                    let filename = format!("{}.yaml", sanitize(&name));
-                    let path = roles_dir.join(filename);
-                    let mut local_secrets = HashMap::new();
-                    let prefix = format!("realm_{}_role", realm_name);
-                    let yaml = to_sorted_yaml_with_secrets(&role, &prefix, &mut local_secrets)
-                        .context("Failed to serialize role")?;
-                    all_secrets.lock().await.extend(local_secrets);
-                    write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
-                });
-            }
-            while let Some(res) = set.join_next().await {
-                res.context("Task panicked")??;
-            }
-            println!(
-                "  {} {}",
-                SUCCESS,
-                style("Exported roles to roles/").green()
-            );
-            Ok(())
-        });
-    }
-
-    // Fetch client scopes
-    {
-        let client = client.clone();
-        let realm_name = realm_name.to_string();
-        let workspace_dir = workspace_dir.clone();
-        let all_secrets = Arc::clone(&all_secrets);
-        let prompt_mutex = Arc::clone(&prompt_mutex);
-        master_set.spawn(async move {
-            let client_scopes = client
-                .get_client_scopes()
-                .await
-                .context("Failed to fetch client scopes")?;
-            let scopes_dir = workspace_dir.join("client-scopes");
-            if !fs::try_exists(&scopes_dir)
-                .await
-                .context("Failed to check client-scopes directory")?
-            {
-                fs::create_dir_all(&scopes_dir)
-                    .await
-                    .context("Failed to create client-scopes directory")?;
-            }
-            let mut set = tokio::task::JoinSet::new();
-            for scope in client_scopes {
-                let scopes_dir = scopes_dir.clone();
-                let all_secrets = Arc::clone(&all_secrets);
-                let realm_name = realm_name.clone();
-                let prompt_mutex = Arc::clone(&prompt_mutex);
-                set.spawn(async move {
-                    let name = scope.get_name();
-                    let filename = format!("{}.yaml", sanitize(&name));
-                    let path = scopes_dir.join(filename);
-                    let mut local_secrets = HashMap::new();
-                    let prefix = format!("realm_{}_client_scope", realm_name);
-                    let yaml = to_sorted_yaml_with_secrets(&scope, &prefix, &mut local_secrets)
-                        .context("Failed to serialize client scope")?;
-                    all_secrets.lock().await.extend(local_secrets);
-                    write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
-                });
-            }
-            while let Some(res) = set.join_next().await {
-                res.context("Task panicked")??;
-            }
-            println!(
-                "  {} {}",
-                SUCCESS,
-                style("Exported client scopes to client-scopes/").green()
-            );
-            Ok(())
-        });
-    }
-
-    // Fetch identity providers
-    {
-        let client = client.clone();
-        let realm_name = realm_name.to_string();
-        let workspace_dir = workspace_dir.clone();
-        let all_secrets = Arc::clone(&all_secrets);
-        let prompt_mutex = Arc::clone(&prompt_mutex);
-        master_set.spawn(async move {
-            let idps = client
-                .get_identity_providers()
-                .await
-                .context("Failed to fetch identity providers")?;
-            let idps_dir = workspace_dir.join("identity-providers");
-            if !fs::try_exists(&idps_dir)
-                .await
-                .context("Failed to check identity-providers directory")?
-            {
-                fs::create_dir_all(&idps_dir)
-                    .await
-                    .context("Failed to create identity-providers directory")?;
-            }
-            let mut set = tokio::task::JoinSet::new();
-            for idp in idps {
-                let idps_dir = idps_dir.clone();
-                let all_secrets = Arc::clone(&all_secrets);
-                let realm_name = realm_name.clone();
-                let prompt_mutex = Arc::clone(&prompt_mutex);
-                set.spawn(async move {
-                    let name = idp.get_name();
-                    let filename = format!("{}.yaml", sanitize(&name));
-                    let path = idps_dir.join(filename);
-                    let mut local_secrets = HashMap::new();
-                    let prefix = format!("realm_{}_idp", realm_name);
-                    let yaml = to_sorted_yaml_with_secrets(&idp, &prefix, &mut local_secrets)
-                        .context("Failed to serialize identity provider")?;
-                    all_secrets.lock().await.extend(local_secrets);
-                    write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
-                });
-            }
-            while let Some(res) = set.join_next().await {
-                res.context("Task panicked")??;
-            }
-            println!(
-                "  {} {}",
-                SUCCESS,
-                style("Exported identity providers to identity-providers/").green()
-            );
-            Ok(())
-        });
-    }
-
-    // Fetch groups
-    {
-        let client = client.clone();
-        let realm_name = realm_name.to_string();
-        let workspace_dir = workspace_dir.clone();
-        let all_secrets = Arc::clone(&all_secrets);
-        let prompt_mutex = Arc::clone(&prompt_mutex);
-        master_set.spawn(async move {
-            let groups = client
-                .get_groups()
-                .await
-                .context("Failed to fetch groups")?;
-            let groups_dir = workspace_dir.join("groups");
-            if !fs::try_exists(&groups_dir)
-                .await
-                .context("Failed to check groups directory")?
-            {
-                fs::create_dir_all(&groups_dir)
-                    .await
-                    .context("Failed to create groups directory")?;
-            }
-            let mut set = tokio::task::JoinSet::new();
-            for group in groups {
-                let groups_dir = groups_dir.clone();
-                let all_secrets = Arc::clone(&all_secrets);
-                let realm_name = realm_name.clone();
-                let prompt_mutex = Arc::clone(&prompt_mutex);
-                set.spawn(async move {
-                    let name = group.get_name();
-                    let id = group.id.as_deref().unwrap_or("unknown");
-                    let filename = format!("{}-{}.yaml", sanitize(&name), id);
-                    let path = groups_dir.join(filename);
-                    let mut local_secrets = HashMap::new();
-                    let prefix = format!("realm_{}_group", realm_name);
-                    let yaml = to_sorted_yaml_with_secrets(&group, &prefix, &mut local_secrets)
-                        .context("Failed to serialize group")?;
-                    all_secrets.lock().await.extend(local_secrets);
-                    write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
-                });
-            }
-            while let Some(res) = set.join_next().await {
-                res.context("Task panicked")??;
-            }
-            println!(
-                "  {} {}",
-                SUCCESS,
-                style("Exported groups to groups/").green()
-            );
-            Ok(())
-        });
-    }
-
-    // Fetch users
-    {
-        let client = client.clone();
-        let realm_name = realm_name.to_string();
-        let workspace_dir = workspace_dir.clone();
-        let all_secrets = Arc::clone(&all_secrets);
-        let prompt_mutex = Arc::clone(&prompt_mutex);
-        master_set.spawn(async move {
-            let users = client.get_users().await.context("Failed to fetch users")?;
-            let users_dir = workspace_dir.join("users");
-            if !fs::try_exists(&users_dir)
-                .await
-                .context("Failed to check users directory")?
-            {
-                fs::create_dir_all(&users_dir)
-                    .await
-                    .context("Failed to create users directory")?;
-            }
-            let mut set = tokio::task::JoinSet::new();
-            for user in users {
-                let users_dir = users_dir.clone();
-                let all_secrets = Arc::clone(&all_secrets);
-                let realm_name = realm_name.clone();
-                let prompt_mutex = Arc::clone(&prompt_mutex);
-                set.spawn(async move {
-                    let name = user.get_name();
-                    let filename = format!("{}.yaml", sanitize(&name));
-                    let path = users_dir.join(filename);
-                    let mut local_secrets = HashMap::new();
-                    let prefix = format!("realm_{}_user", realm_name);
-                    let yaml = to_sorted_yaml_with_secrets(&user, &prefix, &mut local_secrets)
-                        .context("Failed to serialize user")?;
-                    all_secrets.lock().await.extend(local_secrets);
-                    write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
-                });
-            }
-            while let Some(res) = set.join_next().await {
-                res.context("Task panicked")??;
-            }
-            println!(
-                "  {} {}",
-                SUCCESS,
-                style("Exported users to users/").green()
-            );
-            Ok(())
-        });
-    }
-
-    // Fetch authentication flows
-    {
-        let client = client.clone();
-        let realm_name = realm_name.to_string();
-        let workspace_dir = workspace_dir.clone();
-        let all_secrets = Arc::clone(&all_secrets);
-        let prompt_mutex = Arc::clone(&prompt_mutex);
-        master_set.spawn(async move {
-            let flows = client
-                .get_authentication_flows()
-                .await
-                .context("Failed to fetch authentication flows")?;
-            let flows_dir = workspace_dir.join("authentication-flows");
-            if !fs::try_exists(&flows_dir)
-                .await
-                .context("Failed to check authentication-flows directory")?
-            {
-                fs::create_dir_all(&flows_dir)
-                    .await
-                    .context("Failed to create authentication-flows directory")?;
-            }
-            let mut set = tokio::task::JoinSet::new();
-            for flow in flows {
-                let flows_dir = flows_dir.clone();
-                let all_secrets = Arc::clone(&all_secrets);
-                let realm_name = realm_name.clone();
-                let prompt_mutex = Arc::clone(&prompt_mutex);
-                set.spawn(async move {
-                    let name = flow.get_name();
-                    let filename = format!("{}.yaml", sanitize(&name));
-                    let path = flows_dir.join(filename);
-                    let mut local_secrets = HashMap::new();
-                    let prefix = format!("realm_{}_flow", realm_name);
-                    let yaml = to_sorted_yaml_with_secrets(&flow, &prefix, &mut local_secrets)
-                        .context("Failed to serialize authentication flow")?;
-                    all_secrets.lock().await.extend(local_secrets);
-                    write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
-                });
-            }
-            while let Some(res) = set.join_next().await {
-                res.context("Task panicked")??;
-            }
-            println!(
-                "  {} {}",
-                SUCCESS,
-                style("Exported authentication flows to authentication-flows/").green()
-            );
-            Ok(())
-        });
-    }
-
-    // Fetch required actions
-    {
-        let client = client.clone();
-        let realm_name = realm_name.to_string();
-        let workspace_dir = workspace_dir.clone();
-        let all_secrets = Arc::clone(&all_secrets);
-        let prompt_mutex = Arc::clone(&prompt_mutex);
-        master_set.spawn(async move {
-            let actions = client
-                .get_required_actions()
-                .await
-                .context("Failed to fetch required actions")?;
-            let actions_dir = workspace_dir.join("required-actions");
-            if !fs::try_exists(&actions_dir)
-                .await
-                .context("Failed to check required-actions directory")?
-            {
-                fs::create_dir_all(&actions_dir)
-                    .await
-                    .context("Failed to create required-actions directory")?;
-            }
-            let mut set = tokio::task::JoinSet::new();
-            for action in actions {
-                let actions_dir = actions_dir.clone();
-                let all_secrets = Arc::clone(&all_secrets);
-                let realm_name = realm_name.clone();
-                let prompt_mutex = Arc::clone(&prompt_mutex);
-                set.spawn(async move {
-                    let name = action.get_name();
-                    let filename = format!("{}.yaml", sanitize(&name));
-                    let path = actions_dir.join(filename);
-                    let mut local_secrets = HashMap::new();
-                    let prefix = format!("realm_{}_action", realm_name);
-                    let yaml = to_sorted_yaml_with_secrets(&action, &prefix, &mut local_secrets)
-                        .context("Failed to serialize required action")?;
-                    all_secrets.lock().await.extend(local_secrets);
-                    write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
-                });
-            }
-            while let Some(res) = set.join_next().await {
-                res.context("Task panicked")??;
-            }
-            println!(
-                "  {} {}",
-                SUCCESS,
-                style("Exported required actions to required-actions/").green()
-            );
-            Ok(())
-        });
-    }
-
-    // Fetch components and keys
-    {
-        let client = client.clone();
-        let realm_name = realm_name.to_string();
-        let workspace_dir = workspace_dir.clone();
-        let all_secrets = Arc::clone(&all_secrets);
-        let prompt_mutex = Arc::clone(&prompt_mutex);
-        master_set.spawn(async move {
-            let all_components = client
-                .get_components()
-                .await
-                .context("Failed to fetch components")?;
-
-            let components_dir = workspace_dir.join("components");
-            if !fs::try_exists(&components_dir)
-                .await
-                .context("Failed to check components directory")?
-            {
-                fs::create_dir_all(&components_dir)
-                    .await
-                    .context("Failed to create components directory")?;
-            }
-
-            let keys_dir = workspace_dir.join("keys");
-            if !fs::try_exists(&keys_dir)
-                .await
-                .context("Failed to check keys directory")?
-            {
-                fs::create_dir_all(&keys_dir)
-                    .await
-                    .context("Failed to create keys directory")?;
-            }
-
-            let mut set = tokio::task::JoinSet::new();
-            for component in all_components {
-                let is_key = component
-                    .provider_type
-                    .as_deref()
-                    .is_some_and(|pt| pt == "org.keycloak.keys.KeyProvider");
-                let target_dir = if is_key {
-                    keys_dir.clone()
-                } else {
-                    components_dir.clone()
-                };
-
-                let all_secrets = Arc::clone(&all_secrets);
-                let realm_name = realm_name.clone();
-                let prompt_mutex = Arc::clone(&prompt_mutex);
-                set.spawn(async move {
-                    let name = component.get_name();
-                    let id = component.id.as_deref().unwrap_or("unknown");
-                    let filename = format!("{}-{}.yaml", sanitize(&name), id);
-                    let path = target_dir.join(filename);
-                    let mut local_secrets = HashMap::new();
-                    let sub_prefix = if is_key { "key" } else { "component" };
-                    let prefix = format!("realm_{}_{}", realm_name, sub_prefix);
-                    let yaml = to_sorted_yaml_with_secrets(&component, &prefix, &mut local_secrets)
-                        .context("Failed to serialize component")?;
-                    all_secrets.lock().await.extend(local_secrets);
-                    write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
-                });
-            }
-            while let Some(res) = set.join_next().await {
-                res.context("Task panicked")??;
-            }
-            println!(
-                "  {} {}",
-                SUCCESS,
-                style("Exported components to components/ and keys to keys/").green()
-            );
-            Ok(())
-        });
-    }
-
-    while let Some(res) = master_set.join_next().await {
-        res.context("Master task panicked")??;
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
     }
 
     Ok(())
+}
+
+fn spawn_inspect<T>(
+    set: &mut tokio::task::JoinSet<Result<()>>,
+    client: &KeycloakClient,
+    realm_name: &str,
+    workspace_dir: &Arc<PathBuf>,
+    all_secrets: &Arc<Mutex<HashMap<String, String>>>,
+    yes: bool,
+    prompt_mutex: &Arc<Mutex<()>>,
+) where
+    T: KeycloakResource
+        + ResourceMeta
+        + serde::Serialize
+        + for<'de> serde::Deserialize<'de>
+        + Send
+        + Sync
+        + 'static,
+{
+    let client = client.clone();
+    let realm_name = realm_name.to_string();
+    let target_dir = Arc::new(workspace_dir.join(T::dir_name()));
+    let all_secrets = Arc::clone(all_secrets);
+    let prompt_mutex = Arc::clone(prompt_mutex);
+
+    set.spawn(async move {
+        inspect_resources::<T>(
+            &client,
+            &realm_name,
+            target_dir,
+            all_secrets,
+            yes,
+            prompt_mutex,
+        )
+        .await
+    });
 }

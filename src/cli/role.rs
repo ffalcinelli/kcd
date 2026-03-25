@@ -1,5 +1,5 @@
-use super::SUCCESS;
 use crate::models::RoleRepresentation;
+use crate::utils::ui::SUCCESS_CREATE;
 use anyhow::{Context, Result};
 use console::style;
 use dialoguer::{Confirm, Input, theme::ColorfulTheme};
@@ -47,7 +47,7 @@ pub async fn create_role_interactive(workspace_dir: &Path) -> Result<()> {
 
     println!(
         "{} {}",
-        SUCCESS,
+        SUCCESS_CREATE,
         style(format!(
             "Successfully generated YAML for role '{}' in realm '{}'.",
             name, realm
@@ -123,7 +123,7 @@ mod tests {
         let content = fs::read_to_string(&realm_role_path).await.unwrap();
         let role: RoleRepresentation = serde_yaml::from_str(&content).unwrap();
         assert_eq!(role.name, "admin");
-        assert_eq!(role.client_role, false);
+        assert!(!role.client_role);
 
         // Client role
         create_role_yaml(

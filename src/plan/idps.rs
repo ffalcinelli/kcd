@@ -1,8 +1,8 @@
 use crate::client::KeycloakClient;
 use crate::models::{IdentityProviderRepresentation, KeycloakResource};
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::SPARKLE;
 use anyhow::{Context, Result};
-use console::Emoji;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,10 +17,16 @@ pub async fn plan_identity_providers(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let idps_dir = workspace_dir.join("identity-providers");
     if async_fs::try_exists(&idps_dir).await? {
-        let existing_idps = client.get_identity_providers().await?;
+        let existing_idps = client.get_identity_providers().await.with_context(|| {
+            format!(
+                "Failed to get identity providers for realm '{}'",
+                realm_name
+            )
+        })?;
         let existing_idps_map: HashMap<String, IdentityProviderRepresentation> = existing_idps
             .into_iter()
             .filter_map(|i| i.get_identity().map(|id| (id, i)))
@@ -79,7 +85,7 @@ pub async fn plan_identity_providers(
             } else {
                 println!(
                     "\n{} Will create IdentityProvider: {}",
-                    Emoji("✨", ""),
+                    SPARKLE,
                     local_idp.get_name()
                 );
                 print_diff(

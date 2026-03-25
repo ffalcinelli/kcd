@@ -7,7 +7,7 @@
 
 **Disclaimer**: This project is experimentally written almost entirely by AI, so any usage should keep this in mind and that the execution of this software is at your own risk.
 
-`kcd` is a robust CLI tool for the **declarative management** of Keycloak configurations. It allows you to treat your Keycloak settings as code, enabling version control, automated testing, and seamless continuous delivery of your identity infrastructure.
+`kcd` is a robust CLI tool for the **declarative management** of [Keycloak](https://www.keycloak.org/) configurations. It allows you to treat your Keycloak settings as code, enabling version control, automated testing, and seamless continuous delivery of your identity infrastructure.
 
 ---
 
@@ -55,6 +55,7 @@ $ kcd cli
 
 ## 🚀 Key Features
 
+- **Blazing Fast Performance**: Utilizes Rust's `tokio` for highly concurrent API interactions and parallel I/O operations.
 - **Declarative State**: Define your desired Keycloak state in human-readable YAML files.
 - **Inspect & Export**: Bootstrap your project by exporting existing Keycloak configurations to local files.
 - **Dry-Run Planning**: Preview exactly what changes will be applied before they happen.
@@ -209,6 +210,12 @@ publicClient: false
 - **MODIFIER**: Typically `0`, used for specific hotfixes.
 
 This format provides an immediate understanding of how recent your installed version is.
+
+---
+
+## 🤝 Credits
+
+`kcd` is built for and relies on the excellent work of the [Keycloak](https://www.keycloak.org/) project and its community. Keycloak is an open-source identity and access management solution.
 
 ---
 

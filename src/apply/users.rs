@@ -16,11 +16,15 @@ pub async fn apply_users(
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 7. Apply Users
     let users_dir = workspace_dir.join("users");
     if async_fs::try_exists(&users_dir).await? {
-        let existing_users = client.get_users().await?;
+        let existing_users = client
+            .get_users()
+            .await
+            .with_context(|| format!("Failed to get users for realm '{}'", realm_name))?;
         let existing_users_map: HashMap<String, UserRepresentation> = existing_users
             .into_iter()
             .filter_map(|u| u.get_identity().map(|id| (id, u)))
@@ -41,6 +45,7 @@ pub async fn apply_users(
                 let client = client.clone();
                 let existing_users_map = Arc::clone(&existing_users_map);
                 let env_vars = Arc::clone(&env_vars);
+                let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
@@ -55,10 +60,13 @@ pub async fn apply_users(
                     if let Some(existing) = existing_users_map.get(&identity) {
                         if let Some(id) = &existing.id {
                             user_rep.id = Some(id.clone());
-                            client.update_user(id, &user_rep).await.context(format!(
-                                "Failed to update user {}",
-                                user_rep.get_name()
-                            ))?;
+                            client.update_user(id, &user_rep).await.with_context(|| {
+                                format!(
+                                    "Failed to update user '{}' in realm '{}'",
+                                    user_rep.get_name(),
+                                    realm_name
+                                )
+                            })?;
                             println!(
                                 "  {} {}",
                                 SUCCESS_UPDATE,
@@ -67,10 +75,13 @@ pub async fn apply_users(
                         }
                     } else {
                         user_rep.id = None;
-                        client
-                            .create_user(&user_rep)
-                            .await
-                            .context(format!("Failed to create user {}", user_rep.get_name()))?;
+                        client.create_user(&user_rep).await.with_context(|| {
+                            format!(
+                                "Failed to create user '{}' in realm '{}'",
+                                user_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                         println!(
                             "  {} {}",
                             SUCCESS_CREATE,
@@ -185,6 +196,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());
@@ -206,6 +218,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());

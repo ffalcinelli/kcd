@@ -1,5 +1,5 @@
-use super::{INFO, SUCCESS};
 use crate::models::ComponentRepresentation;
+use crate::utils::ui::{INFO, SUCCESS_CREATE};
 use anyhow::{Context, Result};
 use console::style;
 use dialoguer::{Input, theme::ColorfulTheme};
@@ -19,7 +19,7 @@ pub async fn rotate_keys_interactive(workspace_dir: &Path) -> Result<()> {
     if rotated_count > 0 {
         println!(
             "{} {}",
-            SUCCESS,
+            SUCCESS_CREATE,
             style(format!(
                 "Successfully generated {} rotated key component(s) for realm '{}'.",
                 rotated_count, realm

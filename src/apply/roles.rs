@@ -1,6 +1,7 @@
 use crate::client::KeycloakClient;
 use crate::models::{KeycloakResource, RoleRepresentation};
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::{SUCCESS_CREATE, SUCCESS_UPDATE};
 use anyhow::{Context, Result};
 use console::style;
 use std::collections::{HashMap, HashSet};
@@ -9,23 +10,25 @@ use std::sync::Arc;
 use tokio::fs as async_fs;
 use tokio::task::JoinSet;
 
-use super::{SUCCESS_CREATE, SUCCESS_UPDATE};
-
 pub async fn apply_roles(
     client: &KeycloakClient,
     workspace_dir: &std::path::Path,
     env_vars: Arc<HashMap<String, String>>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
+    realm_name: &str,
 ) -> Result<()> {
     // 2. Apply Roles
     let roles_dir = workspace_dir.join("roles");
     if async_fs::try_exists(&roles_dir).await? {
-        let existing_roles = client.get_roles().await?;
+        let existing_roles = client
+            .get_roles()
+            .await
+            .with_context(|| format!("Failed to get roles for realm '{}'", realm_name))?;
         let existing_roles_map: HashMap<String, String> = existing_roles
             .into_iter()
             .filter_map(|r| {
                 let identity = r.get_identity();
-                let id = r.id.clone();
+                let id = r.id;
                 match (identity, id) {
                     (Some(identity), Some(id)) => Some((identity, id)),
                     _ => None,
@@ -48,6 +51,7 @@ pub async fn apply_roles(
                 let client = client.clone();
                 let existing_roles_map = existing_roles_map.clone();
                 let env_vars = Arc::clone(&env_vars);
+                let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
@@ -61,10 +65,13 @@ pub async fn apply_roles(
 
                     if let Some(id) = existing_roles_map.get(&identity) {
                         role_rep.id = Some(id.clone()); // Use remote ID
-                        client
-                            .update_role(id, &role_rep)
-                            .await
-                            .context(format!("Failed to update role {}", role_rep.get_name()))?;
+                        client.update_role(id, &role_rep).await.with_context(|| {
+                            format!(
+                                "Failed to update role '{}' in realm '{}'",
+                                role_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                         println!(
                             "  {} {}",
                             SUCCESS_UPDATE,
@@ -72,10 +79,13 @@ pub async fn apply_roles(
                         );
                     } else {
                         role_rep.id = None; // Don't send ID on create
-                        client
-                            .create_role(&role_rep)
-                            .await
-                            .context(format!("Failed to create role {}", role_rep.get_name()))?;
+                        client.create_role(&role_rep).await.with_context(|| {
+                            format!(
+                                "Failed to create role '{}' in realm '{}'",
+                                role_rep.get_name(),
+                                realm_name
+                            )
+                        })?;
                         println!(
                             "  {} {}",
                             SUCCESS_CREATE,
@@ -188,6 +198,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());
@@ -209,6 +220,7 @@ mod tests {
             temp.path(),
             Arc::new(HashMap::new()),
             Arc::new(None),
+            "test",
         )
         .await;
         assert!(res.is_err());

@@ -1,8 +1,8 @@
 use crate::client::KeycloakClient;
 use crate::models::{KeycloakResource, UserRepresentation};
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::SPARKLE;
 use anyhow::{Context, Result};
-use console::Emoji;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,10 +17,14 @@ pub async fn plan_users(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let users_dir = workspace_dir.join("users");
     if async_fs::try_exists(&users_dir).await? {
-        let existing_users = client.get_users().await?;
+        let existing_users = client
+            .get_users()
+            .await
+            .with_context(|| format!("Failed to get users for realm '{}'", realm_name))?;
         let existing_users_map: HashMap<String, UserRepresentation> = existing_users
             .into_iter()
             .filter_map(|u| u.get_identity().map(|id| (id, u)))
@@ -74,7 +78,7 @@ pub async fn plan_users(
             } else {
                 println!(
                     "\n{} Will create User: {}",
-                    Emoji("✨", ""),
+                    SPARKLE,
                     local_user.get_name()
                 );
                 print_diff(

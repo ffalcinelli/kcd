@@ -1,8 +1,8 @@
 use crate::client::KeycloakClient;
 use crate::models::{KeycloakResource, RoleRepresentation};
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::SPARKLE;
 use anyhow::{Context, Result};
-use console::Emoji;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,10 +17,14 @@ pub async fn plan_roles(
     interactive: bool,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
+    realm_name: &str,
 ) -> Result<()> {
     let roles_dir = workspace_dir.join("roles");
     if async_fs::try_exists(&roles_dir).await? {
-        let existing_roles = client.get_roles().await?;
+        let existing_roles = client
+            .get_roles()
+            .await
+            .with_context(|| format!("Failed to get roles for realm '{}'", realm_name))?;
         let existing_roles_map: HashMap<String, RoleRepresentation> = existing_roles
             .into_iter()
             .filter_map(|r| r.get_identity().map(|id| (id, r)))
@@ -76,7 +80,7 @@ pub async fn plan_roles(
             } else {
                 println!(
                     "\n{} Will create Role: {}",
-                    Emoji("✨", ""),
+                    SPARKLE,
                     local_role.get_name()
                 );
                 print_diff(
