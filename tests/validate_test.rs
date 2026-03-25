@@ -477,6 +477,7 @@ async fn test_validate_empty_auth_flow_alias() {
     let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
+    // Create valid realm.yaml
     let realm = RealmRepresentation {
         realm: "test-realm".to_string(),
         enabled: Some(true),
@@ -525,6 +526,7 @@ async fn test_validate_empty_required_action_alias() {
     let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
+    // Create valid realm.yaml
     let realm = RealmRepresentation {
         realm: "test-realm".to_string(),
         enabled: Some(true),
@@ -573,6 +575,7 @@ async fn test_validate_empty_required_action_provider_id() {
     let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
+    // Create valid realm.yaml
     let realm = RealmRepresentation {
         realm: "test-realm".to_string(),
         enabled: Some(true),
@@ -621,6 +624,7 @@ async fn test_validate_empty_component_name() {
     let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
+    // Create valid realm.yaml
     let realm = RealmRepresentation {
         realm: "test-realm".to_string(),
         enabled: Some(true),
@@ -669,6 +673,7 @@ async fn test_validate_missing_component_name() {
     let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
+    // Create valid realm.yaml
     let realm = RealmRepresentation {
         realm: "test-realm".to_string(),
         enabled: Some(true),
@@ -715,6 +720,7 @@ async fn test_validate_empty_component_provider_id() {
     let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
 
+    // Create valid realm.yaml
     let realm = RealmRepresentation {
         realm: "test-realm".to_string(),
         enabled: Some(true),

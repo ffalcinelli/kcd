@@ -152,7 +152,7 @@ pub struct ClientRepresentation {
 
 impl KeycloakResource for ClientRepresentation {
     fn get_identity(&self) -> Option<String> {
-        self.id.clone().or_else(|| self.client_id.clone())
+        self.client_id.clone().or_else(|| self.id.clone())
     }
     fn get_name(&self) -> String {
         self.client_id
@@ -196,7 +196,7 @@ pub struct RoleRepresentation {
 
 impl KeycloakResource for RoleRepresentation {
     fn get_identity(&self) -> Option<String> {
-        self.id.clone().or_else(|| Some(self.name.clone()))
+        Some(self.name.clone()).or_else(|| self.id.clone())
     }
     fn get_name(&self) -> String {
         self.name.clone()
@@ -239,7 +239,7 @@ pub struct ClientScopeRepresentation {
 
 impl KeycloakResource for ClientScopeRepresentation {
     fn get_identity(&self) -> Option<String> {
-        self.id.clone().or_else(|| self.name.clone())
+        self.name.clone().or_else(|| self.id.clone())
     }
     fn get_name(&self) -> String {
         self.name.clone().unwrap_or_else(|| "unknown".to_string())
@@ -277,7 +277,10 @@ pub struct GroupRepresentation {
 
 impl KeycloakResource for GroupRepresentation {
     fn get_identity(&self) -> Option<String> {
-        self.id.clone().or_else(|| self.name.clone())
+        self.path
+            .clone()
+            .or_else(|| self.id.clone())
+            .or_else(|| self.name.clone())
     }
     fn get_name(&self) -> String {
         self.name.clone().unwrap_or_else(|| "unknown".to_string())
@@ -344,7 +347,7 @@ pub struct UserRepresentation {
 
 impl KeycloakResource for UserRepresentation {
     fn get_identity(&self) -> Option<String> {
-        self.id.clone().or_else(|| self.username.clone())
+        self.username.clone().or_else(|| self.id.clone())
     }
     fn get_name(&self) -> String {
         self.username
@@ -416,7 +419,7 @@ pub struct AuthenticationFlowRepresentation {
 
 impl KeycloakResource for AuthenticationFlowRepresentation {
     fn get_identity(&self) -> Option<String> {
-        self.id.clone().or_else(|| self.alias.clone())
+        self.alias.clone().or_else(|| self.id.clone())
     }
     fn get_name(&self) -> String {
         self.alias.clone().unwrap_or_else(|| "unknown".to_string())
@@ -504,7 +507,7 @@ pub struct ComponentRepresentation {
 
 impl KeycloakResource for ComponentRepresentation {
     fn get_identity(&self) -> Option<String> {
-        self.id.clone()
+        self.id.clone().or_else(|| self.name.clone())
     }
     fn get_name(&self) -> String {
         self.name.clone().unwrap_or_else(|| "unknown".to_string())
