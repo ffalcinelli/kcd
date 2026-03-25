@@ -5,7 +5,7 @@ use crate::models::{
     RequiredActionProviderRepresentation, ResourceMeta, RoleRepresentation, UserRepresentation,
 };
 use crate::utils::to_sorted_yaml_with_secrets;
-use crate::utils::ui::{CHECK, SEARCH, WARN};
+use crate::utils::ui::{CHECK, SEARCH, SUCCESS, WARN};
 use anyhow::{Context, Result};
 use console::style;
 use dialoguer::{Confirm, theme::ColorfulTheme};
@@ -100,36 +100,6 @@ pub async fn run(
     Ok(())
 }
 
-async fn write_if_changed(path: &Path, content: &str, yes: bool) -> Result<()> {
-    if fs::try_exists(path).await.unwrap_or(false) {
-        let existing = fs::read_to_string(path).await.unwrap_or_default();
-        if existing == content {
-            return Ok(());
-        }
-
-        if !yes
-            && !Confirm::with_theme(&ColorfulTheme::default())
-                .with_prompt(format!(
-                    "File {:?} already exists with different content. Overwrite?",
-                    path
-                ))
-                .default(false)
-                .interact()?
-        {
-            println!(
-                "{} {}",
-                WARN,
-                style(format!("Skipping {:?}", path)).yellow()
-            );
-            return Ok(());
-        }
-    }
-    fs::write(path, content)
-        .await
-        .context(format!("Failed to write {:?}", path))?;
-    Ok(())
-}
-
 async fn write_if_changed_with_mutex(
     path: &Path,
     content: &str,
@@ -219,19 +189,22 @@ where
     while let Some(res) = set.join_next().await {
         res.context("Task panicked")??;
     }
-    println!(
-        "  {} {}",
-        CHECK,
-        style(format!(
-            "Exported {} to {}/",
-            T::label(),
-            target_dir
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or_default()
-        ))
-        .green()
-    );
+    {
+        let _lock = prompt_mutex.lock().await;
+        println!(
+            "  {} {}",
+            SUCCESS,
+            style(format!(
+                "Exported {} to {}/",
+                T::label(),
+                target_dir
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or_default()
+            ))
+            .green()
+        );
+    }
 
     Ok(())
 }
@@ -253,24 +226,38 @@ async fn inspect_realm(
             .context("Failed to create output directory")?;
     }
 
-    // Fetch realm
-    let realm = client.get_realm().await.context("Failed to fetch realm")?;
-    let mut local_secrets = HashMap::new();
-    let realm_prefix = format!("realm_{}", realm_name);
-    let realm_yaml = to_sorted_yaml_with_secrets(&realm, &realm_prefix, &mut local_secrets)
-        .context("Failed to serialize realm")?;
-    all_secrets.lock().await.extend(local_secrets);
-
-    let realm_path = workspace_dir.join("realm.yaml");
-    write_if_changed(&realm_path, &realm_yaml, yes).await?;
-    println!(
-        "  {} {}",
-        CHECK,
-        style("Exported realm configuration to realm.yaml").green()
-    );
-
     let mut set = tokio::task::JoinSet::new();
     let workspace_dir = Arc::new(workspace_dir);
+
+    // Fetch realm configuration in parallel
+    {
+        let client = client.clone();
+        let realm_name = realm_name.to_string();
+        let workspace_dir = Arc::clone(&workspace_dir);
+        let all_secrets = Arc::clone(&all_secrets);
+        let prompt_mutex = Arc::clone(&prompt_mutex);
+        set.spawn(async move {
+            let realm = client.get_realm().await.context("Failed to fetch realm")?;
+            let mut local_secrets = HashMap::new();
+            let realm_prefix = format!("realm_{}", realm_name);
+            let realm_yaml = to_sorted_yaml_with_secrets(&realm, &realm_prefix, &mut local_secrets)
+                .context("Failed to serialize realm")?;
+            all_secrets.lock().await.extend(local_secrets);
+
+            let realm_path = workspace_dir.join("realm.yaml");
+            write_if_changed_with_mutex(&realm_path, &realm_yaml, yes, Arc::clone(&prompt_mutex))
+                .await?;
+            {
+                let _lock = prompt_mutex.lock().await;
+                println!(
+                    "  {} {}",
+                    SUCCESS,
+                    style("Exported realm configuration to realm.yaml").green()
+                );
+            }
+            Ok::<(), anyhow::Error>(())
+        });
+    }
 
     // Fetch resources in parallel
     spawn_inspect::<ClientRepresentation>(

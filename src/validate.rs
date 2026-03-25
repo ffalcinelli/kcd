@@ -11,24 +11,35 @@ use serde::de::DeserializeOwned;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tokio::fs;
+use tokio::task::JoinSet;
 
-async fn read_yaml_files<T: DeserializeOwned>(
+async fn read_yaml_files<T: DeserializeOwned + Send + 'static>(
     dir: &Path,
     file_type: &str,
 ) -> Result<Vec<(PathBuf, T)>> {
     let mut results = Vec::new();
     if fs::try_exists(dir).await? {
         let mut entries = fs::read_dir(dir).await?;
+        let mut join_set = JoinSet::new();
+        let file_type_str = file_type.to_string();
+
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let content = fs::read_to_string(&path)
-                    .await
-                    .context(format!("Failed to read {} file {:?}", file_type, path))?;
-                let item: T = serde_yaml::from_str(&content)
-                    .context(format!("Failed to parse {} file {:?}", file_type, path))?;
-                results.push((path, item));
+                let ft = file_type_str.clone();
+                join_set.spawn(async move {
+                    let content = fs::read_to_string(&path)
+                        .await
+                        .context(format!("Failed to read {} file {:?}", ft, path))?;
+                    let item: T = serde_yaml::from_str(&content)
+                        .context(format!("Failed to parse {} file {:?}", ft, path))?;
+                    Ok::<(PathBuf, T), anyhow::Error>((path, item))
+                });
             }
+        }
+
+        while let Some(res) = join_set.join_next().await {
+            results.push(res??);
         }
     }
     Ok(results)
