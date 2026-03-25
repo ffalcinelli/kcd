@@ -184,7 +184,11 @@ mod tests {
         // 1. Test update failure
         call_count.store(0, std::sync::atomic::Ordering::SeqCst);
         let group_existing = groups_dir.join("existing.yaml");
-        fs::write(group_existing, "name: Existing Group\nid: existing-id\npath: /existing-group").unwrap();
+        fs::write(
+            group_existing,
+            "name: Existing Group\nid: existing-id\npath: /existing-group",
+        )
+        .unwrap();
 
         let res = apply_groups(
             &client,

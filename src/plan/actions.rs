@@ -21,10 +21,9 @@ pub async fn plan_required_actions(
 ) -> Result<()> {
     let actions_dir = workspace_dir.join("required-actions");
     if async_fs::try_exists(&actions_dir).await? {
-        let existing_actions = client
-            .get_required_actions()
-            .await
-            .with_context(|| format!("Failed to get required actions for realm '{}'", realm_name))?;
+        let existing_actions = client.get_required_actions().await.with_context(|| {
+            format!("Failed to get required actions for realm '{}'", realm_name)
+        })?;
         let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
             existing_actions
                 .into_iter()
@@ -44,17 +43,28 @@ pub async fn plan_required_actions(
 
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
-                    let mut val: serde_json::Value = serde_yaml::from_str(&content)
-                        .with_context(|| format!("Failed to parse YAML file {:?} in realm '{}'", path, realm_name))?;
+                    let mut val: serde_json::Value =
+                        serde_yaml::from_str(&content).with_context(|| {
+                            format!(
+                                "Failed to parse YAML file {:?} in realm '{}'",
+                                path, realm_name
+                            )
+                        })?;
                     substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                     let local_action: RequiredActionProviderRepresentation =
                         serde_json::from_value(val).with_context(|| {
-                            format!("Failed to deserialize YAML file {:?} in realm '{}'", path, realm_name)
+                            format!(
+                                "Failed to deserialize YAML file {:?} in realm '{}'",
+                                path, realm_name
+                            )
                         })?;
 
-                    let identity = local_action
-                        .get_identity()
-                        .with_context(|| format!("Failed to get identity for action in {:?} in realm '{}'", path, realm_name))?;
+                    let identity = local_action.get_identity().with_context(|| {
+                        format!(
+                            "Failed to get identity for action in {:?} in realm '{}'",
+                            path, realm_name
+                        )
+                    })?;
                     let remote = existing_actions_map.get(&identity).cloned();
 
                     Ok::<

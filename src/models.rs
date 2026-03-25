@@ -277,7 +277,10 @@ pub struct GroupRepresentation {
 
 impl KeycloakResource for GroupRepresentation {
     fn get_identity(&self) -> Option<String> {
-        self.path.clone().or_else(|| self.id.clone()).or_else(|| self.name.clone())
+        self.path
+            .clone()
+            .or_else(|| self.id.clone())
+            .or_else(|| self.name.clone())
     }
     fn get_name(&self) -> String {
         self.name.clone().unwrap_or_else(|| "unknown".to_string())

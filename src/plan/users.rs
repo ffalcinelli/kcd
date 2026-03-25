@@ -76,11 +76,7 @@ pub async fn plan_users(
                     "user",
                 )?
             } else {
-                println!(
-                    "\n{} Will create User: {}",
-                    SPARKLE,
-                    local_user.get_name()
-                );
+                println!("\n{} Will create User: {}", SPARKLE, local_user.get_name());
                 print_diff(
                     &format!("User {}", local_user.get_name()),
                     None::<&UserRepresentation>,

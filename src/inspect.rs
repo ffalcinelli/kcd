@@ -245,7 +245,8 @@ async fn inspect_realm(
             all_secrets.lock().await.extend(local_secrets);
 
             let realm_path = workspace_dir.join("realm.yaml");
-            write_if_changed_with_mutex(&realm_path, &realm_yaml, yes, Arc::clone(&prompt_mutex)).await?;
+            write_if_changed_with_mutex(&realm_path, &realm_yaml, yes, Arc::clone(&prompt_mutex))
+                .await?;
             {
                 let _lock = prompt_mutex.lock().await;
                 println!(

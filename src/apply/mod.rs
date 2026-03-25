@@ -343,4 +343,3 @@ async fn apply_single_realm(
 
     Ok(())
 }
-

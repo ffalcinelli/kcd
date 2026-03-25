@@ -78,11 +78,7 @@ pub async fn plan_roles(
                     "role",
                 )?
             } else {
-                println!(
-                    "\n{} Will create Role: {}",
-                    SPARKLE,
-                    local_role.get_name()
-                );
+                println!("\n{} Will create Role: {}", SPARKLE, local_role.get_name());
                 print_diff(
                     &format!("Role {}", local_role.get_name()),
                     None::<&RoleRepresentation>,

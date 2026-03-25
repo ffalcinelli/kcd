@@ -106,9 +106,9 @@ mod tests {
     use super::*;
     use crate::client::KeycloakClient;
     use axum::{
+        Json, Router,
         http::StatusCode,
         routing::{get, put},
-        Json, Router,
     };
     use std::fs;
     use std::sync::Arc;

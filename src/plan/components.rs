@@ -66,11 +66,21 @@ pub async fn plan_components_or_keys(
 
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
-                    let mut val: serde_json::Value = serde_yaml::from_str(&content)
-                        .with_context(|| format!("Failed to parse YAML file {:?} in realm '{}'", path, realm_name))?;
+                    let mut val: serde_json::Value =
+                        serde_yaml::from_str(&content).with_context(|| {
+                            format!(
+                                "Failed to parse YAML file {:?} in realm '{}'",
+                                path, realm_name
+                            )
+                        })?;
                     substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
                     let local_component: ComponentRepresentation = serde_json::from_value(val)
-                        .with_context(|| format!("Failed to deserialize YAML file {:?} in realm '{}'", path, realm_name))?;
+                        .with_context(|| {
+                            format!(
+                                "Failed to deserialize YAML file {:?} in realm '{}'",
+                                path, realm_name
+                            )
+                        })?;
 
                     let remote = if let Some(identity) = local_component.get_identity() {
                         by_identity
@@ -165,7 +175,11 @@ pub async fn plan_components_or_keys(
     Ok(())
 }
 
-pub async fn check_keys_drift(client: &KeycloakClient, changes_only: bool, realm_name: &str) -> Result<()> {
+pub async fn check_keys_drift(
+    client: &KeycloakClient,
+    changes_only: bool,
+    realm_name: &str,
+) -> Result<()> {
     if !changes_only {
         return Ok(());
     }

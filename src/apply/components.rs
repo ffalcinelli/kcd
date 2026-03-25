@@ -21,12 +21,10 @@ pub async fn apply_components_or_keys(
 ) -> Result<()> {
     let components_dir = workspace_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
-        let existing_components = client.get_components().await.with_context(|| {
-            format!(
-                "Failed to get components/keys for realm '{}'",
-                realm_name
-            )
-        })?;
+        let existing_components = client
+            .get_components()
+            .await
+            .with_context(|| format!("Failed to get components/keys for realm '{}'", realm_name))?;
         let mut by_identity: HashMap<String, ComponentRepresentation> = HashMap::new();
         type ComponentKey = (
             Option<String>,
