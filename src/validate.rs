@@ -274,10 +274,10 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
             let components: Vec<(PathBuf, ComponentRepresentation)> =
                 read_yaml_files(&dir, dir_name).await?;
             for (path, component) in &components {
-                if let Some(name) = &component.name {
-                    if name.is_empty() {
-                        anyhow::bail!("Component name is empty in {:?}", path);
-                    }
+                if let Some(name) = &component.name
+                    && name.is_empty()
+                {
+                    anyhow::bail!("Component name is empty in {:?}", path);
                 }
                 if component.provider_id.as_deref().unwrap_or("").is_empty() {
                     anyhow::bail!("Component providerId is missing or empty in {:?}", path);

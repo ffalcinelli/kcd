@@ -10,13 +10,12 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs as async_fs;
 
-use super::print_diff;
+use super::{PlanOptions, print_diff};
 
 pub async fn plan_components_or_keys(
     client: &KeycloakClient,
     workspace_dir: &Path,
-    changes_only: bool,
-    interactive: bool,
+    options: PlanOptions,
     dir_name: &str,
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
@@ -134,7 +133,7 @@ pub async fn plan_components_or_keys(
                     &format!("Component {}", local_component.get_name()),
                     Some(&remote_clone),
                     &local_component,
-                    changes_only,
+                    options.changes_only,
                     prefix,
                 )?
             } else {
@@ -152,14 +151,14 @@ pub async fn plan_components_or_keys(
                     &format!("Component {}", local_component.get_name()),
                     None::<&ComponentRepresentation>,
                     &local_component,
-                    changes_only,
+                    options.changes_only,
                     prefix,
                 )?
             };
 
             if changed {
                 let mut include = true;
-                if interactive {
+                if options.interactive {
                     include =
                         dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
                             .with_prompt("Include this change in the plan?")
@@ -177,10 +176,10 @@ pub async fn plan_components_or_keys(
 
 pub async fn check_keys_drift(
     client: &KeycloakClient,
-    changes_only: bool,
+    options: PlanOptions,
     realm_name: &str,
 ) -> Result<()> {
-    if !changes_only {
+    if !options.changes_only {
         return Ok(());
     }
 

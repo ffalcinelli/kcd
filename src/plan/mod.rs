@@ -23,6 +23,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
 
+#[derive(Debug, Clone, Copy)]
+pub struct PlanOptions {
+    pub changes_only: bool,
+    pub interactive: bool,
+}
+
 pub async fn run(
     client: &KeycloakClient,
     workspace_dir: PathBuf,
@@ -209,11 +215,15 @@ async fn plan_single_realm(
     )
     .await?;
 
+    let options = PlanOptions {
+        changes_only,
+        interactive,
+    };
+
     components::plan_components_or_keys(
         client,
         &workspace_dir,
-        changes_only,
-        interactive,
+        options,
         "components",
         Arc::clone(&env_vars),
         changed_files,
@@ -223,15 +233,14 @@ async fn plan_single_realm(
     components::plan_components_or_keys(
         client,
         &workspace_dir,
-        changes_only,
-        interactive,
+        options,
         "keys",
         Arc::clone(&env_vars),
         changed_files,
         realm_name,
     )
     .await?;
-    components::check_keys_drift(client, changes_only, realm_name).await?;
+    components::check_keys_drift(client, options, realm_name).await?;
 
     Ok(())
 }
