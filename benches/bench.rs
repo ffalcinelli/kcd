@@ -1,5 +1,5 @@
-use app::client::KeycloakClient;
-use app::plan;
+use kcd::client::KeycloakClient;
+use kcd::plan;
 use std::path::PathBuf;
 use tokio::runtime::Runtime;
 

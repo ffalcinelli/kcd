@@ -1,6 +1,6 @@
-use app::client::KeycloakClient;
-use app::plan::PlanOptions;
-use app::plan::components::{check_keys_drift, plan_components_or_keys};
+use kcd::client::KeycloakClient;
+use kcd::plan::PlanOptions;
+use kcd::plan::components::{check_keys_drift, plan_components_or_keys};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::tempdir;

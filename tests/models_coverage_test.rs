@@ -1,4 +1,4 @@
-use app::models::*;
+use kcd::models::*;
 use std::collections::HashMap;
 
 #[test]

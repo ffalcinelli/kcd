@@ -1,6 +1,6 @@
 use anyhow::Result;
-use app::client::KeycloakClient;
-use app::{apply, inspect, plan};
+use kcd::client::KeycloakClient;
+use kcd::{apply, inspect, plan};
 use std::fs;
 use std::process::Command;
 use std::time::Duration;

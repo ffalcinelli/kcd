@@ -1,4 +1,4 @@
-# GEMINI.md - Keycloak Continuous Delivery (kcd)
+# GEMINI.md - Keycloak Configuration Drive (kcd)
 
 This document serves as the internal developer guide for `kcd`. It explains the architecture, design decisions, and workflows for extending the tool.
 

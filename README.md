@@ -1,4 +1,4 @@
-# Keycloak Continuous Delivery (kcd)
+# Keycloak Configuration Drive (kcd)
 
 [![CI](https://github.com/ffalcinelli/kcd/actions/workflows/ci.yml/badge.svg)](https://github.com/ffalcinelli/kcd/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/ffalcinelli/kcd/graph/badge.svg)](https://app.codecov.io/gh/ffalcinelli/kcd)
@@ -7,7 +7,7 @@
 
 **Disclaimer**: This project is experimentally written almost entirely by AI, so any usage should keep this in mind and that the execution of this software is at your own risk.
 
-`kcd` is a robust CLI tool for the **declarative management** of [Keycloak](https://www.keycloak.org/) configurations. It allows you to treat your Keycloak settings as code, enabling version control, automated testing, and seamless continuous delivery of your identity infrastructure.
+`kcd` is a robust CLI tool for the **declarative management** of [Keycloak](https://www.keycloak.org/) configurations. It allows you to treat your Keycloak settings as code, enabling version control, automated testing, and a seamless drive of your identity infrastructure configuration.
 
 ---
 

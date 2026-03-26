@@ -1,7 +1,10 @@
 [package]
-name = "app"
+name = "kcd"
 version = "2603.1.0"
 edition = "2024"
+description = "Keycloak Configuration Drive"
+repository = "https://github.com/ffalcinelli/kcd"
+license = "MIT"
 
 [[bin]]
 name = "kcd"

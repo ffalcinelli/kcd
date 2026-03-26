@@ -1,7 +1,7 @@
 mod common;
-use app::client::KeycloakClient;
-use app::models::ClientRepresentation;
 use common::start_mock_server;
+use kcd::client::KeycloakClient;
+use kcd::models::ClientRepresentation;
 
 #[tokio::test]
 async fn test_login_password_grant() {
@@ -166,7 +166,7 @@ async fn test_update_realm() {
         .await
         .expect("Login failed");
 
-    let realm = app::models::RealmRepresentation {
+    let realm = kcd::models::RealmRepresentation {
         realm: "test-realm".to_string(),
         enabled: Some(true),
         display_name: Some("New Name".to_string()),
@@ -187,7 +187,7 @@ async fn test_roles() {
         .await
         .expect("Login failed");
 
-    let role = app::models::RoleRepresentation {
+    let role = kcd::models::RoleRepresentation {
         id: None,
         name: "new-role".to_string(),
         description: None,
@@ -218,7 +218,7 @@ async fn test_identity_providers() {
         .expect("Failed to get IDPs");
     assert_eq!(idps.len(), 1);
 
-    let idp = app::models::IdentityProviderRepresentation {
+    let idp = kcd::models::IdentityProviderRepresentation {
         alias: Some("google".to_string()),
         provider_id: Some("google".to_string()),
         enabled: Some(true),
@@ -262,7 +262,7 @@ async fn test_client_scopes() {
         .expect("Failed to get scopes");
     assert_eq!(scopes.len(), 1);
 
-    let scope = app::models::ClientScopeRepresentation {
+    let scope = kcd::models::ClientScopeRepresentation {
         id: None,
         name: Some("new-scope".to_string()),
         description: None,
@@ -289,7 +289,7 @@ async fn test_groups() {
     let groups = client.get_groups().await.expect("Failed to get groups");
     assert_eq!(groups.len(), 1);
 
-    let group = app::models::GroupRepresentation {
+    let group = kcd::models::GroupRepresentation {
         id: None,
         name: Some("new-group".to_string()),
         path: None,
@@ -315,7 +315,7 @@ async fn test_users() {
     let users = client.get_users().await.expect("Failed to get users");
     assert_eq!(users.len(), 1);
 
-    let user = app::models::UserRepresentation {
+    let user = kcd::models::UserRepresentation {
         id: None,
         username: Some("new-user".to_string()),
         enabled: Some(true),
@@ -348,7 +348,7 @@ async fn test_authentication_flows() {
         .expect("Failed to get flows");
     assert_eq!(flows.len(), 1);
 
-    let flow = app::models::AuthenticationFlowRepresentation {
+    let flow = kcd::models::AuthenticationFlowRepresentation {
         id: None,
         alias: Some("new-flow".to_string()),
         description: None,
@@ -380,7 +380,7 @@ async fn test_required_actions() {
         .expect("Failed to get actions");
     assert_eq!(actions.len(), 1);
 
-    let action = app::models::RequiredActionProviderRepresentation {
+    let action = kcd::models::RequiredActionProviderRepresentation {
         alias: Some("action-1".to_string()),
         name: Some("Action 1".to_string()),
         provider_id: Some("action-provider".to_string()),
@@ -417,7 +417,7 @@ async fn test_components() {
         .expect("Failed to get components");
     assert_eq!(components.len(), 1);
 
-    let component = app::models::ComponentRepresentation {
+    let component = kcd::models::ComponentRepresentation {
         id: None,
         name: Some("new-component".to_string()),
         provider_id: Some("ldap".to_string()),
@@ -500,7 +500,7 @@ async fn test_register_required_action_no_name() {
         .await
         .expect("Login failed");
 
-    let action = app::models::RequiredActionProviderRepresentation {
+    let action = kcd::models::RequiredActionProviderRepresentation {
         alias: Some("action-2".to_string()),
         name: None,
         provider_id: Some("action-provider-2".to_string()),
@@ -517,7 +517,7 @@ async fn test_register_required_action_no_name() {
 #[tokio::test]
 async fn test_register_required_action_no_provider_id() {
     let client = KeycloakClient::new("http://localhost".to_string());
-    let action = app::models::RequiredActionProviderRepresentation {
+    let action = kcd::models::RequiredActionProviderRepresentation {
         alias: Some("action-2".to_string()),
         name: None,
         provider_id: None,

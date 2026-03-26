@@ -1,7 +1,7 @@
 mod common;
-use app::client::KeycloakClient;
-use app::inspect;
 use common::start_mock_server;
+use kcd::client::KeycloakClient;
+use kcd::inspect;
 use std::fs;
 use tempfile::tempdir;
 

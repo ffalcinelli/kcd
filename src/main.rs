@@ -1,6 +1,6 @@
 use anyhow::Result;
-use app::args::Cli;
 use clap::Parser;
+use kcd::args::Cli;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -18,5 +18,5 @@ async fn main() -> Result<()> {
         cli.client_secret = std::env::var("KEYCLOAK_CLIENT_SECRET").ok();
     }
 
-    app::run_app(cli).await
+    kcd::run_app(cli).await
 }

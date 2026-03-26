@@ -1,7 +1,7 @@
 mod common;
-use app::client::KeycloakClient;
-use app::plan;
 use common::start_mock_server;
+use kcd::client::KeycloakClient;
+use kcd::plan;
 use std::fs;
 use tempfile::tempdir;
 
@@ -103,7 +103,7 @@ async fn test_plan_realm_not_found_remote() {
     let realm_dir = workspace_dir.join("new-realm");
     fs::create_dir_all(&realm_dir).unwrap();
 
-    let realm = app::models::RealmRepresentation {
+    let realm = kcd::models::RealmRepresentation {
         realm: "new-realm".to_string(),
         enabled: Some(true),
         display_name: Some("New Realm".to_string()),

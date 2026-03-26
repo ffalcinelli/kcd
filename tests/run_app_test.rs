@@ -1,7 +1,7 @@
 mod common;
 use anyhow::Result;
-use app::args::{Cli, Commands};
-use app::run_app;
+use kcd::args::{Cli, Commands};
+use kcd::run_app;
 use tempfile::tempdir;
 
 #[tokio::test]

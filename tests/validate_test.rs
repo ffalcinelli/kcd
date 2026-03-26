@@ -1,10 +1,10 @@
-use app::models::{
+use kcd::models::{
     AuthenticationFlowRepresentation, ClientRepresentation, ClientScopeRepresentation,
     ComponentRepresentation, GroupRepresentation, IdentityProviderRepresentation,
     RealmRepresentation, RequiredActionProviderRepresentation, RoleRepresentation,
     UserRepresentation,
 };
-use app::validate;
+use kcd::validate;
 use std::fs;
 use tempfile::tempdir;
 

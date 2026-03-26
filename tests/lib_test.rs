@@ -1,6 +1,6 @@
-use app::args::{Cli, Commands};
-use app::init_client;
-use app::run_app;
+use kcd::args::{Cli, Commands};
+use kcd::init_client;
+use kcd::run_app;
 use std::path::PathBuf;
 
 #[tokio::test]

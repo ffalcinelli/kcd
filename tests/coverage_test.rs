@@ -1,8 +1,8 @@
 mod common;
-use app::client::KeycloakClient;
-use app::models::RealmRepresentation;
-use app::{apply, clean, inspect, plan};
 use common::start_mock_server;
+use kcd::client::KeycloakClient;
+use kcd::models::RealmRepresentation;
+use kcd::{apply, clean, inspect, plan};
 use std::fs;
 use tempfile::tempdir;
 
@@ -266,12 +266,12 @@ async fn test_validate_edge_cases() {
     let workspace_dir = dir.path().to_path_buf();
 
     // 1. Test run with non-existent directory
-    let res = app::validate::run(workspace_dir.join("non-existent"), &[]).await;
+    let res = kcd::validate::run(workspace_dir.join("non-existent"), &[]).await;
     assert!(res.is_err());
 
     // 2. Test run with empty directory (no realms)
     fs::create_dir_all(&workspace_dir).unwrap();
-    let res = app::validate::run(workspace_dir.clone(), &[]).await;
+    let res = kcd::validate::run(workspace_dir.clone(), &[]).await;
     assert!(res.is_ok());
 
     // 3. Test auto-discovery of realms for validation
@@ -289,7 +289,7 @@ async fn test_validate_edge_cases() {
     )
     .unwrap();
 
-    app::validate::run(workspace_dir.clone(), &[])
+    kcd::validate::run(workspace_dir.clone(), &[])
         .await
         .unwrap();
 }

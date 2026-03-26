@@ -1,8 +1,8 @@
 mod common;
-use app::client::KeycloakClient;
-use app::models::{ClientRepresentation, RealmRepresentation, RoleRepresentation};
-use app::plan;
 use common::start_mock_server;
+use kcd::client::KeycloakClient;
+use kcd::models::{ClientRepresentation, RealmRepresentation, RoleRepresentation};
+use kcd::plan;
 use std::fs;
 use tempfile::tempdir;
 
@@ -113,7 +113,7 @@ async fn test_plan() {
     // Identity Providers
     let idps_dir = realm_dir.join("identity-providers");
     fs::create_dir(&idps_dir).unwrap();
-    let idp = app::models::IdentityProviderRepresentation {
+    let idp = kcd::models::IdentityProviderRepresentation {
         internal_id: None,
         alias: Some("google".to_string()),
         provider_id: Some("google".to_string()),
@@ -136,7 +136,7 @@ async fn test_plan() {
     )
     .unwrap();
 
-    let new_idp = app::models::IdentityProviderRepresentation {
+    let new_idp = kcd::models::IdentityProviderRepresentation {
         internal_id: None,
         alias: Some("new-idp".to_string()),
         provider_id: Some("oidc".to_string()),
@@ -162,7 +162,7 @@ async fn test_plan() {
     // Client Scopes
     let scopes_dir = realm_dir.join("client-scopes");
     fs::create_dir(&scopes_dir).unwrap();
-    let scope = app::models::ClientScopeRepresentation {
+    let scope = kcd::models::ClientScopeRepresentation {
         id: None,
         name: Some("scope-1".to_string()),
         description: None,
@@ -176,7 +176,7 @@ async fn test_plan() {
     )
     .unwrap();
 
-    let new_scope = app::models::ClientScopeRepresentation {
+    let new_scope = kcd::models::ClientScopeRepresentation {
         id: None,
         name: Some("new-scope".to_string()),
         description: None,
@@ -193,7 +193,7 @@ async fn test_plan() {
     // Groups
     let groups_dir = realm_dir.join("groups");
     fs::create_dir(&groups_dir).unwrap();
-    let group = app::models::GroupRepresentation {
+    let group = kcd::models::GroupRepresentation {
         id: None,
         name: Some("group-1".to_string()),
         path: Some("/group-1".to_string()),
@@ -206,7 +206,7 @@ async fn test_plan() {
     )
     .unwrap();
 
-    let new_group = app::models::GroupRepresentation {
+    let new_group = kcd::models::GroupRepresentation {
         id: None,
         name: Some("new-group".to_string()),
         path: Some("/new-group".to_string()),
@@ -222,7 +222,7 @@ async fn test_plan() {
     // Users
     let users_dir = realm_dir.join("users");
     fs::create_dir(&users_dir).unwrap();
-    let user = app::models::UserRepresentation {
+    let user = kcd::models::UserRepresentation {
         id: None,
         username: Some("user-1".to_string()),
         enabled: Some(true),
@@ -239,7 +239,7 @@ async fn test_plan() {
     )
     .unwrap();
 
-    let new_user = app::models::UserRepresentation {
+    let new_user = kcd::models::UserRepresentation {
         id: None,
         username: Some("new-user".to_string()),
         enabled: Some(true),
@@ -259,7 +259,7 @@ async fn test_plan() {
     // Authentication Flows
     let flows_dir = realm_dir.join("authentication-flows");
     fs::create_dir(&flows_dir).unwrap();
-    let flow = app::models::AuthenticationFlowRepresentation {
+    let flow = kcd::models::AuthenticationFlowRepresentation {
         id: None,
         alias: Some("flow-1".to_string()),
         description: None,
@@ -275,7 +275,7 @@ async fn test_plan() {
     )
     .unwrap();
 
-    let new_flow = app::models::AuthenticationFlowRepresentation {
+    let new_flow = kcd::models::AuthenticationFlowRepresentation {
         id: None,
         alias: Some("new-flow".to_string()),
         description: None,
@@ -294,7 +294,7 @@ async fn test_plan() {
     // Required Actions
     let actions_dir = realm_dir.join("required-actions");
     fs::create_dir(&actions_dir).unwrap();
-    let action = app::models::RequiredActionProviderRepresentation {
+    let action = kcd::models::RequiredActionProviderRepresentation {
         alias: Some("action-1".to_string()),
         name: Some("Action 1".to_string()),
         provider_id: Some("action-provider".to_string()),
@@ -310,7 +310,7 @@ async fn test_plan() {
     )
     .unwrap();
 
-    let new_action = app::models::RequiredActionProviderRepresentation {
+    let new_action = kcd::models::RequiredActionProviderRepresentation {
         alias: Some("new-action".to_string()),
         name: Some("New Action".to_string()),
         provider_id: Some("new-action-provider".to_string()),
@@ -329,7 +329,7 @@ async fn test_plan() {
     // Components
     let components_dir = realm_dir.join("components");
     fs::create_dir(&components_dir).unwrap();
-    let component = app::models::ComponentRepresentation {
+    let component = kcd::models::ComponentRepresentation {
         id: None,
         name: Some("component-1".to_string()),
         provider_id: Some("ldap".to_string()),
@@ -345,7 +345,7 @@ async fn test_plan() {
     )
     .unwrap();
 
-    let new_component = app::models::ComponentRepresentation {
+    let new_component = kcd::models::ComponentRepresentation {
         id: None,
         name: Some("new-component".to_string()),
         provider_id: Some("ldap".to_string()),
@@ -364,7 +364,7 @@ async fn test_plan() {
     // Keys (stored as components in 'keys' directory)
     let keys_dir = realm_dir.join("keys");
     fs::create_dir(&keys_dir).unwrap();
-    let key_component = app::models::ComponentRepresentation {
+    let key_component = kcd::models::ComponentRepresentation {
         id: None,
         name: Some("rsa-generated".to_string()),
         provider_id: Some("rsa-generated".to_string()),
