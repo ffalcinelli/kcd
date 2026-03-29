@@ -129,4 +129,15 @@ mod tests {
         assert_eq!(lines[11], "- name: c");
         assert_eq!(lines[12], "  v: 3");
     }
+
+    #[test]
+    fn test_recursive_sort_empty_array() {
+        let mut val = serde_json::json!([]);
+        recursive_sort(&mut val);
+        assert_eq!(val, serde_json::json!([]));
+
+        let mut val_obj = serde_json::json!({ "empty_arr": [] });
+        recursive_sort(&mut val_obj);
+        assert_eq!(val_obj, serde_json::json!({ "empty_arr": [] }));
+    }
 }
