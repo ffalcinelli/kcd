@@ -44,26 +44,41 @@ pub async fn run(
     let all_secrets = Arc::new(Mutex::new(HashMap::new()));
     let prompt_mutex = Arc::new(Mutex::new(()));
 
+    let mut set = tokio::task::JoinSet::new();
+
     for realm_name in realms {
         let mut realm_client = client.clone();
         realm_client.set_target_realm(realm_name.clone());
         let realm_dir = workspace_dir.join(&realm_name);
-        println!(
-            "\n{} {}",
-            SEARCH,
-            style(format!("Inspecting realm: {}", realm_name))
-                .cyan()
-                .bold()
-        );
-        inspect_realm(
-            &realm_client,
-            &realm_name,
-            realm_dir,
-            Arc::clone(&all_secrets),
-            yes,
-            Arc::clone(&prompt_mutex),
-        )
-        .await?;
+        let all_secrets = Arc::clone(&all_secrets);
+        let prompt_mutex = Arc::clone(&prompt_mutex);
+        let realm_name_owned = realm_name.clone();
+
+        set.spawn(async move {
+            {
+                let _lock = prompt_mutex.lock().await;
+                println!(
+                    "\n{} {}",
+                    SEARCH,
+                    style(format!("Inspecting realm: {}", realm_name_owned))
+                        .cyan()
+                        .bold()
+                );
+            }
+            inspect_realm(
+                &realm_client,
+                &realm_name_owned,
+                realm_dir,
+                all_secrets,
+                yes,
+                prompt_mutex,
+            )
+            .await
+        });
+    }
+
+    while let Some(res) = set.join_next().await {
+        res.context("Task panicked")??;
     }
 
     let secrets_lock = all_secrets.lock().await;
