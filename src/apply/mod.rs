@@ -98,25 +98,37 @@ pub async fn run(
         return Ok(());
     }
 
+    let mut set = tokio::task::JoinSet::new();
+
     for realm_name in realms {
-        println!(
-            "\n{} {}",
-            ACTION,
-            style(format!("Applying realm: {}", realm_name))
-                .cyan()
-                .bold()
-        );
         let mut realm_client = client.clone();
         realm_client.set_target_realm(realm_name.clone());
         let realm_dir = workspace_dir.join(&realm_name);
-        apply_single_realm(
-            &realm_client,
-            realm_dir,
-            Arc::clone(&env_vars),
-            Arc::clone(&planned_files),
-            &realm_name,
-        )
-        .await?;
+        let env_vars = Arc::clone(&env_vars);
+        let planned_files = Arc::clone(&planned_files);
+
+        set.spawn(async move {
+            println!(
+                "\n{} {}",
+                ACTION,
+                style(format!("Applying realm: {}", realm_name))
+                    .cyan()
+                    .bold()
+            );
+
+            apply_single_realm(
+                &realm_client,
+                realm_dir,
+                env_vars,
+                planned_files,
+                &realm_name,
+            )
+            .await
+        });
+    }
+
+    while let Some(res) = set.join_next().await {
+        res??;
     }
 
     // Success - remove plan
