@@ -70,29 +70,44 @@ pub async fn run(
         return Ok(());
     }
 
-    let mut changed_files = Vec::new();
+    let mut set = tokio::task::JoinSet::new();
+
     for realm_name in realms {
         let mut realm_client = client.clone();
         realm_client.set_target_realm(realm_name.clone());
         let realm_dir = workspace_dir.join(&realm_name);
-        println!(
-            "\n{} {}",
-            ACTION,
-            style(format!("Planning changes for realm: {}", realm_name))
-                .cyan()
-                .bold()
-        );
-        plan_single_realm(
-            &realm_client,
-            realm_dir,
-            changes_only,
-            interactive,
-            Arc::clone(&env_vars),
-            &mut changed_files,
-            &realm_name,
-        )
-        .await?;
+        let env_vars = Arc::clone(&env_vars);
+
+        set.spawn(async move {
+            println!(
+                "\n{} {}",
+                ACTION,
+                style(format!("Planning changes for realm: {}", realm_name))
+                    .cyan()
+                    .bold()
+            );
+
+            let mut changed_files = Vec::new();
+            plan_single_realm(
+                &realm_client,
+                realm_dir,
+                changes_only,
+                interactive,
+                env_vars,
+                &mut changed_files,
+                &realm_name,
+            )
+            .await?;
+
+            Ok::<Vec<PathBuf>, anyhow::Error>(changed_files)
+        });
     }
+
+    let mut changed_files = Vec::new();
+    while let Some(res) = set.join_next().await {
+        changed_files.extend(res??);
+    }
+    changed_files.sort();
 
     let plan_file = workspace_dir.join(".kcdplan");
     if changed_files.is_empty() {
