@@ -49,7 +49,7 @@ pub async fn rotate_keys_yaml(workspace_dir: &Path, realm: &str) -> Result<usize
     }
 
     let mut rotated_count = 0;
-    let mut entries = fs::read_dir(&keys_dir)
+    let mut entries = tokio::fs::read_dir(&keys_dir)
         .await
         .context("Failed to read components directory")?;
 
@@ -64,7 +64,7 @@ pub async fn rotate_keys_yaml(workspace_dir: &Path, realm: &str) -> Result<usize
                 .extension()
                 .is_some_and(|ext| ext == "yaml" || ext == "yml")
         {
-            let yaml_content = fs::read_to_string(&path)
+            let yaml_content = tokio::fs::read_to_string(&path)
                 .await
                 .context("Failed to read key YAML file")?;
 
@@ -155,14 +155,14 @@ mod tests {
         let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
         assert_eq!(count, 1);
 
-        let mut entries = fs::read_dir(&keys_dir).await.unwrap();
+        let mut entries = tokio::fs::read_dir(&keys_dir).await.unwrap();
         let mut found_rotated = false;
 
         while let Some(entry) = entries.next_entry().await.unwrap() {
             let name = entry.file_name().to_string_lossy().to_string();
             if name.starts_with("rsa-generated-rotated-") {
                 found_rotated = true;
-                let content = fs::read_to_string(entry.path()).await.unwrap();
+                let content = tokio::fs::read_to_string(entry.path()).await.unwrap();
                 let rotated: ComponentRepresentation = serde_yaml::from_str(&content).unwrap();
 
                 let config = rotated.config.unwrap();
@@ -224,11 +224,11 @@ mod tests {
         let count = rotate_keys_yaml(workspace_dir, "master").await.unwrap();
         assert_eq!(count, 1); // It still rotates, but priority won't be updated
 
-        let mut entries = fs::read_dir(&keys_dir).await.unwrap();
+        let mut entries = tokio::fs::read_dir(&keys_dir).await.unwrap();
         while let Some(entry) = entries.next_entry().await.unwrap() {
             let name = entry.file_name().to_string_lossy().to_string();
             if name.starts_with("rsa-rotated-") {
-                let content = fs::read_to_string(entry.path()).await.unwrap();
+                let content = tokio::fs::read_to_string(entry.path()).await.unwrap();
                 let rotated: ComponentRepresentation = serde_yaml::from_str(&content).unwrap();
                 let config = rotated.config.unwrap();
                 let priority_array = config.get("priority").unwrap().as_array().unwrap();

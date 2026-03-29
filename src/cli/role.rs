@@ -120,7 +120,7 @@ mod tests {
             .join("roles")
             .join("admin.yaml");
         assert!(realm_role_path.exists());
-        let content = fs::read_to_string(&realm_role_path).await.unwrap();
+        let content = tokio::fs::read_to_string(&realm_role_path).await.unwrap();
         let role: RoleRepresentation = serde_yaml::from_str(&content).unwrap();
         assert_eq!(role.name, "admin");
         assert!(!role.client_role);

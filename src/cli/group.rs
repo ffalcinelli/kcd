@@ -76,7 +76,7 @@ mod tests {
             .join("my-group.yaml");
         assert!(file_path.exists());
 
-        let content = fs::read_to_string(&file_path).await.unwrap();
+        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
         let group: GroupRepresentation = serde_yaml::from_str(&content).unwrap();
         assert_eq!(group.name.as_deref(), Some("my-group"));
     }

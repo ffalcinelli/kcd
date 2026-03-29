@@ -153,7 +153,7 @@ mod tests {
             .join("testclient.yaml");
         assert!(file_path.exists());
 
-        let content = fs::read_to_string(&file_path).await.unwrap();
+        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
         let client: ClientRepresentation = serde_yaml::from_str(&content).unwrap();
 
         assert_eq!(client.client_id.as_deref(), Some("testclient"));

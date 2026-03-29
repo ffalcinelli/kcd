@@ -96,7 +96,7 @@ mod tests {
             .join("google.yaml");
         assert!(file_path.exists());
 
-        let content = fs::read_to_string(&file_path).await.unwrap();
+        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
         let idp: IdentityProviderRepresentation = serde_yaml::from_str(&content).unwrap();
         assert_eq!(idp.alias.as_deref(), Some("google"));
     }

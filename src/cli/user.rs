@@ -61,7 +61,7 @@ pub async fn change_user_password_yaml(
         create_user_yaml(workspace_dir, realm, username, None, None, None).await?;
     }
 
-    let yaml_content = fs::read_to_string(&file_path)
+    let yaml_content = tokio::fs::read_to_string(&file_path)
         .await
         .context("Failed to read user YAML file")?;
     let mut user: UserRepresentation =
@@ -218,7 +218,7 @@ mod tests {
             .join("testuser.yaml");
         assert!(file_path.exists());
 
-        let content = fs::read_to_string(&file_path).await.unwrap();
+        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
         let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
 
         assert_eq!(user.username.as_deref(), Some("testuser"));
@@ -240,7 +240,7 @@ mod tests {
             .join("master")
             .join("users")
             .join("user2.yaml");
-        let content = fs::read_to_string(&file_path).await.unwrap();
+        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
         let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
 
         assert_eq!(user.username.as_deref(), Some("user2"));
@@ -272,7 +272,7 @@ mod tests {
             .join("master")
             .join("users")
             .join("testuser.yaml");
-        let content = fs::read_to_string(&file_path).await.unwrap();
+        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
         let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
 
         let credentials = user.credentials.unwrap();
@@ -313,7 +313,7 @@ mod tests {
             .await
             .unwrap();
 
-        let content = fs::read_to_string(&file_path).await.unwrap();
+        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
         let updated_user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
         let credentials = updated_user.credentials.unwrap();
         assert_eq!(credentials.len(), 2);
@@ -344,7 +344,7 @@ mod tests {
             .join("master")
             .join("users")
             .join("testuser.yaml");
-        let content = fs::read_to_string(&file_path).await.unwrap();
+        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
         let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
 
         let credentials = user.credentials.expect("Credentials should not be None");
@@ -369,7 +369,7 @@ mod tests {
             .join("newuser.yaml");
         assert!(file_path.exists());
 
-        let content = fs::read_to_string(&file_path).await.unwrap();
+        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
         let user: UserRepresentation = serde_yaml::from_str(&content).unwrap();
         let credentials = user.credentials.unwrap();
         assert_eq!(credentials[0].value.as_deref(), Some("pass123"));
