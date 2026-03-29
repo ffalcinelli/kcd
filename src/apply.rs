@@ -272,39 +272,50 @@ async fn apply_groups(client: &KeycloakClient, input_dir: &std::path::Path) -> R
             .into_iter()
             .filter_map(|g| g.name.clone().map(|n| (n, g)))
             .collect();
+        let existing_groups_map = std::sync::Arc::new(existing_groups_map);
 
         let mut entries = async_fs::read_dir(&groups_dir).await?;
+        let mut set = JoinSet::new();
+
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let content = async_fs::read_to_string(&path).await?;
-                let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
-                substitute_secrets(&mut val);
-                let mut group_rep: GroupRepresentation = serde_json::from_value(val)?;
-                let name = group_rep.name.as_deref().unwrap_or("");
+                let client = client.clone();
+                let existing_groups_map = existing_groups_map.clone();
+                set.spawn(async move {
+                    let content = async_fs::read_to_string(&path).await?;
+                    let mut val: serde_json::Value = serde_yaml::from_str(&content)?;
+                    substitute_secrets(&mut val);
+                    let mut group_rep: GroupRepresentation = serde_json::from_value(val)?;
+                    let name = group_rep.name.clone().unwrap_or_default();
 
-                if name.is_empty() {
-                    continue;
-                }
-
-                if let Some(existing) = existing_groups_map.get(name) {
-                    if let Some(id) = &existing.id {
-                        group_rep.id = Some(id.clone());
-                        client
-                            .update_group(id, &group_rep)
-                            .await
-                            .context(format!("Failed to update group {}", name))?;
-                        println!("Updated group {}", name);
+                    if name.is_empty() {
+                        return Ok::<(), anyhow::Error>(());
                     }
-                } else {
-                    group_rep.id = None;
-                    client
-                        .create_group(&group_rep)
-                        .await
-                        .context(format!("Failed to create group {}", name))?;
-                    println!("Created group {}", name);
-                }
+
+                    if let Some(existing) = existing_groups_map.get(&name) {
+                        if let Some(id) = &existing.id {
+                            group_rep.id = Some(id.clone());
+                            client
+                                .update_group(id, &group_rep)
+                                .await
+                                .context(format!("Failed to update group {}", name))?;
+                            println!("Updated group {}", name);
+                        }
+                    } else {
+                        group_rep.id = None;
+                        client
+                            .create_group(&group_rep)
+                            .await
+                            .context(format!("Failed to create group {}", name))?;
+                        println!("Created group {}", name);
+                    }
+                    Ok::<(), anyhow::Error>(())
+                });
             }
+        }
+        while let Some(res) = set.join_next().await {
+            res??;
         }
     }
     Ok(())
