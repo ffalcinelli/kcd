@@ -564,7 +564,16 @@ pub struct KeysMetadataRepresentation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::de::DeserializeOwned;
     use serde_json::json;
+
+    fn test_serialize_deserialize<T: Serialize + DeserializeOwned>(obj: &T) -> (Value, T) {
+        let json_str = serde_json::to_string(obj).expect("Failed to serialize object");
+        let json_val: Value = serde_json::from_str(&json_str).expect("Failed to parse json");
+        let deserialized: T =
+            serde_json::from_str(&json_str).expect("Failed to deserialize object");
+        (json_val, deserialized)
+    }
 
     #[test]
     fn test_realm_serialization() {
@@ -578,15 +587,12 @@ mod tests {
             extra,
         };
 
-        let json_str = serde_json::to_string(&realm).expect("Failed to serialize realm");
-        let json_val: Value = serde_json::from_str(&json_str).expect("Failed to parse json");
+        let (json_val, deserialized) = test_serialize_deserialize(&realm);
 
         assert_eq!(json_val["realm"], "myrealm");
         assert_eq!(json_val["displayName"], "My Realm");
         assert_eq!(json_val["someExtraField"], "someValue");
 
-        let deserialized: RealmRepresentation =
-            serde_json::from_str(&json_str).expect("Failed to deserialize realm");
         assert_eq!(deserialized.realm, "myrealm");
         assert_eq!(deserialized.display_name, Some("My Realm".to_string()));
         assert_eq!(
@@ -615,14 +621,11 @@ mod tests {
             extra: HashMap::new(),
         };
 
-        let json_str = serde_json::to_string(&idp).expect("Failed to serialize idp");
-        let json_val: Value = serde_json::from_str(&json_str).expect("Failed to parse json");
+        let (json_val, deserialized) = test_serialize_deserialize(&idp);
 
         assert_eq!(json_val["providerId"], "google");
         assert_eq!(json_val["updateProfileFirstLoginMode"], "on");
 
-        let deserialized: IdentityProviderRepresentation =
-            serde_json::from_str(&json_str).expect("Failed to deserialize idp");
         assert_eq!(
             deserialized.update_profile_first_login_mode,
             Some("on".to_string())
@@ -646,15 +649,12 @@ mod tests {
             extra: HashMap::new(),
         };
 
-        let json_str = serde_json::to_string(&client).expect("Failed to serialize client");
-        let json_val: Value = serde_json::from_str(&json_str).expect("Failed to parse json");
+        let (json_val, deserialized) = test_serialize_deserialize(&client);
 
         assert_eq!(json_val["clientId"], "my-client");
         assert_eq!(json_val["publicClient"], true);
         assert_eq!(json_val["redirectUris"][0], "http://localhost/*");
 
-        let deserialized: ClientRepresentation =
-            serde_json::from_str(&json_str).expect("Failed to deserialize client");
         assert_eq!(deserialized.client_id, Some("my-client".to_string()));
         assert_eq!(
             deserialized.redirect_uris,
@@ -674,14 +674,11 @@ mod tests {
             extra: HashMap::new(),
         };
 
-        let json_str = serde_json::to_string(&role).expect("Failed to serialize role");
-        let json_val: Value = serde_json::from_str(&json_str).expect("Failed to parse json");
+        let (json_val, deserialized) = test_serialize_deserialize(&role);
 
         assert_eq!(json_val["containerId"], "realm-id");
         assert_eq!(json_val["clientRole"], true);
 
-        let deserialized: RoleRepresentation =
-            serde_json::from_str(&json_str).expect("Failed to deserialize role");
         assert_eq!(deserialized.container_id, Some("realm-id".to_string()));
     }
 
@@ -703,13 +700,10 @@ mod tests {
             extra: HashMap::new(),
         };
 
-        let json_str = serde_json::to_string(&group).expect("Failed to serialize group");
-        let json_val: Value = serde_json::from_str(&json_str).expect("Failed to parse json");
+        let (json_val, deserialized) = test_serialize_deserialize(&group);
 
         assert_eq!(json_val["subGroups"][0]["name"], "subgroup");
 
-        let deserialized: GroupRepresentation =
-            serde_json::from_str(&json_str).expect("Failed to deserialize group");
         assert_eq!(
             deserialized.sub_groups.expect("Failed to get sub_groups")[0].name,
             Some("subgroup".to_string())
@@ -730,15 +724,12 @@ mod tests {
             extra: HashMap::new(),
         };
 
-        let json_str = serde_json::to_string(&user).expect("Failed to serialize user");
-        let json_val: Value = serde_json::from_str(&json_str).expect("Failed to parse json");
+        let (json_val, deserialized) = test_serialize_deserialize(&user);
 
         assert_eq!(json_val["firstName"], "John");
         assert_eq!(json_val["lastName"], "Doe");
         assert_eq!(json_val["emailVerified"], true);
 
-        let deserialized: UserRepresentation =
-            serde_json::from_str(&json_str).expect("Failed to deserialize user");
         assert_eq!(deserialized.first_name, Some("John".to_string()));
     }
 }
