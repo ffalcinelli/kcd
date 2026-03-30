@@ -8,19 +8,21 @@ This document serves as the internal developer guide for `kcd`. It explains the 
 
 1.  **Desired State**: Defined in local YAML files within the workspace.
 2.  **Current State**: Fetched from the Keycloak Admin API.
-3.  **Diff Engine (`plan.rs`)**: Compares the two states to identify what needs to be Created, Updated, or Deleted.
-4.  **Reconciler (`apply.rs`)**: Executes the necessary API calls to bring the Current State in line with the Desired State.
+3.  **Diff Engine (`plan.rs`)**: Compares the two states to identify what needs to be Created, Updated, or Deleted. It generates a `.kcdplan` file in the workspace containing the list of files that have pending changes.
+4.  **Reconciler (`apply.rs`)**: Executes the necessary API calls to bring the Current State in line with the Desired State. It optionally uses the `.kcdplan` file to only apply changes that were previously planned.
 
 ### Core Modules
 
 -   `src/client.rs`: Low-level wrapper for the Keycloak Admin REST API. Handles authentication and provides a **generic CRUD interface** for Keycloak resources.
 -   `src/models.rs`: Serde-based representations of Keycloak resources. Defines the `KeycloakResource` and `ResourceMeta` traits for generic resource management.
 -   `src/inspect.rs`: Deep-scans the remote Keycloak server and serializes resources into local files using a **generic, parallelized inspection pipeline**.
+-   `src/plan/`: Contains the logic for calculating diffs for each resource type. It's structured into submodules for better maintainability.
+-   `src/apply/`: Contains the logic for applying changes. It uses **parallelized reconciliation** at the resource type level within each realm (using `tokio::task::JoinSet`).
 -   `src/utils/secrets.rs`: Uses heuristics to find and mask sensitive fields in configuration objects.
--   `src/utils/ui.rs`: Centralized module for CLI output formatting and emoji management.
+-   `src/utils/ui.rs`: Centralized module for CLI output formatting, emoji management, and consistent styling across the tool.
 -   `src/clean.rs`: Removes local workspace representations of Keycloak realms and resources using **parallel I/O**.
 -   `src/validate.rs`: Performs local validation of YAML configurations before they are applied using **async I/O**.
--   `src/cli.rs`: Command-line interface definitions and logic for scaffolding new resources.
+-   `src/cli/`: Logic for the interactive scaffolding of new resources.
 
 ---
 
@@ -30,13 +32,13 @@ To support a new Keycloak resource (e.g., "Event Listeners"):
 
 1.  **Update `models.rs`**: 
     - Add the `struct` for the resource.
-    - Implement `KeycloakResource` (for name/ID handling).
-    - Implement `ResourceMeta` (to define API paths, directory names, and secret prefixes).
+    - Implement `KeycloakResource` (for name/ID handling and API paths).
+    - Implement `ResourceMeta` (to define labels and secret prefixes).
 2.  **Update `inspect.rs`**: Add a `spawn_inspect::<NewResourceRepresentation>(...)` call in the `inspect_realm` function.
-3.  **Update `plan.rs`**: Logic to compare the local and remote versions of the resource.
-4.  **Update `apply.rs`**: Hook the resource into the reconciliation loop.
+3.  **Update `plan/`**: Create a new submodule (if needed) and add logic to compare the local and remote versions of the resource. Hook it into `src/plan/mod.rs`.
+4.  **Update `apply/`**: Create a new submodule (if needed) and add logic to execute API calls for Creating/Updating the resource. Hook it into `src/apply/mod.rs` (ensure it's added to the parallelized `JoinSet`).
 5.  **Update `validate.rs`**: (Optional) Add specific validation rules.
-6.  **Update `cli.rs`**: (Optional) Add interactive scaffolding for the new resource.
+6.  **Update `cli/`**: (Optional) Add interactive scaffolding for the new resource.
 
 ---
 
@@ -49,9 +51,10 @@ Located within the modules themselves (e.g., `src/utils/secrets.rs`). Focused on
 
 ### Integration Tests
 Located in `tests/`.
--   **Common**: Shared utilities for setting up temporary workspaces.
--   **Mocked Tests**: Use `mockito` or similar (if implemented) to simulate Keycloak responses.
+-   **Common**: Shared utilities for setting up temporary workspaces and environment variables.
+-   **Mocked Tests**: Use `mockito` to simulate Keycloak responses for various scenarios.
 -   **Real Integration**: Requires a live Keycloak instance (configured via environment variables). See `tests/real_integration_test.rs`.
+-   **Ultimate Coverage**: `tests/ultimate_coverage_test.rs` and `tests/models_coverage_test.rs` provide comprehensive checks for resource handling.
 
 ### Benchmarks
 Located in `benches/`. Used to monitor performance for large workspaces with thousands of files.
@@ -73,7 +76,7 @@ When detected, the value is replaced by `${KEYCLOAK_<RESOURCE_TYPE>_<RESOURCE_NA
 ## 📜 Coding Conventions
 
 1.  **Asynchronous by Default**: All I/O and API operations must use `tokio`.
-2.  **Concurrency**: Use `tokio::task::JoinSet` to parallelize independent resource operations (e.g., fetching multiple clients).
+2.  **Concurrency**: Use `tokio::task::JoinSet` to parallelize independent resource operations.
 3.  **Generic Abstractions**: Prefer using the generic CRUD methods in `KeycloakClient` and the `KeycloakResource`/`ResourceMeta` traits to avoid boilerplate.
 4.  **Error Handling**: Use `anyhow::Context` for descriptive error chains, including specific resource identifiers (e.g., realm name).
 5.  **Formatting**: Run `cargo fmt` before every commit.
@@ -85,6 +88,7 @@ When detected, the value is replaced by `${KEYCLOAK_<RESOURCE_TYPE>_<RESOURCE_NA
 ## 🚀 Future Roadmap
 
 -   [x] Parallel reconciliation (apply changes concurrently for resources within a realm).
+-   [x] Generic refactor for `inspect.rs`.
 -   [ ] Support for custom SPIs and provider configurations.
 -   [ ] Support for multiple environment profiles (e.g., `prod.yaml`, `staging.yaml`).
 -   [ ] Integration with HashiCorp Vault for secret resolution.

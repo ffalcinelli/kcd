@@ -16,7 +16,7 @@
 ### Interactive Plan Mode
 > Previewing changes before applying them with interactive confirmation.
 
-![kcd plan screenshot placeholder](https://raw.githubusercontent.com/ffalcinelli/kcd/main/assets/kcd-plan.png)
+![kcd plan screenshot](https://raw.githubusercontent.com/ffalcinelli/kcd/main/assets/kcd-plan.png)
 
 ```text
 $ kcd plan --interactive
@@ -34,7 +34,7 @@ $ kcd plan --interactive
 ### Interactive CLI Menu
 > Scaffolding resources without writing YAML by hand.
 
-![kcd cli screenshot placeholder](https://raw.githubusercontent.com/ffalcinelli/kcd/main/assets/kcd-cli.png)
+![kcd cli screenshot](https://raw.githubusercontent.com/ffalcinelli/kcd/main/assets/kcd-cli.png)
 
 ```text
 $ kcd cli
@@ -58,11 +58,11 @@ $ kcd cli
 - **Blazing Fast Performance**: Utilizes Rust's `tokio` for highly concurrent API interactions and parallel I/O operations.
 - **Declarative State**: Define your desired Keycloak state in human-readable YAML files.
 - **Inspect & Export**: Bootstrap your project by exporting existing Keycloak configurations to local files.
-- **Dry-Run Planning**: Preview exactly what changes will be applied before they happen.
+- **Dry-Run Planning**: Preview exactly what changes will be applied. It generates a `.kcdplan` file to track intended changes.
 - **Drift Detection**: Identify discrepancies between your local configuration and the live server.
-- **Secret Masking**: Automatically handles sensitive data (secrets, passwords) by replacing them with environment variable placeholders.
+- **Secret Masking**: Automatically handles sensitive data (secrets, passwords) by replacing them with environment variable placeholders and generating a `.secrets` file.
 - **Interactive Scaffolding**: Quickly generate resource templates through an interactive CLI.
-- **Resource Support**: Realms, Roles (Realm & Client), Identity Providers, Clients, Client Scopes, Groups, Users, Authentication Flows, Required Actions, and Components.
+- **Resource Support**: Realms, Roles (Realm & Client), Identity Providers, Clients, Client Scopes, Groups, Users, Authentication Flows, Required Actions, and Components (including Keys).
 
 ---
 
@@ -87,7 +87,7 @@ powershell -c "irm https://raw.githubusercontent.com/ffalcinelli/kcd/main/script
 ### Building from Source
 
 ```bash
-git clone https://github.com/fabio-test/kcd.git
+git clone https://github.com/ffalcinelli/kcd.git
 cd kcd
 cargo build --release
 sudo cp target/release/kcd /usr/local/bin/
@@ -114,6 +114,7 @@ By default, `kcd` looks for a `workspace/` directory:
 ```text
 workspace/
 ├── .secrets                   # Generated during 'inspect', should be gitignored
+├── .kcdplan                   # Generated during 'plan', contains pending changes
 └── my-realm/                  # Realm folder
     ├── realm.yaml             # Main realm settings
     ├── clients/
@@ -150,7 +151,7 @@ Calculates the "diff" between local files and the remote server.
 # Standard plan
 kcd plan
 
-# Interactive plan: decide for each change whether to include it
+# Interactive plan: decide for each change whether to include it in the plan
 kcd plan --interactive
 
 # Only show changes (hide 'No changes' messages)
@@ -158,7 +159,7 @@ kcd plan --changes-only
 ```
 
 ### `apply`
-Reconciles the remote state to match your local configuration.
+Reconciles the remote state to match your local configuration. If a `.kcdplan` exists, it will only apply the planned changes.
 ```bash
 kcd apply --yes
 ```
@@ -176,7 +177,7 @@ kcd clean --yes
 ```
 
 ### `cli`
-An interactive menu to generate resource scaffolds.
+An interactive menu to generate resource scaffolds or perform quick actions.
 ```bash
 kcd cli
 ```
