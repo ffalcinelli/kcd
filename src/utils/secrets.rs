@@ -359,6 +359,71 @@ mod tests {
     }
 
     #[test]
+    fn test_substitute_secrets_complex() {
+        let mut env_vars = HashMap::new();
+        env_vars.insert("KEYCLOAK_VAR1".to_string(), "val1".to_string());
+        env_vars.insert("KEYCLOAK_VAR2".to_string(), "val2".to_string());
+
+        let mut val = json!({
+            "arr": ["${KEYCLOAK_VAR1}", "normal", "${KEYCLOAK_VAR2}"],
+            "nested": {
+                "deep_arr": [
+                    { "secret": "${KEYCLOAK_VAR1}" }
+                ]
+            }
+        });
+
+        substitute_secrets(&mut val, &env_vars).unwrap();
+
+        assert_eq!(val["arr"][0], "val1");
+        assert_eq!(val["arr"][1], "normal");
+        assert_eq!(val["arr"][2], "val2");
+        assert_eq!(val["nested"]["deep_arr"][0]["secret"], "val1");
+    }
+
+    #[test]
+    fn test_substitute_secrets_edge_cases() {
+        let mut env_vars = HashMap::new();
+        env_vars.insert("KEYCLOAK_VAR".to_string(), "val".to_string());
+
+        let mut val = json!({
+            "no_braces": "KEYCLOAK_VAR",
+            "not_at_start": "prefix ${KEYCLOAK_VAR}",
+            "not_at_end": "${KEYCLOAK_VAR} suffix",
+            "empty_braces": "${}",
+            "only_prefix": "${KEYCLOAK_}",
+            "no_closing": "${KEYCLOAK_VAR",
+            "not_keycloak": "${OTHER_VAR}"
+        });
+
+        let original = val.clone();
+        substitute_secrets(&mut val, &env_vars).unwrap();
+
+        // None of these should have been substituted based on the current logic
+        assert_eq!(val, original);
+    }
+
+    #[test]
+    fn test_substitute_secrets_nested_missing() {
+        let env_vars = HashMap::new();
+        let mut val = json!({
+            "nested": {
+                "arr": [
+                    "normal",
+                    { "secret": "${KEYCLOAK_MISSING}" }
+                ]
+            }
+        });
+
+        let res = substitute_secrets(&mut val, &env_vars);
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err(),
+            "Missing required environment variable: KEYCLOAK_MISSING"
+        );
+    }
+
+    #[test]
     fn test_obfuscate_secrets() {
         let mut val = json!({
             "clientSecret": "supersecret"
