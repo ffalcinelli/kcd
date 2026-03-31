@@ -173,10 +173,13 @@ mod tests {
             {"other": 1}
         ]);
         recursive_sort(&mut val_no_keys);
-        assert_eq!(val_no_keys, serde_json::json!([
-            {"other": 2},
-            {"other": 1}
-        ]));
+        assert_eq!(
+            val_no_keys,
+            serde_json::json!([
+                {"other": 2},
+                {"other": 1}
+            ])
+        );
     }
 
     #[test]
@@ -186,9 +189,12 @@ mod tests {
         });
         recursive_sort(&mut val);
         // Elements in array might not be sortable (they are arrays), but inner should be
-        assert_eq!(val, serde_json::json!({
-            "nested": [[1, 2], [3, 4]]
-        }));
+        assert_eq!(
+            val,
+            serde_json::json!({
+                "nested": [[1, 2], [3, 4]]
+            })
+        );
     }
 
     #[test]
