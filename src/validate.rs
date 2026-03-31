@@ -268,34 +268,40 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     );
 
     // 10. Validate Components and Keys
-    for dir_name in ["components", "keys"].iter() {
-        let dir = workspace_dir.join(dir_name);
-        if fs::try_exists(&dir).await? {
-            let components: Vec<(PathBuf, ComponentRepresentation)> =
-                read_yaml_files(&dir, dir_name).await?;
-            for (path, component) in &components {
-                if let Some(name) = &component.name
-                    && name.is_empty()
-                {
-                    anyhow::bail!("Component name is empty in {:?}", path);
-                }
-                if component
-                    .provider_id
-                    .as_deref()
-                    .unwrap_or_default()
-                    .is_empty()
-                {
-                    anyhow::bail!("Component providerId is missing or empty in {:?}", path);
-                }
-            }
-            println!(
-                "  {} {} {}",
-                CHECK,
-                style(format!("Validated {}:", dir_name)).dim(),
-                style(components.len()).green()
-            );
-        }
-    }
+    tokio::try_join!(
+        validate_components_in_dir(&workspace_dir, "components"),
+        validate_components_in_dir(&workspace_dir, "keys")
+    )?;
 
+    Ok(())
+}
+
+async fn validate_components_in_dir(workspace_dir: &Path, dir_name: &str) -> Result<()> {
+    let dir = workspace_dir.join(dir_name);
+    if fs::try_exists(&dir).await? {
+        let components: Vec<(PathBuf, ComponentRepresentation)> =
+            read_yaml_files(&dir, dir_name).await?;
+        for (path, component) in &components {
+            if let Some(name) = &component.name
+                && name.is_empty()
+            {
+                anyhow::bail!("Component name is empty in {:?}", path);
+            }
+            if component
+                .provider_id
+                .as_deref()
+                .unwrap_or_default()
+                .is_empty()
+            {
+                anyhow::bail!("Component providerId is missing or empty in {:?}", path);
+            }
+        }
+        println!(
+            "  {} {} {}",
+            CHECK,
+            style(format!("Validated {}:", dir_name)).dim(),
+            style(components.len()).green()
+        );
+    }
     Ok(())
 }
