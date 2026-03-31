@@ -391,7 +391,6 @@ mod tests {
             "not_at_start": "prefix ${KEYCLOAK_VAR}",
             "not_at_end": "${KEYCLOAK_VAR} suffix",
             "empty_braces": "${}",
-            "only_prefix": "${KEYCLOAK_}",
             "no_closing": "${KEYCLOAK_VAR",
             "not_keycloak": "${OTHER_VAR}"
         });
@@ -401,6 +400,15 @@ mod tests {
 
         // None of these should have been substituted based on the current logic
         assert_eq!(val, original);
+
+        // Test "${KEYCLOAK_}" explicitly as it should trigger a missing env var error
+        let mut val_fail = json!({ "only_prefix": "${KEYCLOAK_}" });
+        let res = substitute_secrets(&mut val_fail, &env_vars);
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err(),
+            "Missing required environment variable: KEYCLOAK_"
+        );
     }
 
     #[test]
