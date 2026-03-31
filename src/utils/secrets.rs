@@ -512,8 +512,14 @@ mod tests {
         assert_eq!(val[1]["password"], "${KEYCLOAK_PREFIX_1_PASSWORD}");
         assert_eq!(val[2], "not_a_secret");
 
-        assert_eq!(secrets.get("KEYCLOAK_PREFIX_0_CLIENTSECRET"), Some(&"secret1".to_string()));
-        assert_eq!(secrets.get("KEYCLOAK_PREFIX_1_PASSWORD"), Some(&"password1".to_string()));
+        assert_eq!(
+            secrets.get("KEYCLOAK_PREFIX_0_CLIENTSECRET"),
+            Some(&"secret1".to_string())
+        );
+        assert_eq!(
+            secrets.get("KEYCLOAK_PREFIX_1_PASSWORD"),
+            Some(&"password1".to_string())
+        );
     }
 
     #[test]
