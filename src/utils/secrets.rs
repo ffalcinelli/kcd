@@ -241,6 +241,69 @@ mod tests {
     }
 
     #[test]
+    fn test_obfuscate_secrets_nested() {
+        let mut val = json!({
+            "name": "root",
+            "level1": {
+                "name": "l1",
+                "password": "superpassword",
+                "level2": [
+                    { "name": "idx0", "secret": "verysecret" },
+                    { "other": "v1" }
+                ]
+            }
+        });
+        obfuscate_secrets(&mut val, "");
+
+        assert_eq!(val["level1"]["password"], "s***d");
+        assert_eq!(val["level1"]["level2"][0]["secret"], "v***t");
+        assert_eq!(val["level1"]["level2"][1]["other"], "v1");
+    }
+
+    #[test]
+    fn test_obfuscate_secrets_array() {
+        let mut val = json!([
+            { "clientSecret": "secret1" },
+            { "password": "password1" },
+            "not_a_secret"
+        ]);
+        obfuscate_secrets(&mut val, "prefix");
+
+        assert_eq!(val[0]["clientSecret"], "s***1");
+        assert_eq!(val[1]["password"], "p***1");
+        assert_eq!(val[2], "not_a_secret");
+    }
+
+    #[test]
+    fn test_obfuscate_secrets_non_string() {
+        let mut val = json!({
+            "secret": 123,
+            "password": true,
+            "token": null
+        });
+        obfuscate_secrets(&mut val, "prefix");
+
+        assert_eq!(val["secret"], 123);
+        assert_eq!(val["password"], true);
+        assert_eq!(val["token"], json!(null));
+    }
+
+    #[test]
+    fn test_obfuscate_secrets_value_field() {
+        let mut val = json!({
+            "value": "mycredential"
+        });
+        obfuscate_secrets(&mut val, "credential");
+        assert_eq!(val["value"], "m***l");
+
+        let mut val_not_secret = json!({
+            "value": "some_value"
+        });
+        obfuscate_secrets(&mut val_not_secret, "name");
+        assert_eq!(val_not_secret["value"], "some_value");
+    }
+
+    #[test]
     fn test_extract_secrets_non_string() {
         let mut val = json!({
             "secret": 123
