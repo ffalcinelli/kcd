@@ -100,7 +100,13 @@ pub async fn rotate_keys_yaml(workspace_dir: &Path, realm: &str) -> Result<usize
                         }
                     }
 
-                    let new_filename = format!("{}.yaml", new_component.name.as_deref().unwrap());
+                    let new_filename = format!(
+                        "{}.yaml",
+                        new_component
+                            .name
+                            .as_deref()
+                            .context("Missing component name after rotation")?
+                    );
                     let new_file_path = keys_dir.join(new_filename);
 
                     let yaml = serde_yaml::to_string(&new_component)
