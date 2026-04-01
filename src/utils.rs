@@ -34,8 +34,8 @@ pub fn recursive_sort(value: &mut serde_json::Value) {
                 for key in keys {
                     if arr.iter().all(|v| v.get(key).is_some()) {
                         arr.sort_by(|a, b| {
-                            let v_a = a.get(key).unwrap().to_string();
-                            let v_b = b.get(key).unwrap().to_string();
+                            let v_a = a.get(key).map_or(String::new(), |v| v.to_string());
+                            let v_b = b.get(key).map_or(String::new(), |v| v.to_string());
                             v_a.cmp(&v_b)
                         });
                         break;
