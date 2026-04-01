@@ -191,7 +191,7 @@ pub async fn check_keys_drift(
     if let Some(keys) = keys_metadata.keys {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .context("System clock is before UNIX EPOCH")?
             .as_millis() as i64;
         let thirty_days = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
 
