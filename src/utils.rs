@@ -140,4 +140,75 @@ mod tests {
         recursive_sort(&mut val_obj);
         assert_eq!(val_obj, serde_json::json!({ "empty_arr": [] }));
     }
+
+    #[test]
+    fn test_recursive_sort_simple_arrays() {
+        let mut val = serde_json::json!([3, 1, 2]);
+        recursive_sort(&mut val);
+        assert_eq!(val, serde_json::json!([1, 2, 3]));
+
+        let mut val_bool = serde_json::json!([true, false, true]);
+        recursive_sort(&mut val_bool);
+        assert_eq!(val_bool, serde_json::json!([false, true, true]));
+
+        let mut val_mixed = serde_json::json!(["b", 1, true, false, "a"]);
+        recursive_sort(&mut val_mixed);
+        // string representation: "b", "1", "true", "false", "a"
+        // sorted by exact output of .to_string() for json Values:
+        // "b" -> "\"b\"", 1 -> "1", true -> "true", false -> "false", "a" -> "\"a\""
+        // sorted: "\"a\"", "\"b\"", "1", "false", "true"
+        // meaning String("a"), String("b"), Number(1), Bool(false), Bool(true)
+        // Note: Number strings ("1") come after String strings starting with double quotes ("\"a\"") in lexicographical order.
+        assert_eq!(val_mixed, serde_json::json!(["a", "b", 1, false, true]));
+    }
+
+    #[test]
+    fn test_recursive_sort_mixed_and_no_keys() {
+        let mut val_mixed = serde_json::json!([{"a": 1}, 1, "string"]);
+        recursive_sort(&mut val_mixed);
+        assert_eq!(val_mixed, serde_json::json!([{"a": 1}, 1, "string"]));
+
+        let mut val_no_keys = serde_json::json!([
+            {"other": 2},
+            {"other": 1}
+        ]);
+        recursive_sort(&mut val_no_keys);
+        assert_eq!(
+            val_no_keys,
+            serde_json::json!([
+                {"other": 2},
+                {"other": 1}
+            ])
+        );
+    }
+
+    #[test]
+    fn test_recursive_sort_nested_arrays() {
+        let mut val = serde_json::json!({
+            "nested": [[2, 1], [4, 3]]
+        });
+        recursive_sort(&mut val);
+        // Elements in array might not be sortable (they are arrays), but inner should be
+        assert_eq!(
+            val,
+            serde_json::json!({
+                "nested": [[1, 2], [3, 4]]
+            })
+        );
+    }
+
+    #[test]
+    fn test_recursive_sort_primitive() {
+        let mut val_str = serde_json::json!("test");
+        recursive_sort(&mut val_str);
+        assert_eq!(val_str, serde_json::json!("test"));
+
+        let mut val_num = serde_json::json!(42);
+        recursive_sort(&mut val_num);
+        assert_eq!(val_num, serde_json::json!(42));
+
+        let mut val_null = serde_json::Value::Null;
+        recursive_sort(&mut val_null);
+        assert_eq!(val_null, serde_json::Value::Null);
+    }
 }
