@@ -223,3 +223,9 @@ This format provides an immediate understanding of how recent your installed ver
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+## 🛡️ Security Policy
+
+Please refer to the [Security Policy](SECURITY.md) for information on reporting vulnerabilities and security best practices.
