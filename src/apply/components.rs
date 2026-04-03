@@ -246,6 +246,57 @@ mod tests {
         (format!("http://{}", addr), call_count)
     }
 
+    #[test]
+    fn test_build_component_indices() {
+        let comps = vec![
+            ComponentRepresentation {
+                id: Some("id1".to_string()),
+                name: Some("comp1".to_string()),
+                provider_id: Some("prov1".to_string()),
+                provider_type: Some("type1".to_string()),
+                sub_type: Some("sub1".to_string()),
+                parent_id: Some("parent1".to_string()),
+                config: None,
+                extra: Default::default(),
+            },
+            ComponentRepresentation {
+                id: None,
+                name: Some("comp2".to_string()),
+                provider_id: Some("prov2".to_string()),
+                provider_type: Some("type2".to_string()),
+                sub_type: None,
+                parent_id: Some("parent2".to_string()),
+                config: None,
+                extra: Default::default(),
+            },
+        ];
+
+        let (by_identity, by_details) = build_component_indices(comps);
+
+        // get_identity for ComponentRepresentation returns `id.or_else(|| name)`.
+        // First component has id "id1", so it uses "id1".
+        // Second component has no id, so it uses "comp2".
+        assert_eq!(by_identity.len(), 2);
+        assert!(by_identity.contains_key("id1"));
+        assert!(by_identity.contains_key("comp2"));
+
+        assert_eq!(by_details.len(), 2);
+        let key1 = (
+            Some("comp1".to_string()),
+            Some("sub1".to_string()),
+            Some("prov1".to_string()),
+            Some("parent1".to_string()),
+        );
+        let key2 = (
+            Some("comp2".to_string()),
+            None,
+            Some("prov2".to_string()),
+            Some("parent2".to_string()),
+        );
+        assert!(by_details.contains_key(&key1));
+        assert!(by_details.contains_key(&key2));
+    }
+
     #[tokio::test]
     async fn test_apply_components_error_paths() {
         let (server_url, call_count) = start_mock_server().await;
