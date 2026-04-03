@@ -11,6 +11,111 @@ use tokio::task::JoinSet;
 
 use super::{SUCCESS_CREATE, SUCCESS_UPDATE};
 
+pub type ComponentKey = (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+);
+
+pub fn build_component_indices(
+    existing_components: impl IntoIterator<Item = ComponentRepresentation>,
+) -> (
+    HashMap<String, ComponentRepresentation>,
+    HashMap<ComponentKey, ComponentRepresentation>,
+) {
+    let mut by_identity: HashMap<String, ComponentRepresentation> = HashMap::new();
+    let mut by_details: HashMap<ComponentKey, ComponentRepresentation> = HashMap::new();
+
+    for c in existing_components {
+        if let Some(id) = c.get_identity() {
+            by_identity.insert(id, c.clone());
+        }
+        let key = (
+            c.name.clone(),
+            c.sub_type.clone(),
+            c.provider_id.clone(),
+            c.parent_id.clone(),
+        );
+        by_details.insert(key, c);
+    }
+    (by_identity, by_details)
+}
+
+pub async fn process_component_file(
+    path: PathBuf,
+    client: KeycloakClient,
+    by_identity: Arc<HashMap<String, ComponentRepresentation>>,
+    by_details: Arc<HashMap<ComponentKey, ComponentRepresentation>>,
+    env_vars: Arc<HashMap<String, String>>,
+    realm_name: String,
+) -> Result<()> {
+    let content = async_fs::read_to_string(&path).await?;
+    let mut val: serde_json::Value = serde_yaml::from_str(&content)
+        .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+    substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+    let mut component_rep: ComponentRepresentation = serde_json::from_value(val)?;
+
+    let existing = if let Some(identity) = component_rep.get_identity() {
+        by_identity.get(&identity).or_else(|| {
+            let key = (
+                component_rep.name.clone(),
+                component_rep.sub_type.clone(),
+                component_rep.provider_id.clone(),
+                component_rep.parent_id.clone(),
+            );
+            by_details.get(&key)
+        })
+    } else {
+        let key = (
+            component_rep.name.clone(),
+            component_rep.sub_type.clone(),
+            component_rep.provider_id.clone(),
+            component_rep.parent_id.clone(),
+        );
+        by_details.get(&key)
+    };
+
+    if let Some(existing) = existing {
+        if let Some(id) = &existing.id {
+            component_rep.id = Some(id.clone());
+            client
+                .update_component(id, &component_rep)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to update component '{}' in realm '{}'",
+                        component_rep.get_name(),
+                        realm_name
+                    )
+                })?;
+            println!(
+                "  {} {}",
+                SUCCESS_UPDATE,
+                style(format!("Updated component {}", component_rep.get_name())).cyan()
+            );
+        }
+    } else {
+        component_rep.id = None;
+        client
+            .create_component(&component_rep)
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to create component '{}' in realm '{}'",
+                    component_rep.get_name(),
+                    realm_name
+                )
+            })?;
+        println!(
+            "  {} {}",
+            SUCCESS_CREATE,
+            style(format!("Created component {}", component_rep.get_name())).green()
+        );
+    }
+    Ok(())
+}
+
 pub async fn apply_components_or_keys(
     client: &KeycloakClient,
     workspace_dir: &std::path::Path,
@@ -25,27 +130,8 @@ pub async fn apply_components_or_keys(
             .get_components()
             .await
             .with_context(|| format!("Failed to get components/keys for realm '{}'", realm_name))?;
-        let mut by_identity: HashMap<String, ComponentRepresentation> = HashMap::new();
-        type ComponentKey = (
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            Option<String>,
-        );
-        let mut by_details: HashMap<ComponentKey, ComponentRepresentation> = HashMap::new();
 
-        for c in existing_components {
-            if let Some(id) = c.get_identity() {
-                by_identity.insert(id, c.clone());
-            }
-            let key = (
-                c.name.clone(),
-                c.sub_type.clone(),
-                c.provider_id.clone(),
-                c.parent_id.clone(),
-            );
-            by_details.insert(key, c);
-        }
+        let (by_identity, by_details) = build_component_indices(existing_components);
         let by_identity = Arc::new(by_identity);
         let by_details = Arc::new(by_details);
 
@@ -66,72 +152,15 @@ pub async fn apply_components_or_keys(
                 let env_vars = Arc::clone(&env_vars);
                 let realm_name = realm_name.to_string();
                 set.spawn(async move {
-                    let content = async_fs::read_to_string(&path).await?;
-                    let mut val: serde_json::Value = serde_yaml::from_str(&content)
-                        .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-                    substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
-                    let mut component_rep: ComponentRepresentation = serde_json::from_value(val)?;
-
-                    let existing = if let Some(identity) = component_rep.get_identity() {
-                        by_identity.get(&identity).or_else(|| {
-                            let key = (
-                                component_rep.name.clone(),
-                                component_rep.sub_type.clone(),
-                                component_rep.provider_id.clone(),
-                                component_rep.parent_id.clone(),
-                            );
-                            by_details.get(&key)
-                        })
-                    } else {
-                        let key = (
-                            component_rep.name.clone(),
-                            component_rep.sub_type.clone(),
-                            component_rep.provider_id.clone(),
-                            component_rep.parent_id.clone(),
-                        );
-                        by_details.get(&key)
-                    };
-
-                    if let Some(existing) = existing {
-                        if let Some(id) = &existing.id {
-                            component_rep.id = Some(id.clone());
-                            client
-                                .update_component(id, &component_rep)
-                                .await
-                                .with_context(|| {
-                                    format!(
-                                        "Failed to update component '{}' in realm '{}'",
-                                        component_rep.get_name(),
-                                        realm_name
-                                    )
-                                })?;
-                            println!(
-                                "  {} {}",
-                                SUCCESS_UPDATE,
-                                style(format!("Updated component {}", component_rep.get_name()))
-                                    .cyan()
-                            );
-                        }
-                    } else {
-                        component_rep.id = None;
-                        client
-                            .create_component(&component_rep)
-                            .await
-                            .with_context(|| {
-                                format!(
-                                    "Failed to create component '{}' in realm '{}'",
-                                    component_rep.get_name(),
-                                    realm_name
-                                )
-                            })?;
-                        println!(
-                            "  {} {}",
-                            SUCCESS_CREATE,
-                            style(format!("Created component {}", component_rep.get_name()))
-                                .green()
-                        );
-                    }
-                    Ok::<(), anyhow::Error>(())
+                    process_component_file(
+                        path,
+                        client,
+                        by_identity,
+                        by_details,
+                        env_vars,
+                        realm_name,
+                    )
+                    .await
                 });
             }
         }
