@@ -12,7 +12,7 @@ pub struct Cli {
     pub server: String,
 
     /// Keycloak Realms to consider. If empty, all realms are considered.
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, env = "KEYCLOAK_REALMS", value_delimiter = ',')]
     pub realms: Vec<String>,
 
     /// Keycloak Admin User
