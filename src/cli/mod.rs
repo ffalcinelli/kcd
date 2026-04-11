@@ -5,19 +5,13 @@ pub mod keys;
 pub mod role;
 pub mod user;
 
-use crate::utils::ui::{ERROR, INFO};
+use crate::utils::ui::Ui;
 use anyhow::Result;
-use console::style;
-use dialoguer::{Select, theme::ColorfulTheme};
 use std::path::PathBuf;
 
-pub async fn run(workspace_dir: PathBuf) -> Result<()> {
-    println!(
-        "{} {}",
-        INFO,
-        style("Welcome to kcd interactive CLI!").cyan().bold()
-    );
-    let theme = ColorfulTheme::default();
+pub async fn run(workspace_dir: PathBuf, ui: &dyn Ui) -> Result<()> {
+    ui.print_info("Welcome to kcd interactive CLI!");
+
     let selections = &[
         "Create User",
         "Change User Password",
@@ -31,87 +25,51 @@ pub async fn run(workspace_dir: PathBuf) -> Result<()> {
     ];
 
     loop {
-        let selection = Select::with_theme(&theme)
-            .with_prompt("What would you like to do?")
-            .default(0)
-            .items(&selections[..])
-            .interact()?;
+        let selection = ui.select("What would you like to do?", selections, 0)?;
 
         match selection {
             0 => {
-                if let Err(e) = user::create_user_interactive(&workspace_dir).await {
-                    println!(
-                        "{} {}",
-                        ERROR,
-                        style(format!("Error creating user: {}", e)).red()
-                    );
+                if let Err(e) = user::create_user_interactive(&workspace_dir, ui).await {
+                    ui.print_error(&format!("Error creating user: {}", e));
                 }
             }
             1 => {
-                if let Err(e) = user::change_user_password_interactive(&workspace_dir).await {
-                    println!(
-                        "{} {}",
-                        ERROR,
-                        style(format!("Error changing password: {}", e)).red()
-                    );
+                if let Err(e) = user::change_user_password_interactive(&workspace_dir, ui).await {
+                    ui.print_error(&format!("Error changing password: {}", e));
                 }
             }
             2 => {
-                if let Err(e) = client::create_client_interactive(&workspace_dir).await {
-                    println!(
-                        "{} {}",
-                        ERROR,
-                        style(format!("Error creating client: {}", e)).red()
-                    );
+                if let Err(e) = client::create_client_interactive(&workspace_dir, ui).await {
+                    ui.print_error(&format!("Error creating client: {}", e));
                 }
             }
             3 => {
-                if let Err(e) = role::create_role_interactive(&workspace_dir).await {
-                    println!(
-                        "{} {}",
-                        ERROR,
-                        style(format!("Error creating role: {}", e)).red()
-                    );
+                if let Err(e) = role::create_role_interactive(&workspace_dir, ui).await {
+                    ui.print_error(&format!("Error creating role: {}", e));
                 }
             }
             4 => {
-                if let Err(e) = group::create_group_interactive(&workspace_dir).await {
-                    println!(
-                        "{} {}",
-                        ERROR,
-                        style(format!("Error creating group: {}", e)).red()
-                    );
+                if let Err(e) = group::create_group_interactive(&workspace_dir, ui).await {
+                    ui.print_error(&format!("Error creating group: {}", e));
                 }
             }
             5 => {
-                if let Err(e) = idp::create_idp_interactive(&workspace_dir).await {
-                    println!(
-                        "{} {}",
-                        ERROR,
-                        style(format!("Error creating IDP: {}", e)).red()
-                    );
+                if let Err(e) = idp::create_idp_interactive(&workspace_dir, ui).await {
+                    ui.print_error(&format!("Error creating IDP: {}", e));
                 }
             }
             6 => {
-                if let Err(e) = client::create_client_scope_interactive(&workspace_dir).await {
-                    println!(
-                        "{} {}",
-                        ERROR,
-                        style(format!("Error creating client scope: {}", e)).red()
-                    );
+                if let Err(e) = client::create_client_scope_interactive(&workspace_dir, ui).await {
+                    ui.print_error(&format!("Error creating client scope: {}", e));
                 }
             }
             7 => {
-                if let Err(e) = keys::rotate_keys_interactive(&workspace_dir).await {
-                    println!(
-                        "{} {}",
-                        ERROR,
-                        style(format!("Error rotating keys: {}", e)).red()
-                    );
+                if let Err(e) = keys::rotate_keys_interactive(&workspace_dir, ui).await {
+                    ui.print_error(&format!("Error rotating keys: {}", e));
                 }
             }
             8 => {
-                println!("{} {}", INFO, style("Exiting...").cyan());
+                ui.print_info("Exiting...");
                 break;
             }
             _ => unreachable!(),

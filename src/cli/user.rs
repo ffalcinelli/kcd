@@ -1,39 +1,21 @@
 use crate::models::{CredentialRepresentation, UserRepresentation};
-use crate::utils::ui::{SUCCESS_CREATE, WARN};
+use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
-use console::style;
-use dialoguer::{Input, Password, theme::ColorfulTheme};
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
 
-pub async fn change_user_password_interactive(workspace_dir: &Path) -> Result<()> {
-    let theme = ColorfulTheme::default();
-
-    let realm: String = Input::with_theme(&theme)
-        .with_prompt("Target Realm")
-        .interact_text()?;
-
-    let username: String = Input::with_theme(&theme)
-        .with_prompt("Username")
-        .interact_text()?;
-
-    let new_password = Password::with_theme(&theme)
-        .with_prompt("New Password")
-        .with_confirmation("Confirm Password", "Passwords mismatching")
-        .interact()?;
+pub async fn change_user_password_interactive(workspace_dir: &Path, ui: &dyn Ui) -> Result<()> {
+    let realm = ui.input("Target Realm", None, false)?;
+    let username = ui.input("Username", None, false)?;
+    let new_password = ui.password("New Password", Some("Confirm Password"))?;
 
     change_user_password_yaml(workspace_dir, &realm, &username, &new_password).await?;
 
-    println!(
-        "{} {}",
-        SUCCESS_CREATE,
-        style(format!(
-            "Successfully updated YAML for user '{}' in realm '{}' with new password.",
-            username, realm
-        ))
-        .green()
-    );
+    ui.print_success(&format!(
+        "Successfully updated YAML for user '{}' in realm '{}' with new password.",
+        username, realm
+    ));
     Ok(())
 }
 
@@ -50,13 +32,9 @@ pub async fn change_user_password_yaml(
 
     if !tokio::fs::try_exists(&file_path).await.unwrap_or(false) {
         println!(
-            "{} {}",
-            WARN,
-            style(format!(
-                "Warning: User file {:?} does not exist. Creating a new one.",
-                file_path
-            ))
-            .yellow()
+            "{} Warning: User file {:?} does not exist. Creating a new one.",
+            crate::utils::ui::WARN,
+            file_path
         );
         create_user_yaml(workspace_dir, realm, username, None, None, None).await?;
     }
@@ -96,31 +74,12 @@ pub async fn change_user_password_yaml(
     Ok(())
 }
 
-pub async fn create_user_interactive(workspace_dir: &Path) -> Result<()> {
-    let theme = ColorfulTheme::default();
-
-    let realm: String = Input::with_theme(&theme)
-        .with_prompt("Target Realm")
-        .interact_text()?;
-
-    let username: String = Input::with_theme(&theme)
-        .with_prompt("Username")
-        .interact_text()?;
-
-    let email: String = Input::with_theme(&theme)
-        .with_prompt("Email")
-        .allow_empty(true)
-        .interact_text()?;
-
-    let first_name: String = Input::with_theme(&theme)
-        .with_prompt("First Name")
-        .allow_empty(true)
-        .interact_text()?;
-
-    let last_name: String = Input::with_theme(&theme)
-        .with_prompt("Last Name")
-        .allow_empty(true)
-        .interact_text()?;
+pub async fn create_user_interactive(workspace_dir: &Path, ui: &dyn Ui) -> Result<()> {
+    let realm = ui.input("Target Realm", None, false)?;
+    let username = ui.input("Username", None, false)?;
+    let email = ui.input("Email", None, true)?;
+    let first_name = ui.input("First Name", None, true)?;
+    let last_name = ui.input("Last Name", None, true)?;
 
     let email_opt = if email.is_empty() { None } else { Some(email) };
     let first_name_opt = if first_name.is_empty() {
@@ -144,15 +103,10 @@ pub async fn create_user_interactive(workspace_dir: &Path) -> Result<()> {
     )
     .await?;
 
-    println!(
-        "{} {}",
-        SUCCESS_CREATE,
-        style(format!(
-            "Successfully generated YAML for user '{}' in realm '{}'.",
-            username, realm
-        ))
-        .green()
-    );
+    ui.print_success(&format!(
+        "Successfully generated YAML for user '{}' in realm '{}'.",
+        username, realm
+    ));
     Ok(())
 }
 

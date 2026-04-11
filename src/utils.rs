@@ -256,4 +256,38 @@ mod tests {
             ])
         );
     }
+
+    #[test]
+    fn test_to_sorted_yaml_with_secrets() {
+        let mut secrets = std::collections::HashMap::new();
+        let val = serde_json::json!({
+            "clientId": "myclient",
+            "secret": "very-secret",
+            "nested": {
+                "password": "pass"
+            }
+        });
+
+        let yaml = to_sorted_yaml_with_secrets(&val, "CLIENT", &mut secrets).unwrap();
+        // current_prefix should be "CLIENT_myclient"
+        // secret env var should be "KEYCLOAK_CLIENT_MYCLIENT_SECRET"
+        // nested password env var should be "KEYCLOAK_CLIENT_MYCLIENT_NESTED_PASSWORD"
+        assert!(yaml.contains("secret: ${KEYCLOAK_CLIENT_MYCLIENT_SECRET}"));
+        assert!(yaml.contains("password: ${KEYCLOAK_CLIENT_MYCLIENT_NESTED_PASSWORD}"));
+        assert_eq!(
+            secrets.get("KEYCLOAK_CLIENT_MYCLIENT_SECRET"),
+            Some(&"very-secret".to_string())
+        );
+        assert_eq!(
+            secrets.get("KEYCLOAK_CLIENT_MYCLIENT_NESTED_PASSWORD"),
+            Some(&"pass".to_string())
+        );
+    }
+
+    #[test]
+    fn test_to_sorted_yaml_simple() {
+        let val = serde_json::json!({ "b": 2, "a": 1 });
+        let yaml = to_sorted_yaml(&val).unwrap();
+        assert_eq!(yaml.trim(), "a: 1\nb: 2");
+    }
 }

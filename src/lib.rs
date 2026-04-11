@@ -114,7 +114,7 @@ pub async fn run_app(cli: Cli) -> Result<()> {
             plan::run(&client, workspace.clone(), true, false, &cli.realms).await?;
         }
         Commands::Cli { workspace } => {
-            cli::run(workspace.clone()).await?;
+            cli::run(workspace.clone(), &crate::utils::ui::DialoguerUi).await?;
         }
         Commands::Clean { workspace, yes } => {
             println!(

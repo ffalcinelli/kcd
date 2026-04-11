@@ -293,3 +293,27 @@ async fn test_validate_edge_cases() {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+async fn test_inspect_edge_cases_2() {
+    let mock_url = start_mock_server().await;
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
+    client.set_token("mock".to_string());
+
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+
+    // 1. Test failure to get realms (500)
+    let mut server = mockito::Server::new_async().await;
+    let mut bad_client = KeycloakClient::new(server.url());
+    bad_client.set_token("mock".to_string());
+    let _m = server
+        .mock("GET", "/admin/realms")
+        .with_status(500)
+        .create_async()
+        .await;
+
+    let res = inspect::run(&bad_client, workspace_dir.clone(), &[], true).await;
+    assert!(res.is_err());
+}

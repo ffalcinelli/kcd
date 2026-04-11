@@ -13,6 +13,10 @@ pub trait KeycloakResource {
     fn get_filename(&self) -> String {
         self.get_name()
     }
+    fn has_id(&self) -> bool {
+        false
+    }
+    fn clear_metadata(&mut self) {}
 }
 
 pub trait ResourceMeta {
@@ -108,6 +112,12 @@ impl KeycloakResource for IdentityProviderRepresentation {
     fn dir_name() -> &'static str {
         "identity-providers"
     }
+    fn has_id(&self) -> bool {
+        self.internal_id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.internal_id = None;
+    }
 }
 
 impl ResourceMeta for IdentityProviderRepresentation {
@@ -166,6 +176,12 @@ impl KeycloakResource for ClientRepresentation {
     fn dir_name() -> &'static str {
         "clients"
     }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
+    }
 }
 
 impl ResourceMeta for ClientRepresentation {
@@ -210,6 +226,13 @@ impl KeycloakResource for RoleRepresentation {
     fn object_path(id: &str) -> String {
         format!("roles-by-id/{}", id)
     }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
+        self.container_id = None;
+    }
 }
 
 impl ResourceMeta for RoleRepresentation {
@@ -250,6 +273,12 @@ impl KeycloakResource for ClientScopeRepresentation {
     fn dir_name() -> &'static str {
         "client-scopes"
     }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
+    }
 }
 
 impl ResourceMeta for ClientScopeRepresentation {
@@ -283,7 +312,10 @@ impl KeycloakResource for GroupRepresentation {
             .or_else(|| self.name.clone())
     }
     fn get_name(&self) -> String {
-        self.name.clone().unwrap_or_else(|| "unknown".to_string())
+        self.name
+            .clone()
+            .or_else(|| self.path.clone())
+            .unwrap_or_else(|| "unknown".to_string())
     }
     fn api_path() -> &'static str {
         "groups"
@@ -297,6 +329,12 @@ impl KeycloakResource for GroupRepresentation {
             self.get_name(),
             self.id.as_deref().unwrap_or("unknown")
         )
+    }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
     }
 }
 
@@ -359,6 +397,12 @@ impl KeycloakResource for UserRepresentation {
     }
     fn dir_name() -> &'static str {
         "users"
+    }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
     }
 }
 
@@ -429,6 +473,12 @@ impl KeycloakResource for AuthenticationFlowRepresentation {
     }
     fn dir_name() -> &'static str {
         "authentication-flows"
+    }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
     }
 }
 
@@ -524,6 +574,12 @@ impl KeycloakResource for ComponentRepresentation {
             self.get_name(),
             self.id.as_deref().unwrap_or("unknown")
         )
+    }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
     }
 }
 

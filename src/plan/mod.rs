@@ -1,13 +1,6 @@
-pub mod actions;
-pub mod clients;
 pub mod components;
-pub mod flows;
-pub mod groups;
-pub mod idps;
+pub mod generic;
 pub mod realm;
-pub mod roles;
-pub mod scopes;
-pub mod users;
 
 use crate::client::KeycloakClient;
 use crate::utils::secrets::obfuscate_secrets;
@@ -122,6 +115,12 @@ pub async fn run(
     Ok(())
 }
 
+use crate::models::{
+    AuthenticationFlowRepresentation, ClientRepresentation, ClientScopeRepresentation,
+    GroupRepresentation, IdentityProviderRepresentation, RequiredActionProviderRepresentation,
+    RoleRepresentation, UserRepresentation,
+};
+
 async fn plan_single_realm(
     client: &KeycloakClient,
     workspace_dir: PathBuf,
@@ -142,7 +141,7 @@ async fn plan_single_realm(
     )
     .await?;
 
-    roles::plan_roles(
+    generic::plan_resources::<RoleRepresentation>(
         client,
         &workspace_dir,
         changes_only,
@@ -153,7 +152,7 @@ async fn plan_single_realm(
     )
     .await?;
 
-    clients::plan_clients(
+    generic::plan_resources::<ClientRepresentation>(
         client,
         &workspace_dir,
         changes_only,
@@ -164,7 +163,7 @@ async fn plan_single_realm(
     )
     .await?;
 
-    idps::plan_identity_providers(
+    generic::plan_resources::<IdentityProviderRepresentation>(
         client,
         &workspace_dir,
         changes_only,
@@ -175,7 +174,7 @@ async fn plan_single_realm(
     )
     .await?;
 
-    scopes::plan_client_scopes(
+    generic::plan_resources::<ClientScopeRepresentation>(
         client,
         &workspace_dir,
         changes_only,
@@ -186,7 +185,7 @@ async fn plan_single_realm(
     )
     .await?;
 
-    groups::plan_groups(
+    generic::plan_resources::<GroupRepresentation>(
         client,
         &workspace_dir,
         changes_only,
@@ -197,7 +196,7 @@ async fn plan_single_realm(
     )
     .await?;
 
-    users::plan_users(
+    generic::plan_resources::<UserRepresentation>(
         client,
         &workspace_dir,
         changes_only,
@@ -208,7 +207,7 @@ async fn plan_single_realm(
     )
     .await?;
 
-    flows::plan_authentication_flows(
+    generic::plan_resources::<AuthenticationFlowRepresentation>(
         client,
         &workspace_dir,
         changes_only,
@@ -219,7 +218,7 @@ async fn plan_single_realm(
     )
     .await?;
 
-    actions::plan_required_actions(
+    generic::plan_resources::<RequiredActionProviderRepresentation>(
         client,
         &workspace_dir,
         changes_only,
