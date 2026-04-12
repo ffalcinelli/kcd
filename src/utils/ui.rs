@@ -109,7 +109,9 @@ impl Ui for MockUi {
         if passwords.is_empty() {
             anyhow::bail!("No more mock passwords");
         }
-        Ok(passwords.remove(0))
+        // Minimize secret copying/retention in memory.
+        let password = passwords.swap_remove(0);
+        Ok(password)
     }
     fn select(&self, _prompt: &str, _items: &[&str], _default: usize) -> Result<usize> {
         let mut selects = self.selects.lock().unwrap();
