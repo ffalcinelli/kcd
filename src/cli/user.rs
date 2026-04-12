@@ -12,10 +12,7 @@ pub async fn change_user_password_interactive(workspace_dir: &Path, ui: &dyn Ui)
 
     change_user_password_yaml(workspace_dir, &realm, &username, &new_password).await?;
 
-    ui.print_success(&format!(
-        "Successfully updated YAML for user '{}' in realm '{}' with new password.",
-        username, realm
-    ));
+    ui.print_success("Successfully updated user password YAML.");
     Ok(())
 }
 
@@ -103,10 +100,7 @@ pub async fn create_user_interactive(workspace_dir: &Path, ui: &dyn Ui) -> Resul
     )
     .await?;
 
-    ui.print_success(&format!(
-        "Successfully generated YAML for user '{}' in realm '{}'.",
-        username, realm
-    ));
+    ui.print_success("Successfully generated user YAML.");
     Ok(())
 }
 
