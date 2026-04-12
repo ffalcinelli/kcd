@@ -29,9 +29,8 @@ pub async fn change_user_password_yaml(
 
     if !tokio::fs::try_exists(&file_path).await.unwrap_or(false) {
         println!(
-            "{} Warning: User file {:?} does not exist. Creating a new one.",
-            crate::utils::ui::WARN,
-            file_path
+            "{} Warning: User file does not exist. Creating a new one.",
+            crate::utils::ui::WARN
         );
         create_user_yaml(workspace_dir, realm, username, None, None, None).await?;
     }

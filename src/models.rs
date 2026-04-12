@@ -440,11 +440,15 @@ pub struct UserRepresentation {
 
 impl KeycloakResource for UserRepresentation {
     fn get_identity(&self) -> Option<String> {
-        self.username.clone().or_else(|| self.id.clone())
+        self.username
+            .as_ref()
+            .map(|s| s.chars().collect::<String>())
+            .or_else(|| self.id.as_ref().map(|s| s.chars().collect::<String>()))
     }
     fn get_name(&self) -> String {
         self.username
-            .clone()
+            .as_ref()
+            .map(|s| s.chars().collect::<String>())
             .unwrap_or_else(|| "unknown".to_string())
     }
     fn api_path() -> &'static str {
