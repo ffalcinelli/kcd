@@ -105,12 +105,7 @@ where
                 T::secret_prefix(),
             )?
         } else {
-            println!(
-                "\n{} Will create {}: {}",
-                SPARKLE,
-                T::label(),
-                local.get_name()
-            );
+            println!("\n{} Will create {}", SPARKLE, T::label());
             print_diff(
                 &format!("{} {}", T::label(), local.get_name()),
                 None::<&T>,
