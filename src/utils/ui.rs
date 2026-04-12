@@ -105,13 +105,12 @@ impl Ui for MockUi {
         Ok(confirms.remove(0))
     }
     fn password(&self, _prompt: &str, _confirm: Option<&str>) -> Result<String> {
-        let mut passwords = self.passwords.lock().unwrap();
-        if passwords.is_empty() {
-            anyhow::bail!("No more mock passwords");
+        let mut p = self.passwords.lock().unwrap();
+        if p.is_empty() {
+            return Err(anyhow::anyhow!("Mock passwords missing"));
         }
         // Minimize secret copying/retention in memory.
-        let password = passwords.swap_remove(0);
-        Ok(password)
+        Ok(p.swap_remove(0))
     }
     fn select(&self, _prompt: &str, _items: &[&str], _default: usize) -> Result<usize> {
         let mut selects = self.selects.lock().unwrap();

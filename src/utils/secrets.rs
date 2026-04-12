@@ -2,7 +2,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 /// Heuristics to identify a secret key based on its name.
-fn is_secret_key(key: &str, prefix: &str) -> bool {
+pub fn is_secret_key(key: &str, prefix: &str) -> bool {
     let lower_key = key.to_lowercase();
 
     // Blacklist common false positives in Keycloak configuration
@@ -10,11 +10,15 @@ fn is_secret_key(key: &str, prefix: &str) -> bool {
         || lower_key.contains("passwordless")
         || lower_key.contains("creation")
         || lower_key.contains("delivery")
+        || lower_key.contains("reset")
     {
         return false;
     }
 
-    if lower_key.contains("secret") || lower_key.contains("password") || lower_key.contains("token")
+    if lower_key.contains("secret")
+        || lower_key.contains("password")
+        || lower_key.contains("token")
+        || lower_key.contains("credential")
     {
         return true;
     }

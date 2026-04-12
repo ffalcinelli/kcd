@@ -277,3 +277,91 @@ async fn test_plan_resources_missing_identity() {
     .await;
     assert!(res.is_err());
 }
+
+#[tokio::test]
+async fn test_plan_resources_update() {
+    let mock_url = start_mock_server().await;
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
+    client
+        .login("admin-cli", Some("secret"), None, None)
+        .await
+        .unwrap();
+
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
+    fs::create_dir_all(&realm_dir).unwrap();
+
+    let roles_dir = realm_dir.join("roles");
+    fs::create_dir_all(&roles_dir).unwrap();
+    // 'role-1' exists in mock server
+    let role = kcd::models::RoleRepresentation {
+        id: Some("r1".to_string()),
+        name: "role-1".to_string(),
+        description: Some("Updated description".to_string()),
+        container_id: None,
+        composite: false,
+        client_role: false,
+        extra: std::collections::HashMap::new(),
+    };
+    let role_path = roles_dir.join("role-1.yaml");
+    fs::write(&role_path, serde_yaml::to_string(&role).unwrap()).unwrap();
+
+    let res = plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &["test-realm".to_string()],
+    )
+    .await;
+    assert!(res.is_ok());
+
+    let plan_file = workspace_dir.join(".kcdplan");
+    assert!(plan_file.exists());
+}
+
+#[tokio::test]
+async fn test_plan_resources_changes_only() {
+    let mock_url = start_mock_server().await;
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
+    client
+        .login("admin-cli", Some("secret"), None, None)
+        .await
+        .unwrap();
+
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
+    fs::create_dir_all(&realm_dir).unwrap();
+
+    let roles_dir = realm_dir.join("roles");
+    fs::create_dir_all(&roles_dir).unwrap();
+    // 'role-1' exists in mock server, same content
+    let role = kcd::models::RoleRepresentation {
+        id: Some("r1".to_string()),
+        name: "role-1".to_string(),
+        description: Some("Role 1".to_string()),
+        container_id: None,
+        composite: false,
+        client_role: false,
+        extra: std::collections::HashMap::new(),
+    };
+    let role_path = roles_dir.join("role-1.yaml");
+    fs::write(&role_path, serde_yaml::to_string(&role).unwrap()).unwrap();
+
+    let res = plan::run(
+        &client,
+        workspace_dir.clone(),
+        true, // changes_only
+        false,
+        &["test-realm".to_string()],
+    )
+    .await;
+    assert!(res.is_ok());
+
+    let plan_file = workspace_dir.join(".kcdplan");
+    assert!(!plan_file.exists());
+}
