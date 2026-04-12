@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::post};
 use serde::Deserialize;
 use tokio::net::TcpListener;
