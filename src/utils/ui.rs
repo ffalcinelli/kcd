@@ -49,7 +49,7 @@ impl Ui for DialoguerUi {
 
     fn password(&self, prompt: &str, confirm: Option<&str>) -> Result<String> {
         let p = dialoguer::Password::new().with_prompt(prompt);
-        let mut p = if let Some(c) = confirm {
+        let p = if let Some(c) = confirm {
             p.with_confirmation(c, "Passwords mismatching")
         } else {
             p
