@@ -79,7 +79,7 @@ When detected, the value is replaced by `${KEYCLOAK_<RESOURCE_TYPE>_<RESOURCE_NA
 2.  **Concurrency**: Use `tokio::task::JoinSet` to parallelize independent resource operations.
 3.  **Generic Abstractions**: Prefer using the generic CRUD methods in `KeycloakClient` and the `KeycloakResource`/`ResourceMeta` traits to avoid boilerplate.
 4.  **Error Handling**: Use `anyhow::Context` for descriptive error chains, including specific resource identifiers (e.g., realm name).
-5.  **Formatting**: Run `cargo fmt` before every commit.
+5.  **Formatting**: Run `cargo fmt --all -- --check` before every commit and ensure all formatting issues are resolved.
 6.  **Clippy**: Ensure `cargo clippy` passes without warnings.
 7.  **Serialization**: Prefer `serde_yaml_ng` for YAML operations to ensure compatibility with modern YAML features.
 

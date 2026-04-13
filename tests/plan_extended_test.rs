@@ -3,7 +3,9 @@ use common::start_mock_server;
 use kcd::client::KeycloakClient;
 use kcd::models::{ComponentRepresentation, RealmRepresentation};
 use kcd::plan;
+use kcd::utils::ui::DialoguerUi;
 use std::fs;
+use std::sync::Arc;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -84,6 +86,7 @@ async fn test_plan_keys_and_extended() {
         true,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi::new()),
     )
     .await
     .expect("Plan failed");
@@ -95,6 +98,7 @@ async fn test_plan_keys_and_extended() {
         false,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi::new()),
     )
     .await
     .expect("Plan failed");
@@ -127,6 +131,7 @@ async fn test_plan_substitute_secrets_error() {
         false,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi::new()),
     )
     .await;
 

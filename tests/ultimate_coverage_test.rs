@@ -1,6 +1,8 @@
+use std::sync::Arc;
 mod common;
 use common::start_mock_server;
 use kcd::client::KeycloakClient;
+use kcd::utils::ui::DialoguerUi;
 use kcd::{apply, plan};
 use std::fs;
 use tempfile::tempdir;
@@ -116,6 +118,7 @@ async fn test_ultimate_coverage() {
         false,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi::new()),
     )
     .await
     .unwrap();
@@ -137,6 +140,7 @@ async fn test_ultimate_coverage() {
         true,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi::new()),
     )
     .await
     .unwrap();
@@ -154,7 +158,14 @@ async fn test_plan_all_realms() {
     fs::create_dir(workspace_dir.join("test-realm")).unwrap();
 
     // Test auto-discovery of realms in plan
-    plan::run(&client, workspace_dir.clone(), false, false, &[])
-        .await
-        .unwrap();
+    plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &[],
+        Arc::new(DialoguerUi::new()),
+    )
+    .await
+    .unwrap();
 }

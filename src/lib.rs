@@ -13,6 +13,7 @@ use anyhow::{Context, Result};
 use args::{Cli, Commands};
 use client::KeycloakClient;
 use console::{Emoji, style};
+use std::sync::Arc;
 
 static ACTION: Emoji<'_, '_> = Emoji("🚀 ", ">> ");
 static SEARCH: Emoji<'_, '_> = Emoji("🔍 ", "> ");
@@ -96,6 +97,7 @@ pub async fn run_app(cli: Cli) -> Result<()> {
                 *changes_only,
                 *interactive,
                 &cli.realms,
+                Arc::new(crate::utils::ui::DialoguerUi::new()),
             )
             .await?;
         }
@@ -111,10 +113,18 @@ pub async fn run_app(cli: Cli) -> Result<()> {
                 .cyan()
                 .bold()
             );
-            plan::run(&client, workspace.clone(), true, false, &cli.realms).await?;
+            plan::run(
+                &client,
+                workspace.clone(),
+                true,
+                false,
+                &cli.realms,
+                Arc::new(crate::utils::ui::DialoguerUi::new()),
+            )
+            .await?;
         }
         Commands::Cli { workspace } => {
-            cli::run(workspace.clone()).await?;
+            cli::run(workspace.clone(), &crate::utils::ui::DialoguerUi::new()).await?;
         }
         Commands::Clean { workspace, yes } => {
             println!(

@@ -34,3 +34,5 @@ lcov.info
 new-component.yaml
 coverage.txt
 cobertura.xml
+codeql-db/
+results.sarif

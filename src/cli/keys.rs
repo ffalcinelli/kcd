@@ -1,41 +1,25 @@
 use crate::models::ComponentRepresentation;
-use crate::utils::ui::{INFO, SUCCESS_CREATE};
+use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
-use console::style;
-use dialoguer::{Input, theme::ColorfulTheme};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs;
 
-pub async fn rotate_keys_interactive(workspace_dir: &Path) -> Result<()> {
-    let theme = ColorfulTheme::default();
-
-    let realm: String = Input::with_theme(&theme)
-        .with_prompt("Target Realm")
-        .interact_text()?;
+pub async fn rotate_keys_interactive(workspace_dir: &Path, ui: &dyn Ui) -> Result<()> {
+    let realm = ui.input("Target Realm", None, false)?;
 
     let rotated_count = rotate_keys_yaml(workspace_dir, &realm).await?;
 
     if rotated_count > 0 {
-        println!(
-            "{} {}",
-            SUCCESS_CREATE,
-            style(format!(
-                "Successfully generated {} rotated key component(s) for realm '{}'.",
-                rotated_count, realm
-            ))
-            .green()
-        );
+        ui.print_success(&format!(
+            "Successfully generated {} rotated key component(s) for realm '{}'.",
+            rotated_count, realm
+        ));
     } else {
-        println!(
-            "{} {}",
-            INFO,
-            style(format!(
-                "No key providers found to rotate for realm '{}'.",
-                realm
-            ))
-            .cyan()
-        );
+        ui.print_info(&format!(
+            "No key providers found to rotate for realm '{}'.",
+            realm
+        ));
     }
 
     Ok(())

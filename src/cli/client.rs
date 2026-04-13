@@ -1,39 +1,21 @@
 use crate::models::{ClientRepresentation, ClientScopeRepresentation};
-use crate::utils::ui::SUCCESS_CREATE;
+use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
-use console::style;
-use dialoguer::{Confirm, Input, theme::ColorfulTheme};
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
 
-pub async fn create_client_interactive(workspace_dir: &Path) -> Result<()> {
-    let theme = ColorfulTheme::default();
-
-    let realm: String = Input::with_theme(&theme)
-        .with_prompt("Target Realm")
-        .interact_text()?;
-
-    let client_id: String = Input::with_theme(&theme)
-        .with_prompt("Client ID")
-        .interact_text()?;
-
-    let is_public = Confirm::with_theme(&theme)
-        .with_prompt("Is this a public client? (No for confidential)")
-        .default(true)
-        .interact()?;
+pub async fn create_client_interactive(workspace_dir: &Path, ui: &dyn Ui) -> Result<()> {
+    let realm = ui.input("Target Realm", None, false)?;
+    let client_id = ui.input("Client ID", None, false)?;
+    let is_public = ui.confirm("Is this a public client? (No for confidential)", true)?;
 
     create_client_yaml(workspace_dir, &realm, &client_id, is_public).await?;
 
-    println!(
-        "{} {}",
-        SUCCESS_CREATE,
-        style(format!(
-            "Successfully generated YAML for client '{}' in realm '{}'.",
-            client_id, realm
-        ))
-        .green()
-    );
+    ui.print_success(&format!(
+        "Successfully generated YAML for client '{}' in realm '{}'.",
+        client_id, realm
+    ));
     Ok(())
 }
 
@@ -73,33 +55,17 @@ pub async fn create_client_yaml(
     Ok(())
 }
 
-pub async fn create_client_scope_interactive(workspace_dir: &Path) -> Result<()> {
-    let theme = ColorfulTheme::default();
-
-    let realm: String = Input::with_theme(&theme)
-        .with_prompt("Target Realm")
-        .interact_text()?;
-
-    let name: String = Input::with_theme(&theme)
-        .with_prompt("Scope Name")
-        .interact_text()?;
-
-    let protocol: String = Input::with_theme(&theme)
-        .with_prompt("Protocol")
-        .default("openid-connect".to_string())
-        .interact_text()?;
+pub async fn create_client_scope_interactive(workspace_dir: &Path, ui: &dyn Ui) -> Result<()> {
+    let realm = ui.input("Target Realm", None, false)?;
+    let name = ui.input("Scope Name", None, false)?;
+    let protocol = ui.input("Protocol", Some("openid-connect".to_string()), false)?;
 
     create_client_scope_yaml(workspace_dir, &realm, &name, &protocol).await?;
 
-    println!(
-        "{} {}",
-        SUCCESS_CREATE,
-        style(format!(
-            "Successfully generated YAML for client scope '{}' in realm '{}'.",
-            name, realm
-        ))
-        .green()
-    );
+    ui.print_success(&format!(
+        "Successfully generated YAML for client scope '{}' in realm '{}'.",
+        name, realm
+    ));
     Ok(())
 }
 
@@ -159,6 +125,19 @@ mod tests {
         assert_eq!(client.client_id.as_deref(), Some("testclient"));
         assert_eq!(client.public_client, Some(true));
         assert_eq!(client.service_accounts_enabled, Some(false));
+
+        // Confidential client
+        create_client_yaml(workspace_dir, "master", "confidential", false)
+            .await
+            .unwrap();
+        let file_path2 = workspace_dir
+            .join("master")
+            .join("clients")
+            .join("confidential.yaml");
+        let content2 = fs::read_to_string(&file_path2).await.unwrap();
+        let client2: ClientRepresentation = serde_yaml::from_str(&content2).unwrap();
+        assert_eq!(client2.public_client, Some(false));
+        assert_eq!(client2.service_accounts_enabled, Some(true));
     }
 
     #[tokio::test]
@@ -174,5 +153,9 @@ mod tests {
             .join("client-scopes")
             .join("my-scope.yaml");
         assert!(file_path.exists());
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        let scope: ClientScopeRepresentation = serde_yaml::from_str(&content).unwrap();
+        assert_eq!(scope.name.as_deref(), Some("my-scope"));
+        assert_eq!(scope.protocol.as_deref(), Some("openid-connect"));
     }
 }

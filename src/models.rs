@@ -13,6 +13,10 @@ pub trait KeycloakResource {
     fn get_filename(&self) -> String {
         self.get_name()
     }
+    fn has_id(&self) -> bool {
+        false
+    }
+    fn clear_metadata(&mut self) {}
 }
 
 pub trait ResourceMeta {
@@ -46,7 +50,7 @@ impl KeycloakResource for RealmRepresentation {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct IdentityProviderRepresentation {
     #[serde(rename = "internalId", skip_serializing_if = "Option::is_none")]
     pub internal_id: Option<String>,
@@ -95,6 +99,49 @@ pub struct IdentityProviderRepresentation {
     pub extra: HashMap<String, Value>,
 }
 
+impl std::fmt::Debug for IdentityProviderRepresentation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut obfuscated_config = self.config.clone();
+        if let Some(config) = &mut obfuscated_config {
+            for (key, val) in config.iter_mut() {
+                if crate::utils::secrets::is_secret_key(key, "idp") {
+                    *val = "********".to_string();
+                }
+            }
+        }
+
+        f.debug_struct("IdentityProviderRepresentation")
+            .field("internal_id", &self.internal_id)
+            .field("alias", &self.alias)
+            .field("provider_id", &self.provider_id)
+            .field("enabled", &self.enabled)
+            .field(
+                "update_profile_first_login_mode",
+                &self.update_profile_first_login_mode,
+            )
+            .field("trust_email", &self.trust_email)
+            .field("store_token", &self.store_token)
+            .field(
+                "add_read_token_role_on_create",
+                &self.add_read_token_role_on_create,
+            )
+            .field("authenticate_by_default", &self.authenticate_by_default)
+            .field("link_only", &self.link_only)
+            .field(
+                "first_broker_login_flow_alias",
+                &self.first_broker_login_flow_alias,
+            )
+            .field(
+                "post_broker_login_flow_alias",
+                &self.post_broker_login_flow_alias,
+            )
+            .field("display_name", &self.display_name)
+            .field("config", &obfuscated_config)
+            .field("extra", &self.extra)
+            .finish()
+    }
+}
+
 impl KeycloakResource for IdentityProviderRepresentation {
     fn get_identity(&self) -> Option<String> {
         self.alias.clone().or_else(|| self.internal_id.clone())
@@ -107,6 +154,12 @@ impl KeycloakResource for IdentityProviderRepresentation {
     }
     fn dir_name() -> &'static str {
         "identity-providers"
+    }
+    fn has_id(&self) -> bool {
+        self.internal_id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.internal_id = None;
     }
 }
 
@@ -166,6 +219,12 @@ impl KeycloakResource for ClientRepresentation {
     fn dir_name() -> &'static str {
         "clients"
     }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
+    }
 }
 
 impl ResourceMeta for ClientRepresentation {
@@ -210,6 +269,13 @@ impl KeycloakResource for RoleRepresentation {
     fn object_path(id: &str) -> String {
         format!("roles-by-id/{}", id)
     }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
+        self.container_id = None;
+    }
 }
 
 impl ResourceMeta for RoleRepresentation {
@@ -250,6 +316,12 @@ impl KeycloakResource for ClientScopeRepresentation {
     fn dir_name() -> &'static str {
         "client-scopes"
     }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
+    }
 }
 
 impl ResourceMeta for ClientScopeRepresentation {
@@ -283,7 +355,10 @@ impl KeycloakResource for GroupRepresentation {
             .or_else(|| self.name.clone())
     }
     fn get_name(&self) -> String {
-        self.name.clone().unwrap_or_else(|| "unknown".to_string())
+        self.name
+            .clone()
+            .or_else(|| self.path.clone())
+            .unwrap_or_else(|| "unknown".to_string())
     }
     fn api_path() -> &'static str {
         "groups"
@@ -298,6 +373,12 @@ impl KeycloakResource for GroupRepresentation {
             self.id.as_deref().unwrap_or("unknown")
         )
     }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
+    }
 }
 
 impl ResourceMeta for GroupRepresentation {
@@ -309,7 +390,7 @@ impl ResourceMeta for GroupRepresentation {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct CredentialRepresentation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
@@ -321,6 +402,18 @@ pub struct CredentialRepresentation {
     pub temporary: Option<bool>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
+}
+
+impl std::fmt::Debug for CredentialRepresentation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CredentialRepresentation")
+            .field("id", &self.id)
+            .field("type", &self.type_)
+            .field("value", &self.value.as_ref().map(|_| "********"))
+            .field("temporary", &self.temporary)
+            .field("extra", &self.extra)
+            .finish()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -347,11 +440,15 @@ pub struct UserRepresentation {
 
 impl KeycloakResource for UserRepresentation {
     fn get_identity(&self) -> Option<String> {
-        self.username.clone().or_else(|| self.id.clone())
+        self.username
+            .as_ref()
+            .map(|s| s.chars().collect::<String>())
+            .or_else(|| self.id.as_ref().map(|s| s.chars().collect::<String>()))
     }
     fn get_name(&self) -> String {
         self.username
-            .clone()
+            .as_ref()
+            .map(|s| s.chars().collect::<String>())
             .unwrap_or_else(|| "unknown".to_string())
     }
     fn api_path() -> &'static str {
@@ -359,6 +456,12 @@ impl KeycloakResource for UserRepresentation {
     }
     fn dir_name() -> &'static str {
         "users"
+    }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
     }
 }
 
@@ -430,6 +533,12 @@ impl KeycloakResource for AuthenticationFlowRepresentation {
     fn dir_name() -> &'static str {
         "authentication-flows"
     }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
+    }
 }
 
 impl ResourceMeta for AuthenticationFlowRepresentation {
@@ -485,7 +594,7 @@ impl ResourceMeta for RequiredActionProviderRepresentation {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ComponentRepresentation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
@@ -503,6 +612,30 @@ pub struct ComponentRepresentation {
     pub config: Option<HashMap<String, Value>>,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
+}
+
+impl std::fmt::Debug for ComponentRepresentation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut obfuscated_config = self.config.clone();
+        if let Some(config) = &mut obfuscated_config {
+            for (key, val) in config.iter_mut() {
+                if crate::utils::secrets::is_secret_key(key, "component") {
+                    *val = serde_json::json!("********");
+                }
+            }
+        }
+
+        f.debug_struct("ComponentRepresentation")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("provider_id", &self.provider_id)
+            .field("provider_type", &self.provider_type)
+            .field("parent_id", &self.parent_id)
+            .field("sub_type", &self.sub_type)
+            .field("config", &obfuscated_config)
+            .field("extra", &self.extra)
+            .finish()
+    }
 }
 
 impl KeycloakResource for ComponentRepresentation {
@@ -524,6 +657,12 @@ impl KeycloakResource for ComponentRepresentation {
             self.get_name(),
             self.id.as_deref().unwrap_or("unknown")
         )
+    }
+    fn has_id(&self) -> bool {
+        self.id.is_some()
+    }
+    fn clear_metadata(&mut self) {
+        self.id = None;
     }
 }
 

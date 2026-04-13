@@ -1,17 +1,10 @@
-pub mod actions;
-pub mod clients;
 pub mod components;
-pub mod flows;
-pub mod groups;
-pub mod idps;
+pub mod generic;
 pub mod realm;
-pub mod roles;
-pub mod scopes;
-pub mod users;
 
 use crate::client::KeycloakClient;
 use crate::utils::secrets::obfuscate_secrets;
-use crate::utils::ui::{ACTION, CHECK, MEMO, WARN};
+use crate::utils::ui::{ACTION, CHECK, MEMO, Ui, WARN};
 
 use anyhow::Result;
 use console::{Style, style};
@@ -29,12 +22,22 @@ pub struct PlanOptions {
     pub interactive: bool,
 }
 
+pub struct PlanContext<'a> {
+    pub client: &'a KeycloakClient,
+    pub workspace_dir: &'a std::path::Path,
+    pub options: PlanOptions,
+    pub env_vars: Arc<HashMap<String, String>>,
+    pub realm_name: &'a str,
+    pub ui: &'a dyn Ui,
+}
+
 pub async fn run(
     client: &KeycloakClient,
     workspace_dir: PathBuf,
     changes_only: bool,
     interactive: bool,
     realms_to_plan: &[String],
+    ui: Arc<dyn Ui>,
 ) -> Result<()> {
     if !workspace_dir.exists() {
         anyhow::bail!("Input directory {:?} does not exist", workspace_dir);
@@ -77,6 +80,7 @@ pub async fn run(
         realm_client.set_target_realm(realm_name.clone());
         let realm_dir = workspace_dir.join(&realm_name);
         let env_vars = Arc::clone(&env_vars);
+        let ui = Arc::clone(&ui);
 
         set.spawn(async move {
             println!(
@@ -88,16 +92,19 @@ pub async fn run(
             );
 
             let mut changed_files = Vec::new();
-            plan_single_realm(
-                &realm_client,
-                realm_dir,
+            let options = PlanOptions {
                 changes_only,
                 interactive,
+            };
+            let ctx = PlanContext {
+                client: &realm_client,
+                workspace_dir: &realm_dir,
+                options,
                 env_vars,
-                &mut changed_files,
-                &realm_name,
-            )
-            .await?;
+                realm_name: &realm_name,
+                ui: ui.as_ref(),
+            };
+            plan_single_realm(ctx, &mut changed_files).await?;
 
             Ok::<Vec<PathBuf>, anyhow::Error>(changed_files)
         });
@@ -122,140 +129,34 @@ pub async fn run(
     Ok(())
 }
 
-async fn plan_single_realm(
-    client: &KeycloakClient,
-    workspace_dir: PathBuf,
-    changes_only: bool,
-    interactive: bool,
-    env_vars: Arc<HashMap<String, String>>,
-    changed_files: &mut Vec<PathBuf>,
-    realm_name: &str,
-) -> Result<()> {
-    realm::plan_realm(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-    )
-    .await?;
+use crate::models::{
+    AuthenticationFlowRepresentation, ClientRepresentation, ClientScopeRepresentation,
+    GroupRepresentation, IdentityProviderRepresentation, RequiredActionProviderRepresentation,
+    RoleRepresentation, UserRepresentation,
+};
 
-    roles::plan_roles(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-    )
-    .await?;
+async fn plan_single_realm(ctx: PlanContext<'_>, changed_files: &mut Vec<PathBuf>) -> Result<()> {
+    realm::plan_realm(&ctx, changed_files).await?;
 
-    clients::plan_clients(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-    )
-    .await?;
+    generic::plan_resources::<RoleRepresentation>(&ctx, changed_files).await?;
 
-    idps::plan_identity_providers(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-    )
-    .await?;
+    generic::plan_resources::<ClientRepresentation>(&ctx, changed_files).await?;
 
-    scopes::plan_client_scopes(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-    )
-    .await?;
+    generic::plan_resources::<IdentityProviderRepresentation>(&ctx, changed_files).await?;
 
-    groups::plan_groups(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-    )
-    .await?;
+    generic::plan_resources::<ClientScopeRepresentation>(&ctx, changed_files).await?;
 
-    users::plan_users(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-    )
-    .await?;
+    generic::plan_resources::<GroupRepresentation>(&ctx, changed_files).await?;
 
-    flows::plan_authentication_flows(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-    )
-    .await?;
+    generic::plan_resources::<UserRepresentation>(&ctx, changed_files).await?;
 
-    actions::plan_required_actions(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-    )
-    .await?;
+    generic::plan_resources::<AuthenticationFlowRepresentation>(&ctx, changed_files).await?;
 
-    let options = PlanOptions {
-        changes_only,
-        interactive,
-    };
+    generic::plan_resources::<RequiredActionProviderRepresentation>(&ctx, changed_files).await?;
 
-    components::plan_components_or_keys(
-        client,
-        &workspace_dir,
-        options,
-        "components",
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-    )
-    .await?;
-    components::plan_components_or_keys(
-        client,
-        &workspace_dir,
-        options,
-        "keys",
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-    )
-    .await?;
-    components::check_keys_drift(client, options, realm_name).await?;
+    components::plan_components_or_keys(&ctx, "components", changed_files).await?;
+    components::plan_components_or_keys(&ctx, "keys", changed_files).await?;
+    components::check_keys_drift(ctx.client, ctx.options, ctx.realm_name).await?;
 
     Ok(())
 }

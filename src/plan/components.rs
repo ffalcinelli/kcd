@@ -5,28 +5,24 @@ use crate::utils::ui::{SPARKLE, WARN};
 use anyhow::{Context, Result};
 use console::style;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs as async_fs;
 
-use super::{PlanOptions, print_diff};
+use super::{PlanContext, PlanOptions, print_diff};
 
 pub async fn plan_components_or_keys(
-    client: &KeycloakClient,
-    workspace_dir: &Path,
-    options: PlanOptions,
+    ctx: &PlanContext<'_>,
     dir_name: &str,
-    env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
-    realm_name: &str,
 ) -> Result<()> {
-    let components_dir = workspace_dir.join(dir_name);
+    let components_dir = ctx.workspace_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
-        let existing_components = client
-            .get_components()
-            .await
-            .with_context(|| format!("Failed to get components for realm '{}'", realm_name))?;
+        let existing_components =
+            ctx.client.get_components().await.with_context(|| {
+                format!("Failed to get components for realm '{}'", ctx.realm_name)
+            })?;
         let mut by_identity: HashMap<String, ComponentRepresentation> = HashMap::new();
         type ComponentKey = (
             Option<String>,
@@ -58,10 +54,10 @@ pub async fn plan_components_or_keys(
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let env_vars = env_vars.clone();
+                let env_vars = ctx.env_vars.clone();
                 let by_identity = by_identity.clone();
                 let by_details = by_details.clone();
-                let realm_name = realm_name.to_string();
+                let realm_name = ctx.realm_name.to_string();
 
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
@@ -133,7 +129,7 @@ pub async fn plan_components_or_keys(
                     &format!("Component {}", local_component.get_name()),
                     Some(&remote_clone),
                     &local_component,
-                    options.changes_only,
+                    ctx.options.changes_only,
                     prefix,
                 )?
             } else {
@@ -151,19 +147,15 @@ pub async fn plan_components_or_keys(
                     &format!("Component {}", local_component.get_name()),
                     None::<&ComponentRepresentation>,
                     &local_component,
-                    options.changes_only,
+                    ctx.options.changes_only,
                     prefix,
                 )?
             };
 
             if changed {
                 let mut include = true;
-                if options.interactive {
-                    include =
-                        dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                            .with_prompt("Include this change in the plan?")
-                            .default(true)
-                            .interact()?;
+                if ctx.options.interactive {
+                    include = ctx.ui.confirm("Include this change in the plan?", true)?;
                 }
                 if include {
                     changed_files.push(path);
