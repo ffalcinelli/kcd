@@ -47,10 +47,8 @@ pub async fn init_secrets(
 
     let mut resolvers: Vec<Box<dyn SecretResolver>> = Vec::new();
 
-    if let Some(vault_addr) = &cli.vault_addr {
-        if let Some(vault_token) = &cli.vault_token {
-            resolvers.push(Box::new(VaultResolver::new(vault_addr, vault_token)?));
-        }
+    if let (Some(vault_addr), Some(vault_token)) = (&cli.vault_addr, &cli.vault_token) {
+        resolvers.push(Box::new(VaultResolver::new(vault_addr, vault_token)?));
     }
 
     resolvers.push(Box::new(EnvResolver::new(

@@ -3,7 +3,6 @@ use kcd::client::KeycloakClient;
 use kcd::plan::components::{check_keys_drift, plan_components_or_keys};
 use kcd::plan::{PlanContext, PlanOptions};
 use kcd::utils::ui::DialoguerUi;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
