@@ -3,15 +3,13 @@ pub mod generic;
 pub mod realm;
 
 use crate::client::KeycloakClient;
-use crate::utils::secrets::obfuscate_secrets;
+use crate::utils::secrets::{SecretResolver, obfuscate_secrets};
 use crate::utils::ui::{ACTION, CHECK, MEMO, Ui, WARN};
 
 use anyhow::Result;
 use console::{Style, style};
 use serde::Serialize;
 use similar::{ChangeTag, TextDiff};
-use std::collections::HashMap;
-use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
@@ -26,7 +24,7 @@ pub struct PlanContext<'a> {
     pub client: &'a KeycloakClient,
     pub workspace_dir: &'a std::path::Path,
     pub options: PlanOptions,
-    pub env_vars: Arc<HashMap<String, String>>,
+    pub resolver: Arc<dyn SecretResolver>,
     pub realm_name: &'a str,
     pub ui: &'a dyn Ui,
 }
@@ -38,18 +36,11 @@ pub async fn run(
     interactive: bool,
     realms_to_plan: &[String],
     ui: Arc<dyn Ui>,
+    resolver: Arc<dyn SecretResolver>,
 ) -> Result<()> {
     if !workspace_dir.exists() {
         anyhow::bail!("Input directory {:?} does not exist", workspace_dir);
     }
-
-    // Load .secrets from input directory if it exists
-    let env_path = workspace_dir.join(".secrets");
-    if env_path.exists() {
-        dotenvy::from_path(&env_path).ok();
-    }
-
-    let env_vars = Arc::new(env::vars().collect::<HashMap<String, String>>());
 
     let realms = if realms_to_plan.is_empty() {
         let mut dirs = Vec::new();
@@ -79,7 +70,7 @@ pub async fn run(
         let mut realm_client = client.clone();
         realm_client.set_target_realm(realm_name.clone());
         let realm_dir = workspace_dir.join(&realm_name);
-        let env_vars = Arc::clone(&env_vars);
+        let resolver = Arc::clone(&resolver);
         let ui = Arc::clone(&ui);
 
         set.spawn(async move {
@@ -100,7 +91,7 @@ pub async fn run(
                 client: &realm_client,
                 workspace_dir: &realm_dir,
                 options,
-                env_vars,
+                resolver,
                 realm_name: &realm_name,
                 ui: ui.as_ref(),
             };

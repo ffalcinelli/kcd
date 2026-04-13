@@ -13,7 +13,10 @@ use anyhow::{Context, Result};
 use args::{Cli, Commands};
 use client::KeycloakClient;
 use console::{Emoji, style};
+use std::collections::HashMap;
 use std::sync::Arc;
+use utils::secrets::vault::VaultResolver;
+use utils::secrets::{CompositeResolver, EnvResolver, SecretResolver};
 
 static ACTION: Emoji<'_, '_> = Emoji("🚀 ", ">> ");
 static SEARCH: Emoji<'_, '_> = Emoji("🔍 ", "> ");
@@ -30,6 +33,31 @@ pub async fn init_client(cli: &Cli) -> Result<KeycloakClient> {
         .await
         .context("Login failed")?;
     Ok(client)
+}
+
+pub async fn init_secrets(
+    cli: &Cli,
+    workspace: &std::path::Path,
+) -> Result<Arc<dyn SecretResolver>> {
+    // Load .secrets from input directory if it exists
+    let env_path = workspace.join(".secrets");
+    if env_path.exists() {
+        dotenvy::from_path(&env_path).ok();
+    }
+
+    let mut resolvers: Vec<Box<dyn SecretResolver>> = Vec::new();
+
+    if let Some(vault_addr) = &cli.vault_addr {
+        if let Some(vault_token) = &cli.vault_token {
+            resolvers.push(Box::new(VaultResolver::new(vault_addr, vault_token)?));
+        }
+    }
+
+    resolvers.push(Box::new(EnvResolver::new(
+        std::env::vars().collect::<HashMap<String, String>>(),
+    )));
+
+    Ok(Arc::new(CompositeResolver::new(resolvers)))
 }
 
 pub async fn run_app(cli: Cli) -> Result<()> {
@@ -63,6 +91,7 @@ pub async fn run_app(cli: Cli) -> Result<()> {
         }
         Commands::Apply { workspace, yes } => {
             let client = init_client(&cli).await?;
+            let resolver = init_secrets(&cli, workspace).await?;
             println!(
                 "{} {}",
                 ACTION,
@@ -73,7 +102,7 @@ pub async fn run_app(cli: Cli) -> Result<()> {
                 .cyan()
                 .bold()
             );
-            apply::run(&client, workspace.clone(), &cli.realms, *yes).await?;
+            apply::run(&client, workspace.clone(), &cli.realms, *yes, resolver).await?;
         }
         Commands::Plan {
             workspace,
@@ -81,6 +110,7 @@ pub async fn run_app(cli: Cli) -> Result<()> {
             interactive,
         } => {
             let client = init_client(&cli).await?;
+            let resolver = init_secrets(&cli, workspace).await?;
             println!(
                 "{} {}",
                 SEARCH,
@@ -98,11 +128,13 @@ pub async fn run_app(cli: Cli) -> Result<()> {
                 *interactive,
                 &cli.realms,
                 Arc::new(crate::utils::ui::DialoguerUi::new()),
+                resolver,
             )
             .await?;
         }
         Commands::Drift { workspace } => {
             let client = init_client(&cli).await?;
+            let resolver = init_secrets(&cli, workspace).await?;
             println!(
                 "{} {}",
                 SEARCH,
@@ -120,6 +152,7 @@ pub async fn run_app(cli: Cli) -> Result<()> {
                 false,
                 &cli.realms,
                 Arc::new(crate::utils::ui::DialoguerUi::new()),
+                resolver,
             )
             .await?;
         }

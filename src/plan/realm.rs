@@ -1,6 +1,7 @@
 use crate::utils::secrets::substitute_secrets;
 use anyhow::{Context, Result};
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::fs as async_fs;
 
 use super::{PlanContext, print_diff};
@@ -11,7 +12,7 @@ pub async fn plan_realm(ctx: &PlanContext<'_>, changed_files: &mut Vec<PathBuf>)
         let content = async_fs::read_to_string(&realm_path).await?;
         let mut val: serde_json::Value = serde_yaml::from_str(&content)
             .with_context(|| format!("Failed to parse YAML file: {:?}", realm_path))?;
-        substitute_secrets(&mut val, &ctx.env_vars).map_err(|e| anyhow::anyhow!(e))?;
+        substitute_secrets(&mut val, Arc::clone(&ctx.resolver)).await?;
         let local_realm: crate::models::RealmRepresentation = serde_json::from_value(val)
             .with_context(|| format!("Failed to deserialize YAML file: {:?}", realm_path))?;
 

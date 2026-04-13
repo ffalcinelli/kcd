@@ -1,6 +1,6 @@
 use crate::client::KeycloakClient;
 use crate::models::{KeycloakResource, UserRepresentation};
-use crate::utils::secrets::substitute_secrets;
+use crate::utils::secrets::{SecretResolver, substitute_secrets};
 use anyhow::{Context, Result};
 use console::style;
 use std::collections::{HashMap, HashSet};
@@ -14,7 +14,7 @@ use super::{SUCCESS_CREATE, SUCCESS_UPDATE};
 pub async fn apply_users(
     client: &KeycloakClient,
     workspace_dir: &std::path::Path,
-    env_vars: Arc<HashMap<String, String>>,
+    resolver: Arc<dyn SecretResolver>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
     realm_name: &str,
 ) -> Result<()> {
@@ -44,13 +44,13 @@ pub async fn apply_users(
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let client = client.clone();
                 let existing_users_map = Arc::clone(&existing_users_map);
-                let env_vars = Arc::clone(&env_vars);
+                let resolver = Arc::clone(&resolver);
                 let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
                         .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-                    substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                    substitute_secrets(&mut val, resolver).await?;
                     let mut user_rep: UserRepresentation = serde_json::from_value(val)?;
 
                     let identity = user_rep
@@ -103,6 +103,7 @@ pub async fn apply_users(
 mod tests {
     use super::*;
     use crate::client::KeycloakClient;
+    use crate::utils::secrets::EnvResolver;
     use axum::{
         Json, Router,
         http::StatusCode,
@@ -186,6 +187,8 @@ mod tests {
         let users_dir = temp.path().join("users");
         fs::create_dir(&users_dir).unwrap();
 
+        let resolver = Arc::new(EnvResolver::new(HashMap::new()));
+
         // 1. Test update failure
         call_count.store(0, std::sync::atomic::Ordering::SeqCst);
         let user_existing = users_dir.join("existing.yaml");
@@ -194,7 +197,7 @@ mod tests {
         let res = apply_users(
             &client,
             temp.path(),
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )
@@ -216,7 +219,7 @@ mod tests {
         let res = apply_users(
             &client,
             temp.path(),
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )
