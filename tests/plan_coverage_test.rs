@@ -493,3 +493,72 @@ async fn test_plan_interactive_exclude() {
     let plan_file = workspace_dir.join(".kcdplan");
     assert!(!plan_file.exists());
 }
+
+#[tokio::test]
+async fn test_plan_error_paths() {
+    let mock_url = start_mock_server().await;
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("error-realm".to_string());
+    client.set_token("mock".to_string());
+
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("error-realm");
+    fs::create_dir_all(&realm_dir).unwrap();
+
+    // 1. Realm fetch error (non-404)
+    fs::write(
+        realm_dir.join("realm.yaml"),
+        "realm: error-realm\nenabled: true\n",
+    )
+    .unwrap();
+
+    let res = plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &["error-realm".to_string()],
+        Arc::new(DialoguerUi),
+    )
+    .await;
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("Failed to get realm"));
+
+    // 2. Resource fetch error
+    // Remove realm.yaml to avoid realm fetch error, but add roles directory
+    fs::remove_file(realm_dir.join("realm.yaml")).unwrap();
+    let roles_dir = realm_dir.join("roles");
+    fs::create_dir_all(&roles_dir).unwrap();
+    fs::write(roles_dir.join("role.yaml"), "name: role\n").unwrap();
+
+    let res = plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &["error-realm".to_string()],
+        Arc::new(DialoguerUi),
+    )
+    .await;
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("Failed to get roles"));
+
+    // 3. Components fetch error
+    fs::remove_dir_all(&roles_dir).unwrap();
+    let comp_dir = realm_dir.join("components");
+    fs::create_dir_all(&comp_dir).unwrap();
+    fs::write(comp_dir.join("comp.yaml"), "name: comp\n").unwrap();
+
+    let res = plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &["error-realm".to_string()],
+        Arc::new(DialoguerUi),
+    )
+    .await;
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("Failed to get components"));
+}
