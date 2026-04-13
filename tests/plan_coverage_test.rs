@@ -562,3 +562,77 @@ async fn test_plan_error_paths() {
     assert!(res.is_err());
     assert!(res.unwrap_err().to_string().contains("Failed to get components"));
 }
+
+#[tokio::test]
+async fn test_plan_empty_realms_list() {
+    let mock_url = start_mock_server().await;
+    let client = KeycloakClient::new(mock_url);
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+    
+    // Create an empty directory (already empty)
+    let res = plan::run(
+        &client,
+        workspace_dir,
+        false,
+        false,
+        &[],
+        Arc::new(DialoguerUi),
+    )
+    .await;
+    assert!(res.is_ok());
+}
+
+#[test]
+fn test_print_diff_delete() {
+    use kcd::models::RoleRepresentation;
+    use kcd::plan::print_diff;
+    use std::collections::HashMap;
+
+    let old = RoleRepresentation {
+        id: Some("1".to_string()),
+        name: "role".to_string(),
+        description: Some("old".to_string()),
+        container_id: None,
+        composite: false,
+        client_role: false,
+        extra: HashMap::new(),
+    };
+    let new = RoleRepresentation {
+        id: Some("1".to_string()),
+        name: "role".to_string(),
+        description: None, // Deleted field
+        container_id: None,
+        composite: false,
+        client_role: false,
+        extra: HashMap::new(),
+    };
+
+    let res = print_diff("test", Some(&old), &new, false, "role").unwrap();
+    assert!(res);
+}
+
+#[tokio::test]
+async fn test_plan_auto_discovery_no_realm_yaml() {
+    let mock_url = start_mock_server().await;
+    let client = KeycloakClient::new(mock_url);
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+    
+    let realm_dir = workspace_dir.join("test-realm");
+    fs::create_dir_all(&realm_dir).unwrap();
+    // No realm.yaml, but maybe roles
+    let roles_dir = realm_dir.join("roles");
+    fs::create_dir_all(&roles_dir).unwrap();
+    
+    let res = plan::run(
+        &client,
+        workspace_dir,
+        false,
+        false,
+        &[],
+        Arc::new(DialoguerUi),
+    )
+    .await;
+    assert!(res.is_ok());
+}
