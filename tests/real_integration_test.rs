@@ -110,7 +110,7 @@ standardFlowEnabled: true
         true,
         false,
         &["master".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await?;
 

@@ -86,7 +86,7 @@ async fn test_plan_keys_and_extended() {
         true,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await
     .expect("Plan failed");
@@ -98,7 +98,7 @@ async fn test_plan_keys_and_extended() {
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await
     .expect("Plan failed");
@@ -131,7 +131,7 @@ async fn test_plan_substitute_secrets_error() {
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
 

@@ -25,7 +25,19 @@ pub trait Ui: Send + Sync {
     fn print_warn(&self, msg: &str);
 }
 
-pub struct DialoguerUi;
+pub struct DialoguerUi {
+    pub term: Option<console::Term>,
+}
+
+impl DialoguerUi {
+    pub fn new() -> Self {
+        Self { term: None }
+    }
+
+    pub fn with_term(term: console::Term) -> Self {
+        Self { term: Some(term) }
+    }
+}
 
 impl Ui for DialoguerUi {
     fn input(&self, prompt: &str, default: Option<String>, allow_empty: bool) -> Result<String> {
@@ -37,14 +49,24 @@ impl Ui for DialoguerUi {
         } else {
             input
         };
-        Ok(input.interact_text()?)
+
+        if let Some(term) = &self.term {
+            Ok(input.interact_text_on(term)?)
+        } else {
+            Ok(input.interact_text()?)
+        }
     }
 
     fn confirm(&self, prompt: &str, default: bool) -> Result<bool> {
-        Ok(dialoguer::Confirm::new()
+        let confirm = dialoguer::Confirm::new()
             .with_prompt(prompt)
-            .default(default)
-            .interact()?)
+            .default(default);
+
+        if let Some(term) = &self.term {
+            Ok(confirm.interact_on(term)?)
+        } else {
+            Ok(confirm.interact()?)
+        }
     }
 
     fn password(&self, prompt: &str, confirm: Option<&str>) -> Result<String> {
@@ -54,15 +76,25 @@ impl Ui for DialoguerUi {
         } else {
             p
         };
-        Ok(p.interact()?)
+
+        if let Some(term) = &self.term {
+            Ok(p.interact_on(term)?)
+        } else {
+            Ok(p.interact()?)
+        }
     }
 
     fn select(&self, prompt: &str, items: &[&str], default: usize) -> Result<usize> {
-        Ok(dialoguer::Select::new()
+        let select = dialoguer::Select::new()
             .with_prompt(prompt)
             .items(items)
-            .default(default)
-            .interact()?)
+            .default(default);
+
+        if let Some(term) = &self.term {
+            Ok(select.interact_on(term)?)
+        } else {
+            Ok(select.interact()?)
+        }
     }
 
     fn print_info(&self, msg: &str) {

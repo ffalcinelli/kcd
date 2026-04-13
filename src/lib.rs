@@ -97,7 +97,7 @@ pub async fn run_app(cli: Cli) -> Result<()> {
                 *changes_only,
                 *interactive,
                 &cli.realms,
-                Arc::new(crate::utils::ui::DialoguerUi),
+                Arc::new(crate::utils::ui::DialoguerUi::new()),
             )
             .await?;
         }
@@ -119,12 +119,12 @@ pub async fn run_app(cli: Cli) -> Result<()> {
                 true,
                 false,
                 &cli.realms,
-                Arc::new(crate::utils::ui::DialoguerUi),
+                Arc::new(crate::utils::ui::DialoguerUi::new()),
             )
             .await?;
         }
         Commands::Cli { workspace } => {
-            cli::run(workspace.clone(), &crate::utils::ui::DialoguerUi).await?;
+            cli::run(workspace.clone(), &crate::utils::ui::DialoguerUi::new()).await?;
         }
         Commands::Clean { workspace, yes } => {
             println!(

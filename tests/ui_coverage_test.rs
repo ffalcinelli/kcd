@@ -3,11 +3,21 @@ use std::sync::Mutex;
 
 #[test]
 fn test_dialoguer_ui_prints() {
-    let ui = DialoguerUi;
+    let ui = DialoguerUi::new();
     ui.print_info("info");
     ui.print_success("success");
     ui.print_error("error");
     ui.print_warn("warn");
+}
+
+#[test]
+fn test_dialoguer_ui_with_term_branches() {
+    let term = console::Term::buffered_stdout();
+    let _ui = DialoguerUi::with_term(term);
+    // Since we cannot easily mock the console read buffer in a way that
+    // dialoguer 0.12 expects without a real TTY, we at least ensure
+    // that we can instantiate it and hit the with_term constructors.
+    // Further coverage of interact_on requires specialized mock terminals.
 }
 
 #[test]

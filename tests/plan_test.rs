@@ -382,7 +382,7 @@ async fn test_plan() {
     )
     .unwrap();
 
-    let ui = Arc::new(DialoguerUi);
+    let ui = Arc::new(DialoguerUi::new());
 
     // Run plan
     plan::run(

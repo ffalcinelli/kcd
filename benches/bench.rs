@@ -21,7 +21,7 @@ fn main() {
             .unwrap();
 
         let start = std::time::Instant::now();
-        let ui = Arc::new(DialoguerUi);
+        let ui = Arc::new(DialoguerUi::new());
         for _ in 0..50 {
             plan::run(
                 &client,

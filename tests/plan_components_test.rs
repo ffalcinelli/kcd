@@ -15,6 +15,7 @@ async fn test_plan_components_no_dir() {
     let workspace_dir = dir.path();
     let mut changed_files = Vec::new();
     let env_vars = Arc::new(HashMap::new());
+    let ui = DialoguerUi::new();
 
     let options = PlanOptions {
         changes_only: false,
@@ -27,7 +28,7 @@ async fn test_plan_components_no_dir() {
         options,
         env_vars,
         realm_name: "master",
-        ui: &DialoguerUi,
+        ui: &ui,
     };
 
     // Should not fail if directory doesn't exist
@@ -61,6 +62,7 @@ async fn test_plan_components_with_invalid_yaml() {
 
     let mut changed_files = Vec::new();
     let env_vars = Arc::new(HashMap::new());
+    let ui = DialoguerUi::new();
 
     let options = PlanOptions {
         changes_only: false,
@@ -73,7 +75,7 @@ async fn test_plan_components_with_invalid_yaml() {
         options,
         env_vars,
         realm_name: "master",
-        ui: &DialoguerUi,
+        ui: &ui,
     };
 
     let res = plan_components_or_keys(&ctx, "components", &mut changed_files).await;
@@ -104,6 +106,7 @@ async fn test_plan_components_no_identity() {
     let workspace_dir = dir.path();
     let mut changed_files = Vec::new();
     let env_vars = Arc::new(HashMap::new());
+    let ui = DialoguerUi::new();
 
     let options = PlanOptions {
         changes_only: false,
@@ -116,7 +119,7 @@ async fn test_plan_components_no_identity() {
         options,
         env_vars,
         realm_name: "master",
-        ui: &DialoguerUi,
+        ui: &ui,
     };
 
     let components_dir = workspace_dir.join("components");

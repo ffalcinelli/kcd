@@ -118,7 +118,7 @@ async fn test_ultimate_coverage() {
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await
     .unwrap();
@@ -140,7 +140,7 @@ async fn test_ultimate_coverage() {
         true,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await
     .unwrap();
@@ -164,7 +164,7 @@ async fn test_plan_all_realms() {
         false,
         false,
         &[],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await
     .unwrap();

@@ -18,7 +18,7 @@ async fn test_plan_non_existent_workspace() {
         false,
         false,
         &[],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_err());
@@ -35,7 +35,7 @@ async fn test_plan_empty_workspace() {
         false,
         false,
         &[],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -64,7 +64,7 @@ async fn test_plan_with_secrets_file() {
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -95,7 +95,7 @@ async fn test_plan_cleanup_old_plan_file() {
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -136,7 +136,7 @@ async fn test_plan_realm_not_found_remote() {
         false,
         false,
         &["new-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -177,7 +177,7 @@ async fn test_plan_resources_creation() {
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -223,7 +223,7 @@ description: ${ROLE_DESC}
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -259,7 +259,7 @@ async fn test_plan_resources_invalid_yaml() {
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_err());
@@ -291,7 +291,7 @@ async fn test_plan_resources_missing_identity() {
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_err());
@@ -333,7 +333,7 @@ async fn test_plan_resources_update() {
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -378,7 +378,7 @@ async fn test_plan_resources_changes_only() {
         true, // changes_only
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -519,7 +519,7 @@ async fn test_plan_error_paths() {
         false,
         false,
         &["error-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_err());
@@ -538,7 +538,7 @@ async fn test_plan_error_paths() {
         false,
         false,
         &["error-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_err());
@@ -556,7 +556,7 @@ async fn test_plan_error_paths() {
         false,
         false,
         &["error-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_err());
@@ -581,7 +581,7 @@ async fn test_plan_empty_realms_list() {
         false,
         false,
         &[],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -636,7 +636,7 @@ async fn test_plan_auto_discovery_no_realm_yaml() {
         false,
         false,
         &[],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -686,7 +686,7 @@ async fn test_plan_resources_ignore_non_yaml() {
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -729,7 +729,7 @@ async fn test_plan_resources_with_id_no_clear() {
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -767,7 +767,7 @@ description: ${KEYCLOAK_ROLE_MISSING_SECRET}
         false,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
 

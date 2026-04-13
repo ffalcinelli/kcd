@@ -29,7 +29,7 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &[],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_err());
@@ -41,7 +41,7 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &[],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_ok());
@@ -70,7 +70,7 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &[],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await
     .unwrap();
@@ -83,7 +83,7 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &["new-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await
     .unwrap();
@@ -96,7 +96,7 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &["new-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     // It should fail when trying to parse roles or something if we put it in a sub-dir
@@ -109,7 +109,7 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &["new-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await;
     assert!(res.is_err());
@@ -200,7 +200,7 @@ async fn test_check_keys_drift() {
         true,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi),
+        Arc::new(DialoguerUi::new()),
     )
     .await
     .unwrap();
