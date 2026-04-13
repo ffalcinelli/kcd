@@ -615,7 +615,8 @@ fn test_print_diff_delete() {
 #[tokio::test]
 async fn test_plan_auto_discovery_no_realm_yaml() {
     let mock_url = start_mock_server().await;
-    let client = KeycloakClient::new(mock_url);
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_token("mock".to_string());
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     
