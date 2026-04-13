@@ -148,7 +148,10 @@ async fn get_realm_handler(
     axum::extract::Path(realm): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if realm == "error-realm" {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal Server Error"})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal Server Error"})),
+        );
     }
     let display_name = if realm == "test-realm" {
         "Test Realm".to_string()
@@ -174,7 +177,10 @@ async fn get_clients_handler(
     axum::extract::Path(realm): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if realm == "error-realm" {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal Server Error"})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal Server Error"})),
+        );
     }
     if realm == "test-realm" {
         (
@@ -203,7 +209,10 @@ async fn get_client_scopes_handler(
     axum::extract::Path(realm): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if realm == "error-realm" {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal Server Error"})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal Server Error"})),
+        );
     }
     if realm == "test-realm" {
         (
@@ -221,7 +230,10 @@ async fn get_idps_handler(
     axum::extract::Path(realm): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if realm == "error-realm" {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal Server Error"})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal Server Error"})),
+        );
     }
     if realm == "test-realm" {
         (
@@ -247,7 +259,10 @@ async fn get_groups_handler(
     axum::extract::Path(realm): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if realm == "error-realm" {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal Server Error"})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal Server Error"})),
+        );
     }
     if realm == "test-realm" {
         (
@@ -265,7 +280,10 @@ async fn get_users_handler(
     axum::extract::Path(realm): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if realm == "error-realm" {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal Server Error"})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal Server Error"})),
+        );
     }
     if realm == "test-realm" {
         (
@@ -283,7 +301,10 @@ async fn get_flows_handler(
     axum::extract::Path(realm): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if realm == "error-realm" {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal Server Error"})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal Server Error"})),
+        );
     }
     if realm == "test-realm" {
         (
@@ -301,7 +322,10 @@ async fn get_required_actions_handler(
     axum::extract::Path(realm): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if realm == "error-realm" {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal Server Error"})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal Server Error"})),
+        );
     }
     if realm == "test-realm" {
         (
@@ -319,7 +343,10 @@ async fn get_components_handler(
     axum::extract::Path(realm): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if realm == "error-realm" {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal Server Error"})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal Server Error"})),
+        );
     }
     if realm == "test-realm" {
         (
@@ -353,7 +380,10 @@ async fn get_keys_handler(
     axum::extract::Path(realm): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if realm == "error-realm" {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal Server Error"})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal Server Error"})),
+        );
     }
     if realm == "test-realm" {
         let now = std::time::SystemTime::now()
@@ -389,7 +419,10 @@ async fn get_roles_handler(
     axum::extract::Path(realm): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if realm == "error-realm" {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal Server Error"})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal Server Error"})),
+        );
     }
     if realm == "test-realm" {
         (
