@@ -641,3 +641,140 @@ async fn test_plan_auto_discovery_no_realm_yaml() {
     .await;
     assert!(res.is_ok());
 }
+
+#[tokio::test]
+async fn test_plan_resources_ignore_non_yaml() {
+    let mock_url = start_mock_server().await;
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
+    client.set_token("mock".to_string());
+
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
+    fs::create_dir_all(&realm_dir).unwrap();
+
+    let roles_dir = realm_dir.join("roles");
+    fs::create_dir_all(&roles_dir).unwrap();
+
+    // Valid YAML
+    let role = kcd::models::RoleRepresentation {
+        id: None,
+        name: "role-1".to_string(),
+        description: None,
+        container_id: None,
+        composite: false,
+        client_role: false,
+        extra: std::collections::HashMap::new(),
+    };
+    fs::write(
+        roles_dir.join("role1.yaml"),
+        serde_yaml::to_string(&role).unwrap(),
+    )
+    .unwrap();
+
+    // Non-YAML file
+    fs::write(roles_dir.join("ignore.me"), "not yaml").unwrap();
+
+    // Directory (should be ignored by next_entry check if we were strictly looking for files,
+    // but read_dir gives all entries, and we check extension)
+    fs::create_dir(roles_dir.join("some_subdir.yaml")).unwrap();
+
+    let res = plan::run(
+        &client,
+        workspace_dir,
+        false,
+        false,
+        &["test-realm".to_string()],
+        Arc::new(DialoguerUi),
+    )
+    .await;
+    assert!(res.is_ok());
+}
+
+#[tokio::test]
+async fn test_plan_resources_with_id_no_clear() {
+    let mock_url = start_mock_server().await;
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
+    client.set_token("mock".to_string());
+
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
+    fs::create_dir_all(&realm_dir).unwrap();
+
+    let roles_dir = realm_dir.join("roles");
+    fs::create_dir_all(&roles_dir).unwrap();
+
+    // Local role WITH ID. 'role-1' exists in mock server with id 'r1'.
+    let role = kcd::models::RoleRepresentation {
+        id: Some("different-id".to_string()),
+        name: "role-1".to_string(),
+        description: Some("Role 1".to_string()),
+        container_id: None,
+        composite: false,
+        client_role: false,
+        extra: std::collections::HashMap::new(),
+    };
+    fs::write(
+        roles_dir.join("role-1.yaml"),
+        serde_yaml::to_string(&role).unwrap(),
+    )
+    .unwrap();
+
+    let res = plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &["test-realm".to_string()],
+        Arc::new(DialoguerUi),
+    )
+    .await;
+    assert!(res.is_ok());
+
+    let plan_file = workspace_dir.join(".kcdplan");
+    assert!(plan_file.exists());
+}
+
+#[tokio::test]
+async fn test_plan_resources_missing_secret_env_var() {
+    let mock_url = start_mock_server().await;
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
+    client.set_token("mock".to_string());
+
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
+    fs::create_dir_all(&realm_dir).unwrap();
+
+    let roles_dir = realm_dir.join("roles");
+    fs::create_dir_all(&roles_dir).unwrap();
+
+    // Role with missing secret env var
+    let role_yaml = "
+name: secret-role
+description: ${KEYCLOAK_ROLE_MISSING_SECRET}
+";
+    let role_path = roles_dir.join("secret-role.yaml");
+    fs::write(&role_path, role_yaml).unwrap();
+
+    let res = plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &["test-realm".to_string()],
+        Arc::new(DialoguerUi),
+    )
+    .await;
+
+    assert!(res.is_err());
+    assert!(
+        res.unwrap_err()
+            .to_string()
+            .contains("Missing required environment variable")
+    );
+}

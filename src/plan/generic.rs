@@ -48,7 +48,7 @@ where
 
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
-        if path.extension().is_some_and(|ext| ext == "yaml") {
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "yaml") {
             let env_vars = Arc::clone(&ctx.env_vars);
             let existing_map = Arc::clone(&existing_map);
             let realm_name = ctx.realm_name.to_string();
