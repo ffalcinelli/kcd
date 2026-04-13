@@ -1,3 +1,4 @@
+use std::sync::Arc;
 mod common;
 use common::start_mock_server;
 use kcd::client::KeycloakClient;
@@ -5,6 +6,8 @@ use kcd::models::RealmRepresentation;
 use kcd::{apply, clean, inspect, plan};
 use std::fs;
 use tempfile::tempdir;
+
+use kcd::utils::ui::DialoguerUi;
 
 #[tokio::test]
 async fn test_plan_edge_cases() {
@@ -26,12 +29,21 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &[],
+        Arc::new(DialoguerUi),
     )
     .await;
     assert!(res.is_err());
 
     // 2. Test run with empty directory (no realms)
-    let res = plan::run(&client, workspace_dir.clone(), false, false, &[]).await;
+    let res = plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &[],
+        Arc::new(DialoguerUi),
+    )
+    .await;
     assert!(res.is_ok());
 
     // 3. Test with .secrets file
@@ -52,9 +64,16 @@ async fn test_plan_edge_cases() {
     .unwrap();
 
     // 4. Test auto-discovery of realms
-    plan::run(&client, workspace_dir.clone(), false, false, &[])
-        .await
-        .unwrap();
+    plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &[],
+        Arc::new(DialoguerUi),
+    )
+    .await
+    .unwrap();
 
     // 5. Test plan_realm with 404 (realm doesn't exist on server)
     // "new-realm" should return 404 in my mock server
@@ -64,6 +83,7 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &["new-realm".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await
     .unwrap();
@@ -76,6 +96,7 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &["new-realm".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await;
     // It should fail when trying to parse roles or something if we put it in a sub-dir
@@ -88,6 +109,7 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &["new-realm".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await;
     assert!(res.is_err());
@@ -178,6 +200,7 @@ async fn test_check_keys_drift() {
         true,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await
     .unwrap();

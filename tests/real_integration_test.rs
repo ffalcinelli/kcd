@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use anyhow::Result;
 use kcd::client::KeycloakClient;
 use kcd::{apply, inspect, plan};
@@ -98,6 +99,8 @@ standardFlowEnabled: true
         new_client_yaml,
     )?;
 
+use kcd::utils::ui::DialoguerUi;
+
     // 5. Plan - Should see changes
     println!("Planning changes...");
     // Just ensuring plan runs without error
@@ -107,6 +110,7 @@ standardFlowEnabled: true
         true,
         false,
         &["master".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await?;
 

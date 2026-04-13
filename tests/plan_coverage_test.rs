@@ -4,6 +4,9 @@ use kcd::client::KeycloakClient;
 use kcd::plan;
 use std::fs;
 use tempfile::tempdir;
+use std::sync::Arc;
+
+use kcd::utils::ui::DialoguerUi;
 
 #[tokio::test]
 async fn test_plan_non_existent_workspace() {
@@ -15,6 +18,7 @@ async fn test_plan_non_existent_workspace() {
         false,
         false,
         &[],
+        Arc::new(DialoguerUi),
     )
     .await;
     assert!(res.is_err());
@@ -25,7 +29,15 @@ async fn test_plan_empty_workspace() {
     let mock_url = start_mock_server().await;
     let client = KeycloakClient::new(mock_url);
     let dir = tempdir().unwrap();
-    let res = plan::run(&client, dir.path().to_path_buf(), false, false, &[]).await;
+    let res = plan::run(
+        &client,
+        dir.path().to_path_buf(),
+        false,
+        false,
+        &[],
+        Arc::new(DialoguerUi),
+    )
+    .await;
     assert!(res.is_ok());
 }
 
@@ -52,6 +64,7 @@ async fn test_plan_with_secrets_file() {
         false,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await;
     assert!(res.is_ok());
@@ -82,6 +95,7 @@ async fn test_plan_cleanup_old_plan_file() {
         false,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await;
     assert!(res.is_ok());
@@ -122,6 +136,7 @@ async fn test_plan_realm_not_found_remote() {
         false,
         false,
         &["new-realm".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await;
     assert!(res.is_ok());
@@ -162,6 +177,7 @@ async fn test_plan_resources_creation() {
         false,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await;
     assert!(res.is_ok());
@@ -207,6 +223,7 @@ description: ${ROLE_DESC}
         false,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await;
     assert!(res.is_ok());
@@ -242,6 +259,7 @@ async fn test_plan_resources_invalid_yaml() {
         false,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await;
     assert!(res.is_err());
@@ -273,6 +291,7 @@ async fn test_plan_resources_missing_identity() {
         false,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await;
     assert!(res.is_err());
@@ -314,6 +333,7 @@ async fn test_plan_resources_update() {
         false,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi),
     )
     .await;
     assert!(res.is_ok());
@@ -358,6 +378,114 @@ async fn test_plan_resources_changes_only() {
         true, // changes_only
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi),
+    )
+    .await;
+    assert!(res.is_ok());
+
+    let plan_file = workspace_dir.join(".kcdplan");
+    assert!(!plan_file.exists());
+}
+
+use kcd::utils::ui::MockUi;
+use std::sync::Mutex;
+
+#[tokio::test]
+async fn test_plan_interactive_include() {
+    let mock_url = start_mock_server().await;
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
+    client
+        .login("admin-cli", Some("secret"), None, None)
+        .await
+        .unwrap();
+
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
+    fs::create_dir_all(&realm_dir).unwrap();
+
+    let roles_dir = realm_dir.join("roles");
+    fs::create_dir_all(&roles_dir).unwrap();
+    let role = kcd::models::RoleRepresentation {
+        id: None,
+        name: "interactive-role".to_string(),
+        description: Some("Interactive role".to_string()),
+        container_id: None,
+        composite: false,
+        client_role: false,
+        extra: std::collections::HashMap::new(),
+    };
+    let role_path = roles_dir.join("interactive-role.yaml");
+    fs::write(&role_path, serde_yaml::to_string(&role).unwrap()).unwrap();
+
+    let ui = Arc::new(MockUi {
+        inputs: Mutex::new(vec![]),
+        confirms: Mutex::new(vec![true]), // Confirm inclusion
+        selects: Mutex::new(vec![]),
+        passwords: Mutex::new(vec![]),
+    });
+
+    let res = plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        true, // interactive
+        &["test-realm".to_string()],
+        ui,
+    )
+    .await;
+    assert!(res.is_ok());
+
+    let plan_file = workspace_dir.join(".kcdplan");
+    assert!(plan_file.exists());
+    let plan_content = fs::read_to_string(plan_file).unwrap();
+    assert!(plan_content.contains("test-realm/roles/interactive-role.yaml"));
+}
+
+#[tokio::test]
+async fn test_plan_interactive_exclude() {
+    let mock_url = start_mock_server().await;
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
+    client
+        .login("admin-cli", Some("secret"), None, None)
+        .await
+        .unwrap();
+
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
+    fs::create_dir_all(&realm_dir).unwrap();
+
+    let roles_dir = realm_dir.join("roles");
+    fs::create_dir_all(&roles_dir).unwrap();
+    let role = kcd::models::RoleRepresentation {
+        id: None,
+        name: "excluded-role".to_string(),
+        description: Some("Excluded role".to_string()),
+        container_id: None,
+        composite: false,
+        client_role: false,
+        extra: std::collections::HashMap::new(),
+    };
+    let role_path = roles_dir.join("excluded-role.yaml");
+    fs::write(&role_path, serde_yaml::to_string(&role).unwrap()).unwrap();
+
+    let ui = Arc::new(MockUi {
+        inputs: Mutex::new(vec![]),
+        confirms: Mutex::new(vec![false]), // Reject inclusion
+        selects: Mutex::new(vec![]),
+        passwords: Mutex::new(vec![]),
+    });
+
+    let res = plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        true, // interactive
+        &["test-realm".to_string()],
+        ui,
     )
     .await;
     assert!(res.is_ok());

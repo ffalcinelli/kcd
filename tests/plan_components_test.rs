@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
+use kcd::utils::ui::DialoguerUi;
 
 #[tokio::test]
 async fn test_plan_components_no_dir() {
@@ -28,6 +29,7 @@ async fn test_plan_components_no_dir() {
         env_vars,
         &mut changed_files,
         "master",
+        &DialoguerUi,
     )
     .await;
     assert!(res.is_ok());
@@ -73,6 +75,7 @@ async fn test_plan_components_with_invalid_yaml() {
         env_vars,
         &mut changed_files,
         "master",
+        &DialoguerUi,
     )
     .await;
     assert!(res.is_err());

@@ -4,7 +4,7 @@ pub mod realm;
 
 use crate::client::KeycloakClient;
 use crate::utils::secrets::obfuscate_secrets;
-use crate::utils::ui::{ACTION, CHECK, MEMO, WARN};
+use crate::utils::ui::{ACTION, CHECK, MEMO, WARN, Ui};
 
 use anyhow::Result;
 use console::{Style, style};
@@ -28,6 +28,7 @@ pub async fn run(
     changes_only: bool,
     interactive: bool,
     realms_to_plan: &[String],
+    ui: Arc<dyn Ui>,
 ) -> Result<()> {
     if !workspace_dir.exists() {
         anyhow::bail!("Input directory {:?} does not exist", workspace_dir);
@@ -70,6 +71,7 @@ pub async fn run(
         realm_client.set_target_realm(realm_name.clone());
         let realm_dir = workspace_dir.join(&realm_name);
         let env_vars = Arc::clone(&env_vars);
+        let ui = Arc::clone(&ui);
 
         set.spawn(async move {
             println!(
@@ -89,6 +91,7 @@ pub async fn run(
                 env_vars,
                 &mut changed_files,
                 &realm_name,
+                ui.as_ref(),
             )
             .await?;
 
@@ -129,6 +132,7 @@ async fn plan_single_realm(
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
     realm_name: &str,
+    ui: &dyn Ui,
 ) -> Result<()> {
     realm::plan_realm(
         client,
@@ -138,6 +142,7 @@ async fn plan_single_realm(
         Arc::clone(&env_vars),
         changed_files,
         realm_name,
+        ui,
     )
     .await?;
 
@@ -149,6 +154,7 @@ async fn plan_single_realm(
         Arc::clone(&env_vars),
         changed_files,
         realm_name,
+        ui,
     )
     .await?;
 
@@ -160,6 +166,7 @@ async fn plan_single_realm(
         Arc::clone(&env_vars),
         changed_files,
         realm_name,
+        ui,
     )
     .await?;
 
@@ -171,6 +178,7 @@ async fn plan_single_realm(
         Arc::clone(&env_vars),
         changed_files,
         realm_name,
+        ui,
     )
     .await?;
 
@@ -182,6 +190,7 @@ async fn plan_single_realm(
         Arc::clone(&env_vars),
         changed_files,
         realm_name,
+        ui,
     )
     .await?;
 
@@ -193,6 +202,7 @@ async fn plan_single_realm(
         Arc::clone(&env_vars),
         changed_files,
         realm_name,
+        ui,
     )
     .await?;
 
@@ -204,6 +214,7 @@ async fn plan_single_realm(
         Arc::clone(&env_vars),
         changed_files,
         realm_name,
+        ui,
     )
     .await?;
 
@@ -215,6 +226,7 @@ async fn plan_single_realm(
         Arc::clone(&env_vars),
         changed_files,
         realm_name,
+        ui,
     )
     .await?;
 
@@ -226,6 +238,7 @@ async fn plan_single_realm(
         Arc::clone(&env_vars),
         changed_files,
         realm_name,
+        ui,
     )
     .await?;
 
@@ -242,6 +255,7 @@ async fn plan_single_realm(
         Arc::clone(&env_vars),
         changed_files,
         realm_name,
+        ui,
     )
     .await?;
     components::plan_components_or_keys(
@@ -252,6 +266,7 @@ async fn plan_single_realm(
         Arc::clone(&env_vars),
         changed_files,
         realm_name,
+        ui,
     )
     .await?;
     components::check_keys_drift(client, options, realm_name).await?;

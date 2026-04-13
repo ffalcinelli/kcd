@@ -5,6 +5,8 @@ use kcd::models::{ClientRepresentation, RealmRepresentation, RoleRepresentation}
 use kcd::plan;
 use std::fs;
 use tempfile::tempdir;
+use std::sync::Arc;
+use kcd::utils::ui::DialoguerUi;
 
 #[tokio::test]
 async fn test_plan() {
@@ -380,6 +382,8 @@ async fn test_plan() {
     )
     .unwrap();
 
+    let ui = Arc::new(DialoguerUi);
+
     // Run plan
     plan::run(
         &client,
@@ -387,6 +391,7 @@ async fn test_plan() {
         false, // changes_only
         false, // interactive
         &["test-realm".to_string()],
+        ui.clone(),
     )
     .await
     .expect("Plan failed");
@@ -398,6 +403,7 @@ async fn test_plan() {
         true,  // changes_only
         false, // interactive
         &["test-realm".to_string()],
+        ui.clone(),
     )
     .await
     .expect("Plan with changes_only failed");
@@ -409,6 +415,7 @@ async fn test_plan() {
         false,
         false,
         &["non-existent".to_string()],
+        ui,
     )
     .await
     .expect("Plan for non-existent realm failed");

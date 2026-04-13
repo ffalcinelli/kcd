@@ -1,6 +1,7 @@
 use crate::client::KeycloakClient;
 use crate::models::RealmRepresentation;
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -17,6 +18,7 @@ pub async fn plan_realm(
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
     realm_name: &str,
+    ui: &dyn Ui,
 ) -> Result<()> {
     let realm_path = workspace_dir.join("realm.yaml");
     if async_fs::try_exists(&realm_path).await? {
@@ -52,11 +54,7 @@ pub async fn plan_realm(
         )? {
             let mut include = true;
             if interactive {
-                include =
-                    dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                        .with_prompt("Include this change in the plan?")
-                        .default(true)
-                        .interact()?;
+                include = ui.confirm("Include this change in the plan?", true)?;
             }
             if include {
                 changed_files.push(realm_path);

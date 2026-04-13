@@ -1,7 +1,7 @@
 use crate::client::KeycloakClient;
 use crate::models::{KeycloakResource, ResourceMeta};
 use crate::utils::secrets::substitute_secrets;
-use crate::utils::ui::SPARKLE;
+use crate::utils::ui::{SPARKLE, Ui};
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -18,6 +18,7 @@ pub async fn plan_resources<T>(
     env_vars: Arc<HashMap<String, String>>,
     changed_files: &mut Vec<PathBuf>,
     realm_name: &str,
+    ui: &dyn Ui,
 ) -> Result<()>
 where
     T: KeycloakResource
@@ -118,11 +119,7 @@ where
         if changed {
             let mut include = true;
             if interactive {
-                include =
-                    dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                        .with_prompt("Include this change in the plan?")
-                        .default(true)
-                        .interact()?;
+                include = ui.confirm("Include this change in the plan?", true)?;
             }
             if include {
                 changed_files.push(path);
