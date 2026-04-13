@@ -1,7 +1,9 @@
 use kcd::client::KeycloakClient;
 use kcd::plan;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::runtime::Runtime;
+use kcd::utils::ui::DialoguerUi;
 
 #[path = "../tests/common/mod.rs"]
 mod common;
@@ -19,10 +21,18 @@ fn main() {
             .unwrap();
 
         let start = std::time::Instant::now();
+        let ui = Arc::new(DialoguerUi);
         for _ in 0..50 {
-            plan::run(&client, PathBuf::from("/tmp/perf_test"), true, false, &[])
-                .await
-                .unwrap();
+            plan::run(
+                &client,
+                PathBuf::from("/tmp/perf_test"),
+                true,
+                false,
+                &[],
+                ui.clone(),
+            )
+            .await
+            .unwrap();
         }
         let elapsed = start.elapsed();
         println!("Elapsed time: {:?}", elapsed);

@@ -1,24 +1,17 @@
-use crate::client::KeycloakClient;
 use crate::models::{KeycloakResource, ResourceMeta};
 use crate::utils::secrets::substitute_secrets;
-use crate::utils::ui::{SPARKLE, Ui};
+use crate::utils::ui::SPARKLE;
 use anyhow::{Context, Result};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
 
-use super::print_diff;
+use super::{PlanContext, print_diff};
 
 pub async fn plan_resources<T>(
-    client: &KeycloakClient,
-    workspace_dir: &Path,
-    changes_only: bool,
-    interactive: bool,
-    env_vars: Arc<HashMap<String, String>>,
+    ctx: &PlanContext<'_>,
     changed_files: &mut Vec<PathBuf>,
-    realm_name: &str,
-    ui: &dyn Ui,
 ) -> Result<()>
 where
     T: KeycloakResource
@@ -31,15 +24,22 @@ where
         + 'static,
 {
     let dir_name = T::dir_name();
-    let resources_dir = workspace_dir.join(dir_name);
+    let resources_dir = ctx.workspace_dir.join(dir_name);
     if !async_fs::try_exists(&resources_dir).await? {
         return Ok(());
     }
 
-    let existing_resources = client
+    let existing_resources = ctx
+        .client
         .get_resources::<T>()
         .await
-        .with_context(|| format!("Failed to get {} for realm '{}'", T::label(), realm_name))?;
+        .with_context(|| {
+            format!(
+                "Failed to get {} for realm '{}'",
+                T::label(),
+                ctx.realm_name
+            )
+        })?;
 
     let existing_map: HashMap<String, T> = existing_resources
         .into_iter()
@@ -53,9 +53,9 @@ where
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
         if path.extension().is_some_and(|ext| ext == "yaml") {
-            let env_vars = Arc::clone(&env_vars);
+            let env_vars = Arc::clone(&ctx.env_vars);
             let existing_map = Arc::clone(&existing_map);
-            let realm_name = realm_name.to_string();
+            let realm_name = ctx.realm_name.to_string();
 
             set.spawn(async move {
                 let content = async_fs::read_to_string(&path).await?;
@@ -102,7 +102,7 @@ where
                 &format!("{} {}", T::label(), local.get_name()),
                 Some(&remote_clone),
                 &local,
-                changes_only,
+                ctx.options.changes_only,
                 T::secret_prefix(),
             )?
         } else {
@@ -111,15 +111,15 @@ where
                 &format!("{} {}", T::label(), local.get_name()),
                 None::<&T>,
                 &local,
-                changes_only,
+                ctx.options.changes_only,
                 T::secret_prefix(),
             )?
         };
 
         if changed {
             let mut include = true;
-            if interactive {
-                include = ui.confirm("Include this change in the plan?", true)?;
+            if ctx.options.interactive {
+                include = ctx.ui.confirm("Include this change in the plan?", true)?;
             }
             if include {
                 changed_files.push(path);

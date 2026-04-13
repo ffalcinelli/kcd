@@ -3,8 +3,8 @@ use common::start_mock_server;
 use kcd::client::KeycloakClient;
 use kcd::plan;
 use std::fs;
-use tempfile::tempdir;
 use std::sync::Arc;
+use tempfile::tempdir;
 
 use kcd::utils::ui::DialoguerUi;
 

@@ -1,5 +1,5 @@
 use kcd::client::KeycloakClient;
-use kcd::plan::PlanOptions;
+use kcd::plan::{PlanContext, PlanOptions};
 use kcd::plan::components::{check_keys_drift, plan_components_or_keys};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -20,16 +20,20 @@ async fn test_plan_components_no_dir() {
         interactive: false,
     };
 
-    // Should not fail if directory doesn't exist
-    let res = plan_components_or_keys(
-        &client,
+    let ctx = PlanContext {
+        client: &client,
         workspace_dir,
         options,
-        "non-existent",
         env_vars,
+        realm_name: "master",
+        ui: &DialoguerUi,
+    };
+
+    // Should not fail if directory doesn't exist
+    let res = plan_components_or_keys(
+        &ctx,
+        "non-existent",
         &mut changed_files,
-        "master",
-        &DialoguerUi,
     )
     .await;
     assert!(res.is_ok());
@@ -67,15 +71,19 @@ async fn test_plan_components_with_invalid_yaml() {
         interactive: false,
     };
 
-    let res = plan_components_or_keys(
-        &client,
+    let ctx = PlanContext {
+        client: &client,
         workspace_dir,
         options,
-        "components",
         env_vars,
+        realm_name: "master",
+        ui: &DialoguerUi,
+    };
+
+    let res = plan_components_or_keys(
+        &ctx,
+        "components",
         &mut changed_files,
-        "master",
-        &DialoguerUi,
     )
     .await;
     assert!(res.is_err());

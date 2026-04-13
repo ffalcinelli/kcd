@@ -3,10 +3,10 @@ use common::start_mock_server;
 use kcd::client::KeycloakClient;
 use kcd::models::{ClientRepresentation, RealmRepresentation, RoleRepresentation};
 use kcd::plan;
-use std::fs;
-use tempfile::tempdir;
-use std::sync::Arc;
 use kcd::utils::ui::DialoguerUi;
+use std::fs;
+use std::sync::Arc;
+use tempfile::tempdir;
 
 #[tokio::test]
 async fn test_plan() {

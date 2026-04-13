@@ -1,37 +1,26 @@
-use crate::client::KeycloakClient;
-use crate::models::RealmRepresentation;
 use crate::utils::secrets::substitute_secrets;
-use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::path::PathBuf;
 use tokio::fs as async_fs;
 
-use super::print_diff;
+use super::{PlanContext, print_diff};
 
 pub async fn plan_realm(
-    client: &KeycloakClient,
-    workspace_dir: &Path,
-    changes_only: bool,
-    interactive: bool,
-    env_vars: Arc<HashMap<String, String>>,
+    ctx: &PlanContext<'_>,
     changed_files: &mut Vec<PathBuf>,
-    realm_name: &str,
-    ui: &dyn Ui,
 ) -> Result<()> {
-    let realm_path = workspace_dir.join("realm.yaml");
+    let realm_path = ctx.workspace_dir.join("realm.yaml");
     if async_fs::try_exists(&realm_path).await? {
         let content = async_fs::read_to_string(&realm_path).await?;
         let mut val: serde_json::Value = serde_yaml::from_str(&content)
             .with_context(|| format!("Failed to parse YAML file: {:?}", realm_path))?;
-        substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
-        let local_realm: RealmRepresentation = serde_json::from_value(val)
+        substitute_secrets(&mut val, &ctx.env_vars).map_err(|e| anyhow::anyhow!(e))?;
+        let local_realm: crate::models::RealmRepresentation = serde_json::from_value(val)
             .with_context(|| format!("Failed to deserialize YAML file: {:?}", realm_path))?;
 
         // We handle the case where remote realm fetch might fail (e.g. if we are creating it)
         // by treating it as None (creation). However, usually plan is run against existing realm.
-        let remote_realm = match client.get_realm().await {
+        let remote_realm = match ctx.client.get_realm().await {
             Ok(r) => Some(r),
             Err(e) => {
                 // Check if it's a 404 (Not Found)
@@ -39,7 +28,7 @@ pub async fn plan_realm(
                     None
                 } else {
                     return Err(e).with_context(|| {
-                        format!("Failed to get realm '{}' from Keycloak", realm_name)
+                        format!("Failed to get realm '{}' from Keycloak", ctx.realm_name)
                     });
                 }
             }
@@ -49,12 +38,12 @@ pub async fn plan_realm(
             "Realm",
             remote_realm.as_ref(),
             &local_realm,
-            changes_only,
+            ctx.options.changes_only,
             "realm",
         )? {
             let mut include = true;
-            if interactive {
-                include = ui.confirm("Include this change in the plan?", true)?;
+            if ctx.options.interactive {
+                include = ctx.ui.confirm("Include this change in the plan?", true)?;
             }
             if include {
                 changed_files.push(realm_path);

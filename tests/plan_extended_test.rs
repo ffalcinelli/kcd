@@ -4,8 +4,8 @@ use kcd::client::KeycloakClient;
 use kcd::models::{ComponentRepresentation, RealmRepresentation};
 use kcd::plan;
 use kcd::utils::ui::DialoguerUi;
-use std::sync::Arc;
 use std::fs;
+use std::sync::Arc;
 use tempfile::tempdir;
 
 #[tokio::test]

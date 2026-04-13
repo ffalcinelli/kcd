@@ -39,8 +39,14 @@ fn test_models_resource_trait() {
     assert!(idp.has_id());
     idp.clear_metadata();
     assert!(idp.internal_id.is_none());
-    assert_eq!(IdentityProviderRepresentation::dir_name(), "identity-providers");
-    assert_eq!(IdentityProviderRepresentation::label(), "identity providers");
+    assert_eq!(
+        IdentityProviderRepresentation::dir_name(),
+        "identity-providers"
+    );
+    assert_eq!(
+        IdentityProviderRepresentation::label(),
+        "identity providers"
+    );
     assert_eq!(IdentityProviderRepresentation::secret_prefix(), "idp");
 
     let mut client = ClientRepresentation {
@@ -153,8 +159,14 @@ fn test_models_resource_trait() {
     assert!(flow.has_id());
     flow.clear_metadata();
     assert!(flow.id.is_none());
-    assert_eq!(AuthenticationFlowRepresentation::dir_name(), "authentication-flows");
-    assert_eq!(AuthenticationFlowRepresentation::label(), "authentication flows");
+    assert_eq!(
+        AuthenticationFlowRepresentation::dir_name(),
+        "authentication-flows"
+    );
+    assert_eq!(
+        AuthenticationFlowRepresentation::label(),
+        "authentication flows"
+    );
     assert_eq!(AuthenticationFlowRepresentation::secret_prefix(), "flow");
 
     let mut action = RequiredActionProviderRepresentation {
@@ -172,9 +184,18 @@ fn test_models_resource_trait() {
     assert!(!action.has_id()); // RequiredActionProviderRepresentation doesn't have has_id impl, so it uses default (false)
     action.clear_metadata();
     assert!(action.alias.is_some());
-    assert_eq!(RequiredActionProviderRepresentation::dir_name(), "required-actions");
-    assert_eq!(RequiredActionProviderRepresentation::label(), "required actions");
-    assert_eq!(RequiredActionProviderRepresentation::secret_prefix(), "action");
+    assert_eq!(
+        RequiredActionProviderRepresentation::dir_name(),
+        "required-actions"
+    );
+    assert_eq!(
+        RequiredActionProviderRepresentation::label(),
+        "required actions"
+    );
+    assert_eq!(
+        RequiredActionProviderRepresentation::secret_prefix(),
+        "action"
+    );
 
     let mut comp = ComponentRepresentation {
         id: Some("id8".to_string()),

@@ -1,9 +1,9 @@
-use std::sync::Arc;
 use anyhow::Result;
 use kcd::client::KeycloakClient;
 use kcd::{apply, inspect, plan};
 use std::fs;
 use std::process::Command;
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::tempdir;
 
@@ -99,7 +99,7 @@ standardFlowEnabled: true
         new_client_yaml,
     )?;
 
-use kcd::utils::ui::DialoguerUi;
+    use kcd::utils::ui::DialoguerUi;
 
     // 5. Plan - Should see changes
     println!("Planning changes...");

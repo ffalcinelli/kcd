@@ -4,7 +4,7 @@ pub mod realm;
 
 use crate::client::KeycloakClient;
 use crate::utils::secrets::obfuscate_secrets;
-use crate::utils::ui::{ACTION, CHECK, MEMO, WARN, Ui};
+use crate::utils::ui::{ACTION, CHECK, MEMO, Ui, WARN};
 
 use anyhow::Result;
 use console::{Style, style};
@@ -20,6 +20,15 @@ use tokio::fs as async_fs;
 pub struct PlanOptions {
     pub changes_only: bool,
     pub interactive: bool,
+}
+
+pub struct PlanContext<'a> {
+    pub client: &'a KeycloakClient,
+    pub workspace_dir: &'a std::path::Path,
+    pub options: PlanOptions,
+    pub env_vars: Arc<HashMap<String, String>>,
+    pub realm_name: &'a str,
+    pub ui: &'a dyn Ui,
 }
 
 pub async fn run(
@@ -83,17 +92,19 @@ pub async fn run(
             );
 
             let mut changed_files = Vec::new();
-            plan_single_realm(
-                &realm_client,
-                realm_dir,
+            let options = PlanOptions {
                 changes_only,
                 interactive,
+            };
+            let ctx = PlanContext {
+                client: &realm_client,
+                workspace_dir: &realm_dir,
+                options,
                 env_vars,
-                &mut changed_files,
-                &realm_name,
-                ui.as_ref(),
-            )
-            .await?;
+                realm_name: &realm_name,
+                ui: ui.as_ref(),
+            };
+            plan_single_realm(ctx, &mut changed_files).await?;
 
             Ok::<Vec<PathBuf>, anyhow::Error>(changed_files)
         });
@@ -125,151 +136,30 @@ use crate::models::{
 };
 
 async fn plan_single_realm(
-    client: &KeycloakClient,
-    workspace_dir: PathBuf,
-    changes_only: bool,
-    interactive: bool,
-    env_vars: Arc<HashMap<String, String>>,
+    ctx: PlanContext<'_>,
     changed_files: &mut Vec<PathBuf>,
-    realm_name: &str,
-    ui: &dyn Ui,
 ) -> Result<()> {
-    realm::plan_realm(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-        ui,
-    )
-    .await?;
+    realm::plan_realm(&ctx, changed_files).await?;
 
-    generic::plan_resources::<RoleRepresentation>(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-        ui,
-    )
-    .await?;
+    generic::plan_resources::<RoleRepresentation>(&ctx, changed_files).await?;
 
-    generic::plan_resources::<ClientRepresentation>(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-        ui,
-    )
-    .await?;
+    generic::plan_resources::<ClientRepresentation>(&ctx, changed_files).await?;
 
-    generic::plan_resources::<IdentityProviderRepresentation>(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-        ui,
-    )
-    .await?;
+    generic::plan_resources::<IdentityProviderRepresentation>(&ctx, changed_files).await?;
 
-    generic::plan_resources::<ClientScopeRepresentation>(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-        ui,
-    )
-    .await?;
+    generic::plan_resources::<ClientScopeRepresentation>(&ctx, changed_files).await?;
 
-    generic::plan_resources::<GroupRepresentation>(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-        ui,
-    )
-    .await?;
+    generic::plan_resources::<GroupRepresentation>(&ctx, changed_files).await?;
 
-    generic::plan_resources::<UserRepresentation>(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-        ui,
-    )
-    .await?;
+    generic::plan_resources::<UserRepresentation>(&ctx, changed_files).await?;
 
-    generic::plan_resources::<AuthenticationFlowRepresentation>(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-        ui,
-    )
-    .await?;
+    generic::plan_resources::<AuthenticationFlowRepresentation>(&ctx, changed_files).await?;
 
-    generic::plan_resources::<RequiredActionProviderRepresentation>(
-        client,
-        &workspace_dir,
-        changes_only,
-        interactive,
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-        ui,
-    )
-    .await?;
+    generic::plan_resources::<RequiredActionProviderRepresentation>(&ctx, changed_files).await?;
 
-    let options = PlanOptions {
-        changes_only,
-        interactive,
-    };
-
-    components::plan_components_or_keys(
-        client,
-        &workspace_dir,
-        options,
-        "components",
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-        ui,
-    )
-    .await?;
-    components::plan_components_or_keys(
-        client,
-        &workspace_dir,
-        options,
-        "keys",
-        Arc::clone(&env_vars),
-        changed_files,
-        realm_name,
-        ui,
-    )
-    .await?;
-    components::check_keys_drift(client, options, realm_name).await?;
+    components::plan_components_or_keys(&ctx, "components", changed_files).await?;
+    components::plan_components_or_keys(&ctx, "keys", changed_files).await?;
+    components::check_keys_drift(ctx.client, ctx.options, ctx.realm_name).await?;
 
     Ok(())
 }
