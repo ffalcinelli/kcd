@@ -39,6 +39,12 @@ impl DialoguerUi {
     }
 }
 
+impl Default for DialoguerUi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Ui for DialoguerUi {
     fn input(&self, prompt: &str, default: Option<String>, allow_empty: bool) -> Result<String> {
         let input = dialoguer::Input::<String>::new()
