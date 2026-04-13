@@ -1,11 +1,11 @@
 use kcd::client::KeycloakClient;
-use kcd::plan::{PlanContext, PlanOptions};
 use kcd::plan::components::{check_keys_drift, plan_components_or_keys};
+use kcd::plan::{PlanContext, PlanOptions};
+use kcd::utils::ui::DialoguerUi;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
-use kcd::utils::ui::DialoguerUi;
 
 #[tokio::test]
 async fn test_plan_components_no_dir() {
@@ -30,12 +30,7 @@ async fn test_plan_components_no_dir() {
     };
 
     // Should not fail if directory doesn't exist
-    let res = plan_components_or_keys(
-        &ctx,
-        "non-existent",
-        &mut changed_files,
-    )
-    .await;
+    let res = plan_components_or_keys(&ctx, "non-existent", &mut changed_files).await;
     assert!(res.is_ok());
 }
 
@@ -80,11 +75,6 @@ async fn test_plan_components_with_invalid_yaml() {
         ui: &DialoguerUi,
     };
 
-    let res = plan_components_or_keys(
-        &ctx,
-        "components",
-        &mut changed_files,
-    )
-    .await;
+    let res = plan_components_or_keys(&ctx, "components", &mut changed_files).await;
     assert!(res.is_err());
 }

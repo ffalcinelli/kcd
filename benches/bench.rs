@@ -1,9 +1,9 @@
 use kcd::client::KeycloakClient;
 use kcd::plan;
+use kcd::utils::ui::DialoguerUi;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
-use kcd::utils::ui::DialoguerUi;
 
 #[path = "../tests/common/mod.rs"]
 mod common;

@@ -29,17 +29,13 @@ where
         return Ok(());
     }
 
-    let existing_resources = ctx
-        .client
-        .get_resources::<T>()
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to get {} for realm '{}'",
-                T::label(),
-                ctx.realm_name
-            )
-        })?;
+    let existing_resources = ctx.client.get_resources::<T>().await.with_context(|| {
+        format!(
+            "Failed to get {} for realm '{}'",
+            T::label(),
+            ctx.realm_name
+        )
+    })?;
 
     let existing_map: HashMap<String, T> = existing_resources
         .into_iter()

@@ -135,10 +135,7 @@ use crate::models::{
     RoleRepresentation, UserRepresentation,
 };
 
-async fn plan_single_realm(
-    ctx: PlanContext<'_>,
-    changed_files: &mut Vec<PathBuf>,
-) -> Result<()> {
+async fn plan_single_realm(ctx: PlanContext<'_>, changed_files: &mut Vec<PathBuf>) -> Result<()> {
     realm::plan_realm(&ctx, changed_files).await?;
 
     generic::plan_resources::<RoleRepresentation>(&ctx, changed_files).await?;
