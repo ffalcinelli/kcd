@@ -103,8 +103,14 @@ pub async fn run(
         }
 
         let new_content = format!("{}{}", existing_env, env_content);
-        write_if_changed_with_mutex(&env_path, &new_content, yes, Arc::clone(&prompt_mutex))
-            .await?;
+        write_if_changed_with_mutex(
+            &env_path,
+            &new_content,
+            yes,
+            Arc::clone(&prompt_mutex),
+            true,
+        )
+        .await?;
         println!(
             "{} {}",
             CHECK,
@@ -120,6 +126,7 @@ async fn write_if_changed_with_mutex(
     content: &str,
     yes: bool,
     prompt_mutex: Arc<Mutex<()>>,
+    secure: bool,
 ) -> Result<()> {
     if fs::try_exists(path).await.unwrap_or(false) {
         let existing = fs::read_to_string(path).await.unwrap_or_default();
@@ -146,9 +153,15 @@ async fn write_if_changed_with_mutex(
             }
         }
     }
-    fs::write(path, content)
-        .await
-        .context(format!("Failed to write {:?}", path))?;
+
+    if secure {
+        crate::utils::write_secure(path, content).await?;
+    } else {
+        fs::write(path, content)
+            .await
+            .context(format!("Failed to write {:?}", path))?;
+    }
+
     Ok(())
 }
 
@@ -198,7 +211,7 @@ where
                 format!("Failed to serialize {} {}", T::label(), res.get_name()),
             )?;
             all_secrets.lock().await.extend(local_secrets);
-            write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex).await
+            write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex, true).await
         });
     }
     while let Some(res) = set.join_next().await {
@@ -260,8 +273,14 @@ async fn inspect_realm(
             all_secrets.lock().await.extend(local_secrets);
 
             let realm_path = workspace_dir.join("realm.yaml");
-            write_if_changed_with_mutex(&realm_path, &realm_yaml, yes, Arc::clone(&prompt_mutex))
-                .await?;
+            write_if_changed_with_mutex(
+                &realm_path,
+                &realm_yaml,
+                yes,
+                Arc::clone(&prompt_mutex),
+                true,
+            )
+            .await?;
             {
                 let _lock = prompt_mutex.lock().await;
                 println!(

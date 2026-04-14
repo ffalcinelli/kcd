@@ -2,6 +2,52 @@ pub mod secrets;
 pub mod ui;
 use anyhow::Context;
 use serde::Serialize;
+use std::path::Path;
+use tokio::fs;
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
+use tokio::os::unix::fs::OpenOptionsExt;
+
+pub async fn write_secure(path: &Path, content: &str) -> anyhow::Result<()> {
+    #[cfg(unix)]
+    {
+        use tokio::io::AsyncWriteExt;
+
+        // If file exists, ensure permissions are 0o600
+        if fs::try_exists(path).await.unwrap_or(false) {
+            fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+                .await
+                .context(format!("Failed to set permissions for {:?}", path))?;
+        }
+
+        let mut options = fs::OpenOptions::new();
+        options
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600);
+
+        let mut file = options
+            .open(path)
+            .await
+            .context(format!("Failed to open {:?}", path))?;
+        file.write_all(content.as_bytes())
+            .await
+            .context(format!("Failed to write to {:?}", path))?;
+        file.flush()
+            .await
+            .context(format!("Failed to flush {:?}", path))?;
+    }
+    #[cfg(not(unix))]
+    {
+        fs::write(path, content)
+            .await
+            .context(format!("Failed to write {:?}", path))?;
+    }
+    Ok(())
+}
 
 pub fn recursive_sort(value: &mut serde_json::Value) {
     match value {
@@ -289,5 +335,49 @@ mod tests {
         let val = serde_json::json!({ "b": 2, "a": 1 });
         let yaml = to_sorted_yaml(&val).unwrap();
         assert_eq!(yaml.trim(), "a: 1\nb: 2");
+    }
+
+    #[tokio::test]
+    async fn test_write_secure_permissions() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("secure.txt");
+        let content = "sensitive data";
+
+        // Test creating a new file
+        write_secure(&file_path, content).await.unwrap();
+        let read_content = std::fs::read_to_string(&file_path).unwrap();
+        assert_eq!(read_content, content);
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let metadata = std::fs::metadata(&file_path).unwrap();
+            let mode = metadata.permissions().mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
+
+        // Test updating an existing file with insecure permissions
+        let existing_path = temp_dir.path().join("existing.txt");
+        std::fs::write(&existing_path, "old content").unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&existing_path, std::fs::Permissions::from_mode(0o644)).unwrap();
+            let metadata = std::fs::metadata(&existing_path).unwrap();
+            assert_eq!(metadata.permissions().mode() & 0o777, 0o644);
+        }
+
+        write_secure(&existing_path, "new content").await.unwrap();
+        let read_content = std::fs::read_to_string(&existing_path).unwrap();
+        assert_eq!(read_content, "new content");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let metadata = std::fs::metadata(&existing_path).unwrap();
+            let mode = metadata.permissions().mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
     }
 }
