@@ -1,6 +1,6 @@
 use crate::client::KeycloakClient;
 use crate::models::{KeycloakResource, RoleRepresentation};
-use crate::utils::secrets::substitute_secrets;
+use crate::utils::secrets::{SecretResolver, substitute_secrets};
 use crate::utils::ui::{SUCCESS_CREATE, SUCCESS_UPDATE};
 use anyhow::{Context, Result};
 use console::style;
@@ -13,7 +13,7 @@ use tokio::task::JoinSet;
 pub async fn apply_roles(
     client: &KeycloakClient,
     workspace_dir: &std::path::Path,
-    env_vars: Arc<HashMap<String, String>>,
+    resolver: Arc<dyn SecretResolver>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
     realm_name: &str,
 ) -> Result<()> {
@@ -50,13 +50,13 @@ pub async fn apply_roles(
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let client = client.clone();
                 let existing_roles_map = existing_roles_map.clone();
-                let env_vars = Arc::clone(&env_vars);
+                let resolver = Arc::clone(&resolver);
                 let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
                         .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-                    substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                    substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
                     let mut role_rep: RoleRepresentation = serde_json::from_value(val)?;
 
                     let identity = role_rep
@@ -107,6 +107,7 @@ pub async fn apply_roles(
 mod tests {
     use super::*;
     use crate::client::KeycloakClient;
+    use crate::utils::secrets::EnvResolver;
     use axum::{
         Json, Router,
         http::StatusCode,
@@ -187,6 +188,7 @@ mod tests {
         let temp = tempdir().unwrap();
         let roles_dir = temp.path().join("roles");
         fs::create_dir(&roles_dir).unwrap();
+        let resolver = Arc::new(EnvResolver::new(HashMap::new()));
 
         // 1. Test update failure
         call_count.store(0, std::sync::atomic::Ordering::SeqCst);
@@ -196,7 +198,7 @@ mod tests {
         let res = apply_roles(
             &client,
             temp.path(),
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )
@@ -218,7 +220,7 @@ mod tests {
         let res = apply_roles(
             &client,
             temp.path(),
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )

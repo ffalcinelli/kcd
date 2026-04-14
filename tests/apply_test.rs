@@ -3,7 +3,10 @@ use common::start_mock_server;
 use kcd::apply;
 use kcd::client::KeycloakClient;
 use kcd::models::{ClientRepresentation, RealmRepresentation, RoleRepresentation};
+use kcd::utils::secrets::{EnvResolver, SecretResolver};
+use std::collections::HashMap;
 use std::fs;
+use std::sync::Arc;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -20,6 +23,8 @@ async fn test_apply() {
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
     std::fs::create_dir_all(&realm_dir).unwrap();
+
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
 
     // Create realm.yaml
     let realm = RealmRepresentation {
@@ -386,6 +391,7 @@ async fn test_apply() {
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        resolver.clone(),
     )
     .await
     .expect("Apply failed");
@@ -400,6 +406,7 @@ async fn test_apply() {
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        resolver.clone(),
     )
     .await
     .expect("Apply with plan failed");
@@ -411,6 +418,7 @@ async fn test_apply() {
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        resolver.clone(),
     )
     .await
     .expect("Apply with empty plan failed");

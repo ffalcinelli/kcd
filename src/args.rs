@@ -30,6 +30,14 @@ pub struct Cli {
     /// Keycloak Client Secret (for client credentials grant)
     #[arg(skip)]
     pub client_secret: Option<String>,
+
+    /// HashiCorp Vault URL
+    #[arg(long, env = "VAULT_ADDR")]
+    pub vault_addr: Option<String>,
+
+    /// HashiCorp Vault Token
+    #[arg(long, env = "VAULT_TOKEN")]
+    pub vault_token: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]

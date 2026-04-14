@@ -22,6 +22,10 @@ async fn test_plan_edge_cases() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
 
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+
     // 1. Test run with non-existent directory
     let res = plan::run(
         &client,
@@ -30,6 +34,7 @@ async fn test_plan_edge_cases() {
         false,
         &[],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_err());
@@ -42,6 +47,7 @@ async fn test_plan_edge_cases() {
         false,
         &[],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -71,6 +77,7 @@ async fn test_plan_edge_cases() {
         false,
         &[],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await
     .unwrap();
@@ -84,6 +91,7 @@ async fn test_plan_edge_cases() {
         false,
         &["new-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await
     .unwrap();
@@ -97,6 +105,7 @@ async fn test_plan_edge_cases() {
         false,
         &["new-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     // It should fail when trying to parse roles or something if we put it in a sub-dir
@@ -110,6 +119,7 @@ async fn test_plan_edge_cases() {
         false,
         &["new-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver,
     )
     .await;
     assert!(res.is_err());
@@ -128,12 +138,23 @@ async fn test_apply_edge_cases() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
 
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+
     // 1. Test run with non-existent directory
-    let res = apply::run(&client, workspace_dir.join("non-existent"), &[], true).await;
+    let res = apply::run(
+        &client,
+        workspace_dir.join("non-existent"),
+        &[],
+        true,
+        resolver.clone(),
+    )
+    .await;
     assert!(res.is_err());
 
     // 2. Test run with empty directory (no realms)
-    let res = apply::run(&client, workspace_dir.clone(), &[], true).await;
+    let res = apply::run(&client, workspace_dir.clone(), &[], true, resolver.clone()).await;
     assert!(res.is_ok());
 
     // 3. Test with .secrets file
@@ -154,7 +175,7 @@ async fn test_apply_edge_cases() {
     .unwrap();
 
     // 4. Test auto-discovery of realms
-    apply::run(&client, workspace_dir.clone(), &[], true)
+    apply::run(&client, workspace_dir.clone(), &[], true, resolver.clone())
         .await
         .unwrap();
 
@@ -165,6 +186,7 @@ async fn test_apply_edge_cases() {
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        resolver.clone(),
     )
     .await
     .unwrap();
@@ -178,6 +200,7 @@ async fn test_apply_edge_cases() {
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        resolver,
     )
     .await;
     assert!(res.is_err());
@@ -194,6 +217,9 @@ async fn test_check_keys_drift() {
     let realm_dir = workspace_dir.join("test-realm");
     fs::create_dir(&realm_dir).unwrap();
 
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
     plan::run(
         &client,
         workspace_dir,
@@ -201,6 +227,7 @@ async fn test_check_keys_drift() {
         false,
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver,
     )
     .await
     .unwrap();

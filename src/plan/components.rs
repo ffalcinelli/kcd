@@ -54,7 +54,7 @@ pub async fn plan_components_or_keys(
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
-                let env_vars = ctx.env_vars.clone();
+                let resolver = Arc::clone(&ctx.resolver);
                 let by_identity = by_identity.clone();
                 let by_details = by_details.clone();
                 let realm_name = ctx.realm_name.to_string();
@@ -68,7 +68,7 @@ pub async fn plan_components_or_keys(
                                 path, realm_name
                             )
                         })?;
-                    substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                    substitute_secrets(&mut val, resolver).await?;
                     let local_component: ComponentRepresentation = serde_json::from_value(val)
                         .with_context(|| {
                             format!(

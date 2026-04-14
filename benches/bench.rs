@@ -1,6 +1,8 @@
 use kcd::client::KeycloakClient;
 use kcd::plan;
+use kcd::utils::secrets::{EnvResolver, SecretResolver};
 use kcd::utils::ui::DialoguerUi;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -20,6 +22,8 @@ fn main() {
             .await
             .unwrap();
 
+        let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
+
         let start = std::time::Instant::now();
         let ui = Arc::new(DialoguerUi::new());
         for _ in 0..50 {
@@ -30,6 +34,7 @@ fn main() {
                 false,
                 &[],
                 ui.clone(),
+                resolver.clone(),
             )
             .await
             .unwrap();

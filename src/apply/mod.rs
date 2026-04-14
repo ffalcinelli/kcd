@@ -10,10 +10,11 @@ pub mod scopes;
 pub mod users;
 
 use crate::client::KeycloakClient;
-use crate::utils::ui::{ACTION, SUCCESS_CREATE, SUCCESS_UPDATE, WARN};
+use crate::utils::secrets::SecretResolver;
+pub use crate::utils::ui::{ACTION, SUCCESS_CREATE, SUCCESS_UPDATE, WARN};
 use anyhow::Result;
 use console::style;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
@@ -24,18 +25,11 @@ pub async fn run(
     workspace_dir: PathBuf,
     realms_to_apply: &[String],
     yes: bool,
+    resolver: Arc<dyn SecretResolver>,
 ) -> Result<()> {
     if !workspace_dir.exists() {
         anyhow::bail!("Input directory {:?} does not exist", workspace_dir);
     }
-
-    // Load .secrets from input directory if it exists
-    let env_path = workspace_dir.join(".secrets");
-    if env_path.exists() {
-        dotenvy::from_path(&env_path).ok();
-    }
-
-    let env_vars = Arc::new(std::env::vars().collect::<HashMap<String, String>>());
 
     // Check for .kcdplan
     let plan_path = workspace_dir.join(".kcdplan");
@@ -104,7 +98,7 @@ pub async fn run(
         let mut realm_client = client.clone();
         realm_client.set_target_realm(realm_name.clone());
         let realm_dir = workspace_dir.join(&realm_name);
-        let env_vars = Arc::clone(&env_vars);
+        let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
 
         set.spawn(async move {
@@ -119,7 +113,7 @@ pub async fn run(
             apply_single_realm(
                 &realm_client,
                 realm_dir,
-                env_vars,
+                resolver,
                 planned_files,
                 &realm_name,
             )
@@ -142,14 +136,14 @@ pub async fn run(
 async fn apply_single_realm(
     client: &KeycloakClient,
     workspace_dir: PathBuf,
-    env_vars: Arc<HashMap<String, String>>,
+    resolver: Arc<dyn SecretResolver>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
     realm_name: &str,
 ) -> Result<()> {
     realm::apply_realm(
         client,
         &workspace_dir,
-        Arc::clone(&env_vars),
+        Arc::clone(&resolver),
         Arc::clone(&planned_files),
         realm_name,
     )
@@ -161,14 +155,14 @@ async fn apply_single_realm(
     {
         let client = client.clone();
         let workspace_dir = workspace_dir.clone();
-        let env_vars = Arc::clone(&env_vars);
+        let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
         let realm_name = realm_name.to_string();
         set.spawn(async move {
             roles::apply_roles(
                 &client,
                 &workspace_dir,
-                env_vars,
+                resolver,
                 planned_files,
                 &realm_name,
             )
@@ -180,14 +174,14 @@ async fn apply_single_realm(
     {
         let client = client.clone();
         let workspace_dir = workspace_dir.clone();
-        let env_vars = Arc::clone(&env_vars);
+        let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
         let realm_name = realm_name.to_string();
         set.spawn(async move {
             idps::apply_identity_providers(
                 &client,
                 &workspace_dir,
-                env_vars,
+                resolver,
                 planned_files,
                 &realm_name,
             )
@@ -199,14 +193,14 @@ async fn apply_single_realm(
     {
         let client = client.clone();
         let workspace_dir = workspace_dir.clone();
-        let env_vars = Arc::clone(&env_vars);
+        let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
         let realm_name = realm_name.to_string();
         set.spawn(async move {
             clients::apply_clients(
                 &client,
                 &workspace_dir,
-                env_vars,
+                resolver,
                 planned_files,
                 &realm_name,
             )
@@ -218,14 +212,14 @@ async fn apply_single_realm(
     {
         let client = client.clone();
         let workspace_dir = workspace_dir.clone();
-        let env_vars = Arc::clone(&env_vars);
+        let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
         let realm_name = realm_name.to_string();
         set.spawn(async move {
             scopes::apply_client_scopes(
                 &client,
                 &workspace_dir,
-                env_vars,
+                resolver,
                 planned_files,
                 &realm_name,
             )
@@ -237,14 +231,14 @@ async fn apply_single_realm(
     {
         let client = client.clone();
         let workspace_dir = workspace_dir.clone();
-        let env_vars = Arc::clone(&env_vars);
+        let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
         let realm_name = realm_name.to_string();
         set.spawn(async move {
             groups::apply_groups(
                 &client,
                 &workspace_dir,
-                env_vars,
+                resolver,
                 planned_files,
                 &realm_name,
             )
@@ -256,14 +250,14 @@ async fn apply_single_realm(
     {
         let client = client.clone();
         let workspace_dir = workspace_dir.clone();
-        let env_vars = Arc::clone(&env_vars);
+        let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
         let realm_name = realm_name.to_string();
         set.spawn(async move {
             users::apply_users(
                 &client,
                 &workspace_dir,
-                env_vars,
+                resolver,
                 planned_files,
                 &realm_name,
             )
@@ -275,14 +269,14 @@ async fn apply_single_realm(
     {
         let client = client.clone();
         let workspace_dir = workspace_dir.clone();
-        let env_vars = Arc::clone(&env_vars);
+        let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
         let realm_name = realm_name.to_string();
         set.spawn(async move {
             flows::apply_authentication_flows(
                 &client,
                 &workspace_dir,
-                env_vars,
+                resolver,
                 planned_files,
                 &realm_name,
             )
@@ -294,14 +288,14 @@ async fn apply_single_realm(
     {
         let client = client.clone();
         let workspace_dir = workspace_dir.clone();
-        let env_vars = Arc::clone(&env_vars);
+        let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
         let realm_name = realm_name.to_string();
         set.spawn(async move {
             actions::apply_required_actions(
                 &client,
                 &workspace_dir,
-                env_vars,
+                resolver,
                 planned_files,
                 &realm_name,
             )
@@ -313,7 +307,7 @@ async fn apply_single_realm(
     {
         let client = client.clone();
         let workspace_dir = workspace_dir.clone();
-        let env_vars = Arc::clone(&env_vars);
+        let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
         let realm_name = realm_name.to_string();
         set.spawn(async move {
@@ -321,7 +315,7 @@ async fn apply_single_realm(
                 &client,
                 &workspace_dir,
                 "components",
-                env_vars,
+                resolver,
                 planned_files,
                 &realm_name,
             )
@@ -333,7 +327,7 @@ async fn apply_single_realm(
     {
         let client = client.clone();
         let workspace_dir = workspace_dir.clone();
-        let env_vars = Arc::clone(&env_vars);
+        let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
         let realm_name = realm_name.to_string();
         set.spawn(async move {
@@ -341,7 +335,7 @@ async fn apply_single_realm(
                 &client,
                 &workspace_dir,
                 "keys",
-                env_vars,
+                resolver,
                 planned_files,
                 &realm_name,
             )

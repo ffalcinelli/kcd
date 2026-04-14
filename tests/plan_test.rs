@@ -383,6 +383,9 @@ async fn test_plan() {
     .unwrap();
 
     let ui = Arc::new(DialoguerUi::new());
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
 
     // Run plan
     plan::run(
@@ -392,6 +395,7 @@ async fn test_plan() {
         false, // interactive
         &["test-realm".to_string()],
         ui.clone(),
+        resolver.clone(),
     )
     .await
     .expect("Plan failed");
@@ -404,6 +408,7 @@ async fn test_plan() {
         false, // interactive
         &["test-realm".to_string()],
         ui.clone(),
+        resolver.clone(),
     )
     .await
     .expect("Plan with changes_only failed");
@@ -416,6 +421,7 @@ async fn test_plan() {
         false,
         &["non-existent".to_string()],
         ui,
+        resolver,
     )
     .await
     .expect("Plan for non-existent realm failed");
