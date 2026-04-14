@@ -130,7 +130,10 @@ pub struct MockUi {
 impl Ui for MockUi {
     fn input(&self, _prompt: &str, _default: Option<String>, _allow_empty: bool) -> Result<String> {
         let res = {
-            let mut inputs = self.inputs.lock().unwrap();
+            let mut inputs = self
+                .inputs
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Mutex poisoned: {}", e))?;
             if inputs.is_empty() {
                 anyhow::bail!("No more mock inputs");
             }
@@ -140,7 +143,10 @@ impl Ui for MockUi {
     }
     fn confirm(&self, _prompt: &str, _default: bool) -> Result<bool> {
         let res = {
-            let mut confirms = self.confirms.lock().unwrap();
+            let mut confirms = self
+                .confirms
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Mutex poisoned: {}", e))?;
             if confirms.is_empty() {
                 anyhow::bail!("No more mock confirms");
             }
@@ -150,7 +156,10 @@ impl Ui for MockUi {
     }
     fn password(&self, _prompt: &str, _confirm: Option<&str>) -> Result<String> {
         let res = {
-            let mut p = self.passwords.lock().unwrap();
+            let mut p = self
+                .passwords
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Mutex poisoned: {}", e))?;
             if p.is_empty() {
                 return Err(anyhow::anyhow!("Mock passwords missing"));
             }
@@ -162,7 +171,10 @@ impl Ui for MockUi {
     }
     fn select(&self, _prompt: &str, _items: &[&str], _default: usize) -> Result<usize> {
         let res = {
-            let mut selects = self.selects.lock().unwrap();
+            let mut selects = self
+                .selects
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Mutex poisoned: {}", e))?;
             if selects.is_empty() {
                 anyhow::bail!("No more mock selects");
             }
