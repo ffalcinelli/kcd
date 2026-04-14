@@ -152,6 +152,6 @@ async fn test_plan_substitute_secrets_error() {
     assert!(
         res.unwrap_err()
             .to_string()
-            .contains("Missing required environment variable")
+            .contains("Missing required secret or environment variable")
     );
 }
