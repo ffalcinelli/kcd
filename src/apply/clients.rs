@@ -116,7 +116,7 @@ mod tests {
     use tempfile::tempdir;
     use tokio::net::TcpListener;
 
-    async fn start_mock_server() -> (String, Arc<std::sync::atomic::AtomicUsize>) {
+    async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::AtomicUsize>)> {
         let call_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let count_clone = Arc::clone(&call_count);
 
@@ -170,24 +170,24 @@ mod tests {
                 }),
             );
 
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        let addr = listener.local_addr()?;
         tokio::spawn(async move {
-            axum::serve(listener, app).await.unwrap();
+            let _ = axum::serve(listener, app).await;
         });
-        (format!("http://{}", addr), call_count)
+        Ok((format!("http://{}", addr), call_count))
     }
 
     #[tokio::test]
-    async fn test_apply_clients_error_paths() {
-        let (server_url, call_count) = start_mock_server().await;
+    async fn test_apply_clients_error_paths() -> Result<()> {
+        let (server_url, call_count) = start_mock_server().await?;
         let mut client = KeycloakClient::new(server_url);
         client.set_target_realm("test".to_string());
         client.set_token("mock_token".to_string());
 
-        let temp = tempdir().unwrap();
+        let temp = tempdir()?;
         let clients_dir = temp.path().join("clients");
-        fs::create_dir(&clients_dir).unwrap();
+        fs::create_dir(&clients_dir)?;
         let resolver = Arc::new(EnvResolver::new(HashMap::new()));
 
         // 1. Test update failure
@@ -196,8 +196,7 @@ mod tests {
         fs::write(
             client_existing,
             "clientId: existing-client\nname: Existing Client",
-        )
-        .unwrap();
+        )?;
 
         let res = apply_clients(
             &client,
@@ -214,12 +213,12 @@ mod tests {
                 .contains("Failed to update client")
         );
 
-        fs::remove_file(clients_dir.join("existing.yaml")).unwrap();
+        fs::remove_file(clients_dir.join("existing.yaml"))?;
 
         // 2. Test create failure
         call_count.store(0, std::sync::atomic::Ordering::SeqCst);
         let client_new = clients_dir.join("new.yaml");
-        fs::write(client_new, "clientId: new-client\nname: New Client").unwrap();
+        fs::write(client_new, "clientId: new-client\nname: New Client")?;
 
         let res = apply_clients(
             &client,
@@ -238,7 +237,7 @@ mod tests {
 
         // 3. Test invalid YAML
         let client_invalid = clients_dir.join("invalid.yaml");
-        fs::write(client_invalid, "invalid: yaml: :").unwrap();
+        fs::write(client_invalid, "invalid: yaml: :")?;
         let res = apply_clients(
             &client,
             temp.path(),
@@ -253,5 +252,7 @@ mod tests {
                 .to_string()
                 .contains("Failed to parse YAML file")
         );
+
+        Ok(())
     }
 }

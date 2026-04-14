@@ -134,7 +134,7 @@ mod tests {
     use tempfile::tempdir;
     use tokio::net::TcpListener;
 
-    async fn start_mock_server() -> (String, Arc<std::sync::atomic::AtomicUsize>) {
+    async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::AtomicUsize>)> {
         let call_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let count_clone = Arc::clone(&call_count);
 
@@ -191,29 +191,29 @@ mod tests {
                 }),
             );
 
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        let addr = listener.local_addr()?;
         tokio::spawn(async move {
-            axum::serve(listener, app).await.unwrap();
+            let _ = axum::serve(listener, app).await;
         });
-        (format!("http://{}", addr), call_count)
+        Ok((format!("http://{}", addr), call_count))
     }
 
     #[tokio::test]
-    async fn test_apply_required_actions_error_paths() {
-        let (server_url, call_count) = start_mock_server().await;
+    async fn test_apply_required_actions_error_paths() -> Result<()> {
+        let (server_url, call_count) = start_mock_server().await?;
         let mut client = KeycloakClient::new(server_url);
         client.set_target_realm("test".to_string());
         client.set_token("mock_token".to_string());
 
-        let temp = tempdir().unwrap();
+        let temp = tempdir()?;
         let actions_dir = temp.path().join("required-actions");
-        fs::create_dir(&actions_dir).unwrap();
+        fs::create_dir(&actions_dir)?;
         let resolver = Arc::new(EnvResolver::new(HashMap::new()));
 
         // 1. Test missing identity (alias missing)
         let action_no_alias = actions_dir.join("no_alias.yaml");
-        fs::write(action_no_alias, "name: No Alias\nproviderId: some-provider").unwrap();
+        fs::write(action_no_alias, "name: No Alias\nproviderId: some-provider")?;
 
         let res = apply_required_actions(
             &client,
@@ -230,7 +230,7 @@ mod tests {
                 .contains("Failed to get identity")
         );
 
-        fs::remove_file(actions_dir.join("no_alias.yaml")).unwrap();
+        fs::remove_file(actions_dir.join("no_alias.yaml"))?;
 
         // 2. Test update failure
         call_count.store(0, std::sync::atomic::Ordering::SeqCst);
@@ -238,8 +238,7 @@ mod tests {
         fs::write(
             action_existing,
             "alias: existing-action\nname: Existing Action\nproviderId: existing-provider",
-        )
-        .unwrap();
+        )?;
 
         let res = apply_required_actions(
             &client,
@@ -256,7 +255,7 @@ mod tests {
                 .contains("Failed to update required action")
         );
 
-        fs::remove_file(actions_dir.join("existing.yaml")).unwrap();
+        fs::remove_file(actions_dir.join("existing.yaml"))?;
 
         // 3. Test register failure
         call_count.store(0, std::sync::atomic::Ordering::SeqCst);
@@ -264,8 +263,7 @@ mod tests {
         fs::write(
             action_new,
             "alias: new-action\nname: New Action\nproviderId: new-provider",
-        )
-        .unwrap();
+        )?;
 
         let res = apply_required_actions(
             &client,
@@ -299,5 +297,7 @@ mod tests {
                 .to_string()
                 .contains("Failed to configure registered required action")
         );
+
+        Ok(())
     }
 }
