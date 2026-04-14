@@ -6,9 +6,7 @@ use std::path::Path;
 use tokio::fs;
 
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
-#[cfg(unix)]
-use tokio::os::unix::fs::OpenOptionsExt;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 
 pub async fn write_secure(path: &Path, content: &str) -> anyhow::Result<()> {
     #[cfg(unix)]
@@ -23,11 +21,7 @@ pub async fn write_secure(path: &Path, content: &str) -> anyhow::Result<()> {
         }
 
         let mut options = fs::OpenOptions::new();
-        options
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600);
+        options.write(true).create(true).truncate(true).mode(0o600);
 
         let mut file = options
             .open(path)
@@ -363,7 +357,11 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&existing_path, std::fs::Permissions::from_mode(0o644)).unwrap();
+            std::fs::set_permissions(
+                &existing_path,
+                std::fs::Permissions::from_mode(0o644),
+            )
+            .unwrap();
             let metadata = std::fs::metadata(&existing_path).unwrap();
             assert_eq!(metadata.permissions().mode() & 0o777, 0o644);
         }
