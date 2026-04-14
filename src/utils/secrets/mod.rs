@@ -341,5 +341,36 @@ mod tests {
         assert!(is_secret_key("secret", ""));
         assert!(is_secret_key("password", ""));
         assert!(!is_secret_key("passwordPolicy", ""));
+        assert!(is_secret_key("value", "credential"));
+        assert!(!is_secret_key("value", "other"));
+    }
+
+    #[test]
+    fn test_obfuscate_secrets() {
+        let mut val = json!({
+            "clientId": "my_client",
+            "clientSecret": "my_super_secret",
+            "normal": "value",
+            "nested": {
+                "password": "pass"
+            },
+            "array": [
+                {"token": "secret_token"}
+            ]
+        });
+
+        obfuscate_secrets(&mut val, "client");
+
+        assert_eq!(val["clientSecret"], "m***t");
+        assert_eq!(val["normal"], "value");
+        assert_eq!(val["nested"]["password"], "p***s");
+        assert_eq!(val["array"][0]["token"], "s***n");
+    }
+
+    #[test]
+    fn test_obfuscate_string() {
+        assert_eq!(obfuscate_string(""), "");
+        assert_eq!(obfuscate_string("abc"), "***");
+        assert_eq!(obfuscate_string("abcd"), "a***d");
     }
 }

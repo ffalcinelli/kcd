@@ -145,4 +145,36 @@ mod tests {
                 .contains("Vault secret not found")
         );
     }
+
+    #[tokio::test]
+    async fn test_vault_resolver_invalid_format() {
+        let resolver = VaultResolver::new("http://localhost", "token").unwrap();
+
+        let res = resolver.resolve("vault:noparts").await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().to_string().contains("Invalid vault secret format"));
+
+        let res = resolver.resolve("vault:no_slash#field").await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().to_string().contains("Invalid vault path format"));
+
+        let res = resolver.resolve("not-vault").await.unwrap();
+        assert_eq!(res, None);
+    }
+
+    #[tokio::test]
+    async fn test_vault_resolver_error_status() {
+        let mut server = Server::new_async().await;
+        let _mock = server
+            .mock("GET", "/v1/secret/data/mysecret")
+            .with_status(500)
+            .with_body("Internal Server Error")
+            .create_async()
+            .await;
+
+        let resolver = VaultResolver::new(&server.url(), "token").unwrap();
+        let res = resolver.resolve("vault:secret/mysecret#field").await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().to_string().contains("Vault error (500 Internal Server Error)"));
+    }
 }
