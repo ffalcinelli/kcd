@@ -112,7 +112,7 @@ mod tests {
     use tempfile::tempdir;
     use tokio::net::TcpListener;
 
-    async fn start_mock_server() -> (String, Arc<std::sync::atomic::AtomicUsize>) {
+    async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::AtomicUsize>)> {
         let call_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let count_clone = Arc::clone(&call_count);
 
@@ -162,24 +162,24 @@ mod tests {
                 }),
             );
 
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        let addr = listener.local_addr()?;
         tokio::spawn(async move {
-            axum::serve(listener, app).await.unwrap();
+            let _ = axum::serve(listener, app).await;
         });
-        (format!("http://{}", addr), call_count)
+        Ok((format!("http://{}", addr), call_count))
     }
 
     #[tokio::test]
-    async fn test_apply_groups_error_paths() {
-        let (server_url, call_count) = start_mock_server().await;
+    async fn test_apply_groups_error_paths() -> Result<()> {
+        let (server_url, call_count) = start_mock_server().await?;
         let mut client = KeycloakClient::new(server_url);
         client.set_target_realm("test".to_string());
         client.set_token("mock_token".to_string());
 
-        let temp = tempdir().unwrap();
+        let temp = tempdir()?;
         let groups_dir = temp.path().join("groups");
-        fs::create_dir(&groups_dir).unwrap();
+        fs::create_dir(&groups_dir)?;
 
         // 1. Test update failure
         call_count.store(0, std::sync::atomic::Ordering::SeqCst);
@@ -187,8 +187,7 @@ mod tests {
         fs::write(
             group_existing,
             "name: Existing Group\nid: existing-id\npath: /existing-group",
-        )
-        .unwrap();
+        )?;
 
         let res = apply_groups(
             &client,
@@ -205,12 +204,12 @@ mod tests {
                 .contains("Failed to update group")
         );
 
-        fs::remove_file(groups_dir.join("existing.yaml")).unwrap();
+        fs::remove_file(groups_dir.join("existing.yaml"))?;
 
         // 2. Test create failure
         call_count.store(0, std::sync::atomic::Ordering::SeqCst);
         let group_new = groups_dir.join("new.yaml");
-        fs::write(group_new, "name: New Group").unwrap();
+        fs::write(group_new, "name: New Group")?;
 
         let res = apply_groups(
             &client,
@@ -226,5 +225,7 @@ mod tests {
                 .to_string()
                 .contains("Failed to create group")
         );
+
+        Ok(())
     }
 }
