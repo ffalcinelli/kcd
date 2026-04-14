@@ -195,14 +195,29 @@ kcd cli
 1. **Environment Variables**: Placeholders like `${VAR_NAME}` are resolved from the environment or a local `.secrets` file.
 2. **HashiCorp Vault**: Placeholders like `${vault:mount/path#field}` are resolved from a live Vault instance using the KV2 engine.
 
-**Example `client.yaml`:**
+#### Example 1: `confidential-client.yaml` (using Environment Variable)
 ```yaml
-clientId: my-app
-# Using environment variable
-secret: ${KEYCLOAK_CLIENT_MY_APP_SECRET}
-# Using Vault (mount/path#field)
-other_secret: ${vault:secret/data/my-app#client_secret}
+clientId: internal-api
+name: Internal API Service
+enabled: true
 publicClient: false
+secret: ${KEYCLOAK_CLIENT_INTERNAL_API_SECRET}
+redirectUris:
+  - "https://api.example.com/*"
+serviceAccountsEnabled: true
+```
+
+#### Example 2: `vault-client.yaml` (using HashiCorp Vault)
+```yaml
+clientId: api-gateway
+name: API Gateway
+enabled: true
+publicClient: false
+# Format: ${vault:mount/path#field}
+secret: ${vault:secret/data/kcd/clients/api-gateway#secret}
+redirectUris:
+  - "https://gateway.example.com/*"
+protocol: openid-connect
 ```
 
 ### Usage Workflow
