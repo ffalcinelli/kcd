@@ -152,11 +152,19 @@ mod tests {
 
         let res = resolver.resolve("vault:noparts").await;
         assert!(res.is_err());
-        assert!(res.unwrap_err().to_string().contains("Invalid vault secret format"));
+        assert!(
+            res.unwrap_err()
+                .to_string()
+                .contains("Invalid vault secret format")
+        );
 
         let res = resolver.resolve("vault:no_slash#field").await;
         assert!(res.is_err());
-        assert!(res.unwrap_err().to_string().contains("Invalid vault path format"));
+        assert!(
+            res.unwrap_err()
+                .to_string()
+                .contains("Invalid vault path format")
+        );
 
         let res = resolver.resolve("not-vault").await.unwrap();
         assert_eq!(res, None);
@@ -175,6 +183,10 @@ mod tests {
         let resolver = VaultResolver::new(&server.url(), "token").unwrap();
         let res = resolver.resolve("vault:secret/mysecret#field").await;
         assert!(res.is_err());
-        assert!(res.unwrap_err().to_string().contains("Vault error (500 Internal Server Error)"));
+        assert!(
+            res.unwrap_err()
+                .to_string()
+                .contains("Vault error (500 Internal Server Error)")
+        );
     }
 }
