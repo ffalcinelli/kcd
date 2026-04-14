@@ -1,34 +1,20 @@
 use crate::models::GroupRepresentation;
-use crate::utils::ui::SUCCESS_CREATE;
+use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
-use console::style;
-use dialoguer::{Input, theme::ColorfulTheme};
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
 
-pub async fn create_group_interactive(workspace_dir: &Path) -> Result<()> {
-    let theme = ColorfulTheme::default();
-
-    let realm: String = Input::with_theme(&theme)
-        .with_prompt("Target Realm")
-        .interact_text()?;
-
-    let name: String = Input::with_theme(&theme)
-        .with_prompt("Group Name")
-        .interact_text()?;
+pub async fn create_group_interactive(workspace_dir: &Path, ui: &dyn Ui) -> Result<()> {
+    let realm = ui.input("Target Realm", None, false)?;
+    let name = ui.input("Group Name", None, false)?;
 
     create_group_yaml(workspace_dir, &realm, &name).await?;
 
-    println!(
-        "{} {}",
-        SUCCESS_CREATE,
-        style(format!(
-            "Successfully generated YAML for group '{}' in realm '{}'.",
-            name, realm
-        ))
-        .green()
-    );
+    ui.print_success(&format!(
+        "Successfully generated YAML for group '{}' in realm '{}'.",
+        name, realm
+    ));
     Ok(())
 }
 

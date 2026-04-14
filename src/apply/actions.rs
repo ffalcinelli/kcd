@@ -1,6 +1,6 @@
 use crate::client::KeycloakClient;
 use crate::models::{KeycloakResource, RequiredActionProviderRepresentation};
-use crate::utils::secrets::substitute_secrets;
+use crate::utils::secrets::{SecretResolver, substitute_secrets};
 use anyhow::{Context, Result};
 use console::style;
 use std::collections::{HashMap, HashSet};
@@ -14,7 +14,7 @@ use super::{SUCCESS_CREATE, SUCCESS_UPDATE};
 pub async fn apply_required_actions(
     client: &KeycloakClient,
     workspace_dir: &std::path::Path,
-    env_vars: Arc<HashMap<String, String>>,
+    resolver: Arc<dyn SecretResolver>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
     realm_name: &str,
 ) -> Result<()> {
@@ -44,13 +44,13 @@ pub async fn apply_required_actions(
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let client = client.clone();
                 let existing_actions_map = Arc::clone(&existing_actions_map);
-                let env_vars = Arc::clone(&env_vars);
+                let resolver = Arc::clone(&resolver);
                 let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
                         .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-                    substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                    substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
                     let action_rep: RequiredActionProviderRepresentation =
                         serde_json::from_value(val)?;
 
@@ -123,6 +123,7 @@ pub async fn apply_required_actions(
 mod tests {
     use super::*;
     use crate::client::KeycloakClient;
+    use crate::utils::secrets::EnvResolver;
     use axum::{
         Json, Router,
         http::StatusCode,
@@ -208,6 +209,7 @@ mod tests {
         let temp = tempdir()?;
         let actions_dir = temp.path().join("required-actions");
         fs::create_dir(&actions_dir)?;
+        let resolver = Arc::new(EnvResolver::new(HashMap::new()));
 
         // 1. Test missing identity (alias missing)
         let action_no_alias = actions_dir.join("no_alias.yaml");
@@ -216,7 +218,7 @@ mod tests {
         let res = apply_required_actions(
             &client,
             temp.path(),
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )
@@ -241,7 +243,7 @@ mod tests {
         let res = apply_required_actions(
             &client,
             temp.path(),
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )
@@ -266,7 +268,7 @@ mod tests {
         let res = apply_required_actions(
             &client,
             temp.path(),
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )
@@ -284,7 +286,7 @@ mod tests {
         let res = apply_required_actions(
             &client,
             temp.path(),
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )

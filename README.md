@@ -106,6 +106,8 @@ sudo cp target/release/kcd /usr/local/bin/
 | `KEYCLOAK_PASSWORD` | Admin password | |
 | `KEYCLOAK_CLIENT_ID` | Client ID for auth | `admin-cli` |
 | `KEYCLOAK_CLIENT_SECRET` | Client Secret (if using client credentials) | |
+| `VAULT_ADDR` | HashiCorp Vault URL | |
+| `VAULT_TOKEN` | HashiCorp Vault Token | |
 
 ### Workspace Structure
 
@@ -186,20 +188,46 @@ kcd cli
 
 ## 🔐 Secret Management
 
-`kcd` is designed with security in mind. During `inspect`, it detects sensitive fields and replaces them with `${KEYCLOAK_...}` placeholders.
+`kcd` is designed with security in mind. During `inspect`, it detects sensitive fields and replaces them with placeholders.
 
-**Example `client.yaml`:**
+### Resolution Strategies
+
+1. **Environment Variables**: Placeholders like `${VAR_NAME}` are resolved from the environment or a local `.secrets` file.
+2. **HashiCorp Vault**: Placeholders like `${vault:mount/path#field}` are resolved from a live Vault instance using the KV2 engine.
+
+#### Example 1: `confidential-client.yaml` (using Environment Variable)
 ```yaml
-clientId: my-app
-secret: ${KEYCLOAK_CLIENT_MY_APP_SECRET}
+clientId: internal-api
+name: Internal API Service
+enabled: true
 publicClient: false
+secret: ${KEYCLOAK_CLIENT_INTERNAL_API_SECRET}
+redirectUris:
+  - "https://api.example.com/*"
+serviceAccountsEnabled: true
 ```
 
-1. Run `kcd inspect`.
-2. A `.secrets` file is created (contains `KEYCLOAK_CLIENT_MY_APP_SECRET=xyz`).
-3. **DO NOT commit `.secrets`**.
-4. Source the secrets: `set -a; source workspace/.secrets; set +a`.
-5. Run `kcd apply`.
+#### Example 2: `vault-client.yaml` (using HashiCorp Vault)
+```yaml
+clientId: api-gateway
+name: API Gateway
+enabled: true
+publicClient: false
+# Format: ${vault:mount/path#field}
+secret: ${vault:secret/data/kcd/clients/api-gateway#secret}
+redirectUris:
+  - "https://gateway.example.com/*"
+protocol: openid-connect
+```
+
+### Usage Workflow
+
+1. Run `kcd inspect` to bootstrap your local configuration.
+2. Sensitive values are automatically replaced with `${KEYCLOAK_...}` placeholders and saved to a `.secrets` file.
+3. **DO NOT commit the `.secrets` file**.
+4. (Optional) Replace placeholders with `vault:` syntax if using HashiCorp Vault.
+5. Provide secrets via environment variables or set `VAULT_ADDR` and `VAULT_TOKEN`.
+6. Run `kcd apply` to synchronize changes.
 
 ---
 

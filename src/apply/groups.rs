@@ -1,6 +1,6 @@
 use crate::client::KeycloakClient;
 use crate::models::{GroupRepresentation, KeycloakResource};
-use crate::utils::secrets::substitute_secrets;
+use crate::utils::secrets::{SecretResolver, substitute_secrets};
 use crate::utils::ui::{SUCCESS_CREATE, SUCCESS_UPDATE};
 use anyhow::{Context, Result};
 use console::style;
@@ -13,7 +13,7 @@ use tokio::task::JoinSet;
 pub async fn apply_groups(
     client: &KeycloakClient,
     workspace_dir: &std::path::Path,
-    env_vars: Arc<HashMap<String, String>>,
+    resolver: Arc<dyn SecretResolver>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
     realm_name: &str,
 ) -> Result<()> {
@@ -43,13 +43,13 @@ pub async fn apply_groups(
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let client = client.clone();
                 let existing_groups_map = Arc::clone(&existing_groups_map);
-                let env_vars = Arc::clone(&env_vars);
+                let resolver = Arc::clone(&resolver);
                 let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
                         .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-                    substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                    substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
                     let mut group_rep: GroupRepresentation = serde_json::from_value(val)?;
 
                     let identity = group_rep
@@ -102,6 +102,7 @@ pub async fn apply_groups(
 mod tests {
     use super::*;
     use crate::client::KeycloakClient;
+    use crate::utils::secrets::EnvResolver;
     use axum::{
         Json, Router,
         http::StatusCode,
@@ -180,6 +181,7 @@ mod tests {
         let temp = tempdir()?;
         let groups_dir = temp.path().join("groups");
         fs::create_dir(&groups_dir)?;
+        let resolver = Arc::new(EnvResolver::new(HashMap::new()));
 
         // 1. Test update failure
         call_count.store(0, std::sync::atomic::Ordering::SeqCst);
@@ -192,7 +194,7 @@ mod tests {
         let res = apply_groups(
             &client,
             temp.path(),
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )
@@ -214,7 +216,7 @@ mod tests {
         let res = apply_groups(
             &client,
             temp.path(),
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )

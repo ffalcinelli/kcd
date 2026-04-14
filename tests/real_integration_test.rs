@@ -3,6 +3,7 @@ use kcd::client::KeycloakClient;
 use kcd::{apply, inspect, plan};
 use std::fs;
 use std::process::Command;
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::tempdir;
 
@@ -98,15 +99,22 @@ standardFlowEnabled: true
         new_client_yaml,
     )?;
 
+    use kcd::utils::ui::DialoguerUi;
+
     // 5. Plan - Should see changes
     println!("Planning changes...");
     // Just ensuring plan runs without error
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
     plan::run(
         &client,
         workspace_dir.clone(),
         true,
         false,
         &["master".to_string()],
+        Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await?;
 
@@ -117,6 +125,7 @@ standardFlowEnabled: true
         workspace_dir.clone(),
         &["master".to_string()],
         true,
+        resolver,
     )
     .await?;
 

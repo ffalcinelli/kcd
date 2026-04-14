@@ -1,3 +1,4 @@
+use std::sync::Arc;
 mod common;
 use common::start_mock_server;
 use kcd::client::KeycloakClient;
@@ -5,6 +6,8 @@ use kcd::models::RealmRepresentation;
 use kcd::{apply, clean, inspect, plan};
 use std::fs;
 use tempfile::tempdir;
+
+use kcd::utils::ui::DialoguerUi;
 
 #[tokio::test]
 async fn test_plan_edge_cases() {
@@ -19,6 +22,10 @@ async fn test_plan_edge_cases() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
 
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+
     // 1. Test run with non-existent directory
     let res = plan::run(
         &client,
@@ -26,12 +33,23 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &[],
+        Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_err());
 
     // 2. Test run with empty directory (no realms)
-    let res = plan::run(&client, workspace_dir.clone(), false, false, &[]).await;
+    let res = plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &[],
+        Arc::new(DialoguerUi::new()),
+        resolver.clone(),
+    )
+    .await;
     assert!(res.is_ok());
 
     // 3. Test with .secrets file
@@ -52,9 +70,17 @@ async fn test_plan_edge_cases() {
     .unwrap();
 
     // 4. Test auto-discovery of realms
-    plan::run(&client, workspace_dir.clone(), false, false, &[])
-        .await
-        .unwrap();
+    plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &[],
+        Arc::new(DialoguerUi::new()),
+        resolver.clone(),
+    )
+    .await
+    .unwrap();
 
     // 5. Test plan_realm with 404 (realm doesn't exist on server)
     // "new-realm" should return 404 in my mock server
@@ -64,6 +90,8 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &["new-realm".to_string()],
+        Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await
     .unwrap();
@@ -76,6 +104,8 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &["new-realm".to_string()],
+        Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     // It should fail when trying to parse roles or something if we put it in a sub-dir
@@ -88,6 +118,8 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &["new-realm".to_string()],
+        Arc::new(DialoguerUi::new()),
+        resolver,
     )
     .await;
     assert!(res.is_err());
@@ -106,12 +138,23 @@ async fn test_apply_edge_cases() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
 
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+
     // 1. Test run with non-existent directory
-    let res = apply::run(&client, workspace_dir.join("non-existent"), &[], true).await;
+    let res = apply::run(
+        &client,
+        workspace_dir.join("non-existent"),
+        &[],
+        true,
+        resolver.clone(),
+    )
+    .await;
     assert!(res.is_err());
 
     // 2. Test run with empty directory (no realms)
-    let res = apply::run(&client, workspace_dir.clone(), &[], true).await;
+    let res = apply::run(&client, workspace_dir.clone(), &[], true, resolver.clone()).await;
     assert!(res.is_ok());
 
     // 3. Test with .secrets file
@@ -132,7 +175,7 @@ async fn test_apply_edge_cases() {
     .unwrap();
 
     // 4. Test auto-discovery of realms
-    apply::run(&client, workspace_dir.clone(), &[], true)
+    apply::run(&client, workspace_dir.clone(), &[], true, resolver.clone())
         .await
         .unwrap();
 
@@ -143,6 +186,7 @@ async fn test_apply_edge_cases() {
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        resolver.clone(),
     )
     .await
     .unwrap();
@@ -156,6 +200,7 @@ async fn test_apply_edge_cases() {
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        resolver,
     )
     .await;
     assert!(res.is_err());
@@ -172,12 +217,17 @@ async fn test_check_keys_drift() {
     let realm_dir = workspace_dir.join("test-realm");
     fs::create_dir(&realm_dir).unwrap();
 
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
     plan::run(
         &client,
         workspace_dir,
         true,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi::new()),
+        resolver,
     )
     .await
     .unwrap();
@@ -292,4 +342,28 @@ async fn test_validate_edge_cases() {
     kcd::validate::run(workspace_dir.clone(), &[])
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn test_inspect_edge_cases_2() {
+    let mock_url = start_mock_server().await;
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
+    client.set_token("mock".to_string());
+
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+
+    // 1. Test failure to get realms (500)
+    let mut server = mockito::Server::new_async().await;
+    let mut bad_client = KeycloakClient::new(server.url());
+    bad_client.set_token("mock".to_string());
+    let _m = server
+        .mock("GET", "/admin/realms")
+        .with_status(500)
+        .create_async()
+        .await;
+
+    let res = inspect::run(&bad_client, workspace_dir.clone(), &[], true).await;
+    assert!(res.is_err());
 }

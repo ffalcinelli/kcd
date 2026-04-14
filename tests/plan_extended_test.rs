@@ -3,7 +3,9 @@ use common::start_mock_server;
 use kcd::client::KeycloakClient;
 use kcd::models::{ComponentRepresentation, RealmRepresentation};
 use kcd::plan;
+use kcd::utils::ui::DialoguerUi;
 use std::fs;
+use std::sync::Arc;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -77,6 +79,11 @@ async fn test_plan_keys_and_extended() {
     )
     .unwrap();
 
+    let ui = Arc::new(DialoguerUi::new());
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+
     // Run plan with changes_only=true to trigger check_keys_drift
     plan::run(
         &client,
@@ -84,6 +91,8 @@ async fn test_plan_keys_and_extended() {
         true,
         false,
         &["test-realm".to_string()],
+        ui.clone(),
+        resolver.clone(),
     )
     .await
     .expect("Plan failed");
@@ -95,6 +104,8 @@ async fn test_plan_keys_and_extended() {
         false,
         false,
         &["test-realm".to_string()],
+        ui,
+        resolver,
     )
     .await
     .expect("Plan failed");
@@ -121,12 +132,18 @@ async fn test_plan_substitute_secrets_error() {
     )
     .unwrap();
 
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+
     let res = plan::run(
         &client,
         workspace_dir,
         false,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi::new()),
+        resolver,
     )
     .await;
 
@@ -135,6 +152,6 @@ async fn test_plan_substitute_secrets_error() {
     assert!(
         res.unwrap_err()
             .to_string()
-            .contains("Missing required environment variable")
+            .contains("Missing required secret or environment variable")
     );
 }

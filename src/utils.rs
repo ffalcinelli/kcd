@@ -211,4 +211,83 @@ mod tests {
         recursive_sort(&mut val_null);
         assert_eq!(val_null, serde_json::Value::Null);
     }
+
+    #[test]
+    fn test_recursive_sort_mixed_identify_keys() {
+        // Scenario 1: Both "id" and "name" are present in all elements. Should sort by "id".
+        let mut val1 = serde_json::json!([
+            { "id": "2", "name": "a" },
+            { "id": "1", "name": "b" }
+        ]);
+        recursive_sort(&mut val1);
+        assert_eq!(
+            val1,
+            serde_json::json!([
+                { "id": "1", "name": "b" },
+                { "id": "2", "name": "a" }
+            ])
+        );
+
+        // Scenario 2: "id" is only present in some elements, but "name" is present in all. Should sort by "name".
+        let mut val2 = serde_json::json!([
+            { "id": "1", "name": "b" },
+            { "name": "a" }
+        ]);
+        recursive_sort(&mut val2);
+        assert_eq!(
+            val2,
+            serde_json::json!([
+                { "name": "a" },
+                { "id": "1", "name": "b" }
+            ])
+        );
+
+        // Scenario 3: "alias" is present in all, but "id" and "name" are missing or partially present. Should sort by "alias".
+        let mut val3 = serde_json::json!([
+            { "alias": "z", "name": "a" },
+            { "alias": "x", "id": "1" }
+        ]);
+        recursive_sort(&mut val3);
+        assert_eq!(
+            val3,
+            serde_json::json!([
+                { "alias": "x", "id": "1" },
+                { "alias": "z", "name": "a" }
+            ])
+        );
+    }
+
+    #[test]
+    fn test_to_sorted_yaml_with_secrets() {
+        let mut secrets = std::collections::HashMap::new();
+        let val = serde_json::json!({
+            "clientId": "myclient",
+            "secret": "very-secret",
+            "nested": {
+                "password": "pass"
+            }
+        });
+
+        let yaml = to_sorted_yaml_with_secrets(&val, "CLIENT", &mut secrets).unwrap();
+        // current_prefix should be "CLIENT_myclient"
+        // secret env var should be "KEYCLOAK_CLIENT_MYCLIENT_SECRET"
+        // nested password env var should be "KEYCLOAK_CLIENT_MYCLIENT_NESTED_PASSWORD"
+        assert!(yaml.contains("secret: ${KEYCLOAK_CLIENT_MYCLIENT_SECRET}"));
+        assert!(yaml.contains("password: ${KEYCLOAK_CLIENT_MYCLIENT_NESTED_PASSWORD}"));
+        assert_eq!(
+            secrets.get("KEYCLOAK_CLIENT_MYCLIENT_SECRET"),
+            Some(&"very-secret".to_string())
+        );
+        assert_eq!(
+            secrets.get("KEYCLOAK_CLIENT_MYCLIENT_NESTED_PASSWORD"),
+            Some(&"pass".to_string())
+        );
+    }
+
+    #[test]
+    fn test_to_sorted_yaml_simple() {
+        let val = serde_json::json!({ "b": 2, "a": 1 });
+        let yaml = to_sorted_yaml(&val).unwrap();
+        assert_eq!(yaml.trim(), "a: 1\nb: 2");
+    }
 }

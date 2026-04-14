@@ -1,6 +1,6 @@
 use crate::client::KeycloakClient;
 use crate::models::{ComponentRepresentation, KeycloakResource};
-use crate::utils::secrets::substitute_secrets;
+use crate::utils::secrets::{SecretResolver, substitute_secrets};
 use anyhow::{Context, Result};
 use console::style;
 use std::collections::{HashMap, HashSet};
@@ -47,13 +47,13 @@ pub async fn process_component_file(
     client: KeycloakClient,
     by_identity: Arc<HashMap<String, ComponentRepresentation>>,
     by_details: Arc<HashMap<ComponentKey, ComponentRepresentation>>,
-    env_vars: Arc<HashMap<String, String>>,
+    resolver: Arc<dyn SecretResolver>,
     realm_name: String,
 ) -> Result<()> {
     let content = async_fs::read_to_string(&path).await?;
     let mut val: serde_json::Value = serde_yaml::from_str(&content)
         .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-    substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+    substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
     let mut component_rep: ComponentRepresentation = serde_json::from_value(val)?;
 
     let existing = if let Some(identity) = component_rep.get_identity() {
@@ -120,7 +120,7 @@ pub async fn apply_components_or_keys(
     client: &KeycloakClient,
     workspace_dir: &std::path::Path,
     dir_name: &str,
-    env_vars: Arc<HashMap<String, String>>,
+    resolver: Arc<dyn SecretResolver>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
     realm_name: &str,
 ) -> Result<()> {
@@ -149,7 +149,7 @@ pub async fn apply_components_or_keys(
                 let client = client.clone();
                 let by_identity = Arc::clone(&by_identity);
                 let by_details = Arc::clone(&by_details);
-                let env_vars = Arc::clone(&env_vars);
+                let resolver = Arc::clone(&resolver);
                 let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     process_component_file(
@@ -157,7 +157,7 @@ pub async fn apply_components_or_keys(
                         client,
                         by_identity,
                         by_details,
-                        env_vars,
+                        resolver,
                         realm_name,
                     )
                     .await
@@ -175,6 +175,7 @@ pub async fn apply_components_or_keys(
 mod tests {
     use super::*;
     use crate::client::KeycloakClient;
+    use crate::utils::secrets::EnvResolver;
     use axum::{
         Json, Router,
         http::StatusCode,
@@ -307,6 +308,7 @@ mod tests {
         let temp = tempdir()?;
         let components_dir = temp.path().join("components");
         fs::create_dir(&components_dir)?;
+        let resolver = Arc::new(EnvResolver::new(HashMap::new()));
 
         // 1. Test update failure
         call_count.store(0, std::sync::atomic::Ordering::SeqCst);
@@ -317,7 +319,7 @@ mod tests {
             &client,
             temp.path(),
             "components",
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )
@@ -340,7 +342,7 @@ mod tests {
             &client,
             temp.path(),
             "components",
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )

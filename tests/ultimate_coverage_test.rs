@@ -1,6 +1,8 @@
+use std::sync::Arc;
 mod common;
 use common::start_mock_server;
 use kcd::client::KeycloakClient;
+use kcd::utils::ui::DialoguerUi;
 use kcd::{apply, plan};
 use std::fs;
 use tempfile::tempdir;
@@ -109,6 +111,10 @@ async fn test_ultimate_coverage() {
     fs::create_dir(&components_dir).unwrap();
     fs::write(components_dir.join("component-1.yaml"), "name: component-1\nproviderId: ldap\nproviderType: org.keycloak.storage.UserStorageProvider\nconfig:\n  priority: ['1']\n").unwrap();
 
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+
     // Run Plan
     plan::run(
         &client,
@@ -116,6 +122,8 @@ async fn test_ultimate_coverage() {
         false,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await
     .unwrap();
@@ -126,6 +134,7 @@ async fn test_ultimate_coverage() {
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        resolver.clone(),
     )
     .await
     .unwrap();
@@ -137,6 +146,8 @@ async fn test_ultimate_coverage() {
         true,
         false,
         &["test-realm".to_string()],
+        Arc::new(DialoguerUi::new()),
+        resolver,
     )
     .await
     .unwrap();
@@ -154,7 +165,18 @@ async fn test_plan_all_realms() {
     fs::create_dir(workspace_dir.join("test-realm")).unwrap();
 
     // Test auto-discovery of realms in plan
-    plan::run(&client, workspace_dir.clone(), false, false, &[])
-        .await
-        .unwrap();
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+    plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &[],
+        Arc::new(DialoguerUi::new()),
+        resolver,
+    )
+    .await
+    .unwrap();
 }

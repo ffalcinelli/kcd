@@ -1,39 +1,25 @@
 use crate::models::IdentityProviderRepresentation;
-use crate::utils::ui::SUCCESS_CREATE;
+use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
-use console::style;
-use dialoguer::{Input, theme::ColorfulTheme};
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
 
-pub async fn create_idp_interactive(workspace_dir: &Path) -> Result<()> {
-    let theme = ColorfulTheme::default();
-
-    let realm: String = Input::with_theme(&theme)
-        .with_prompt("Target Realm")
-        .interact_text()?;
-
-    let alias: String = Input::with_theme(&theme)
-        .with_prompt("IDP Alias (e.g. google, github)")
-        .interact_text()?;
-
-    let provider_id: String = Input::with_theme(&theme)
-        .with_prompt("Provider ID (e.g. oidc, saml, google)")
-        .default(alias.clone())
-        .interact_text()?;
+pub async fn create_idp_interactive(workspace_dir: &Path, ui: &dyn Ui) -> Result<()> {
+    let realm = ui.input("Target Realm", None, false)?;
+    let alias = ui.input("IDP Alias (e.g. google, github)", None, false)?;
+    let provider_id = ui.input(
+        "Provider ID (e.g. oidc, saml, google)",
+        Some(alias.clone()),
+        false,
+    )?;
 
     create_idp_yaml(workspace_dir, &realm, &alias, &provider_id).await?;
 
-    println!(
-        "{} {}",
-        SUCCESS_CREATE,
-        style(format!(
-            "Successfully generated YAML for Identity Provider '{}' in realm '{}'.",
-            alias, realm
-        ))
-        .green()
-    );
+    ui.print_success(&format!(
+        "Successfully generated YAML for Identity Provider '{}' in realm '{}'.",
+        alias, realm
+    ));
     Ok(())
 }
 
@@ -99,5 +85,20 @@ mod tests {
         let content = fs::read_to_string(&file_path).await.unwrap();
         let idp: IdentityProviderRepresentation = serde_yaml::from_str(&content).unwrap();
         assert_eq!(idp.alias.as_deref(), Some("google"));
+        assert_eq!(idp.provider_id.as_deref(), Some("google"));
+        assert!(idp.enabled.unwrap());
+
+        // Test with different provider_id
+        create_idp_yaml(workspace_dir, "master", "my-idp", "oidc")
+            .await
+            .unwrap();
+        let file_path2 = workspace_dir
+            .join("master")
+            .join("identity-providers")
+            .join("my-idp.yaml");
+        let content2 = fs::read_to_string(&file_path2).await.unwrap();
+        let idp2: IdentityProviderRepresentation = serde_yaml::from_str(&content2).unwrap();
+        assert_eq!(idp2.alias.as_deref(), Some("my-idp"));
+        assert_eq!(idp2.provider_id.as_deref(), Some("oidc"));
     }
 }

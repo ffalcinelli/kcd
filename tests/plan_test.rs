@@ -3,7 +3,9 @@ use common::start_mock_server;
 use kcd::client::KeycloakClient;
 use kcd::models::{ClientRepresentation, RealmRepresentation, RoleRepresentation};
 use kcd::plan;
+use kcd::utils::ui::DialoguerUi;
 use std::fs;
+use std::sync::Arc;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -380,6 +382,11 @@ async fn test_plan() {
     )
     .unwrap();
 
+    let ui = Arc::new(DialoguerUi::new());
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+
     // Run plan
     plan::run(
         &client,
@@ -387,6 +394,8 @@ async fn test_plan() {
         false, // changes_only
         false, // interactive
         &["test-realm".to_string()],
+        ui.clone(),
+        resolver.clone(),
     )
     .await
     .expect("Plan failed");
@@ -398,6 +407,8 @@ async fn test_plan() {
         true,  // changes_only
         false, // interactive
         &["test-realm".to_string()],
+        ui.clone(),
+        resolver.clone(),
     )
     .await
     .expect("Plan with changes_only failed");
@@ -409,6 +420,8 @@ async fn test_plan() {
         false,
         false,
         &["non-existent".to_string()],
+        ui,
+        resolver,
     )
     .await
     .expect("Plan for non-existent realm failed");

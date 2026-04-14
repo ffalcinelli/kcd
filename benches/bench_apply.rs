@@ -1,6 +1,8 @@
 use kcd::apply;
 use kcd::client::KeycloakClient;
+use kcd::utils::secrets::{EnvResolver, SecretResolver};
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 #[path = "../tests/common/mod.rs"]
@@ -16,6 +18,8 @@ fn main() {
             .login("admin-cli", None, Some("admin"), Some("admin"))
             .await
             .unwrap();
+
+        let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
 
         let dir = tempfile::tempdir().unwrap();
         let workspace_dir = dir.path().to_path_buf();
@@ -45,9 +49,15 @@ fn main() {
 
         for _ in 0..iters {
             let start = std::time::Instant::now();
-            apply::run(&client, workspace_dir.clone(), &realms, true)
-                .await
-                .unwrap();
+            apply::run(
+                &client,
+                workspace_dir.clone(),
+                &realms,
+                true,
+                resolver.clone(),
+            )
+            .await
+            .unwrap();
             total_time += start.elapsed();
         }
 

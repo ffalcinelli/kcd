@@ -1,38 +1,18 @@
 use crate::models::RoleRepresentation;
-use crate::utils::ui::SUCCESS_CREATE;
+use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
-use console::style;
-use dialoguer::{Confirm, Input, theme::ColorfulTheme};
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
 
-pub async fn create_role_interactive(workspace_dir: &Path) -> Result<()> {
-    let theme = ColorfulTheme::default();
-
-    let realm: String = Input::with_theme(&theme)
-        .with_prompt("Target Realm")
-        .interact_text()?;
-
-    let name: String = Input::with_theme(&theme)
-        .with_prompt("Role Name")
-        .interact_text()?;
-
-    let description: String = Input::with_theme(&theme)
-        .with_prompt("Description")
-        .allow_empty(true)
-        .interact_text()?;
-
-    let is_client_role = Confirm::with_theme(&theme)
-        .with_prompt("Is this a client role?")
-        .default(false)
-        .interact()?;
+pub async fn create_role_interactive(workspace_dir: &Path, ui: &dyn Ui) -> Result<()> {
+    let realm = ui.input("Target Realm", None, false)?;
+    let name = ui.input("Role Name", None, false)?;
+    let description = ui.input("Description", None, true)?;
+    let is_client_role = ui.confirm("Is this a client role?", false)?;
 
     let client_id = if is_client_role {
-        let id: String = Input::with_theme(&theme)
-            .with_prompt("Client ID")
-            .interact_text()?;
-        Some(id)
+        Some(ui.input("Client ID", None, false)?)
     } else {
         None
     };
@@ -45,15 +25,10 @@ pub async fn create_role_interactive(workspace_dir: &Path) -> Result<()> {
 
     create_role_yaml(workspace_dir, &realm, &name, description_opt, client_id).await?;
 
-    println!(
-        "{} {}",
-        SUCCESS_CREATE,
-        style(format!(
-            "Successfully generated YAML for role '{}' in realm '{}'.",
-            name, realm
-        ))
-        .green()
-    );
+    ui.print_success(&format!(
+        "Successfully generated YAML for role '{}' in realm '{}'.",
+        name, realm
+    ));
     Ok(())
 }
 
@@ -123,6 +98,7 @@ mod tests {
         let content = fs::read_to_string(&realm_role_path).await.unwrap();
         let role: RoleRepresentation = serde_yaml::from_str(&content).unwrap();
         assert_eq!(role.name, "admin");
+        assert_eq!(role.description, Some("desc".to_string()));
         assert!(!role.client_role);
 
         // Client role
@@ -142,5 +118,10 @@ mod tests {
             .join("roles")
             .join("editor.yaml");
         assert!(client_role_path.exists());
+        let content = fs::read_to_string(&client_role_path).await.unwrap();
+        let role: RoleRepresentation = serde_yaml::from_str(&content).unwrap();
+        assert_eq!(role.name, "editor");
+        assert!(role.client_role);
+        assert_eq!(role.description, None);
     }
 }

@@ -1,7 +1,8 @@
+mod common;
 use kcd::client::KeycloakClient;
-use kcd::plan::PlanOptions;
 use kcd::plan::components::{check_keys_drift, plan_components_or_keys};
-use std::collections::HashMap;
+use kcd::plan::{PlanContext, PlanOptions};
+use kcd::utils::ui::DialoguerUi;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
@@ -12,24 +13,27 @@ async fn test_plan_components_no_dir() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path();
     let mut changed_files = Vec::new();
-    let env_vars = Arc::new(HashMap::new());
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+    let ui = DialoguerUi::new();
 
     let options = PlanOptions {
         changes_only: false,
         interactive: false,
     };
 
-    // Should not fail if directory doesn't exist
-    let res = plan_components_or_keys(
-        &client,
+    let ctx = PlanContext {
+        client: &client,
         workspace_dir,
         options,
-        "non-existent",
-        env_vars,
-        &mut changed_files,
-        "master",
-    )
-    .await;
+        resolver,
+        realm_name: "master",
+        ui: &ui,
+    };
+
+    // Should not fail if directory doesn't exist
+    let res = plan_components_or_keys(&ctx, "non-existent", &mut changed_files).await;
     assert!(res.is_ok());
 }
 
@@ -58,22 +62,79 @@ async fn test_plan_components_with_invalid_yaml() {
         .unwrap();
 
     let mut changed_files = Vec::new();
-    let env_vars = Arc::new(HashMap::new());
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+    let ui = DialoguerUi::new();
 
     let options = PlanOptions {
         changes_only: false,
         interactive: false,
     };
 
-    let res = plan_components_or_keys(
-        &client,
+    let ctx = PlanContext {
+        client: &client,
         workspace_dir,
         options,
-        "components",
-        env_vars,
-        &mut changed_files,
-        "master",
-    )
-    .await;
+        resolver,
+        realm_name: "master",
+        ui: &ui,
+    };
+
+    let res = plan_components_or_keys(&ctx, "components", &mut changed_files).await;
+    assert!(res.is_err());
+}
+
+#[tokio::test]
+async fn test_check_keys_drift_warning() {
+    let mock_url = common::start_mock_server().await;
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
+
+    let options = PlanOptions {
+        changes_only: true,
+        interactive: false,
+    };
+
+    // This should run and print a warning (we can't easily assert on stdout here without more effort,
+    // but we can ensure it doesn't crash and hits the logic)
+    let res = check_keys_drift(&client, options, "test-realm").await;
+    assert!(res.is_ok());
+}
+
+#[tokio::test]
+async fn test_plan_components_no_identity() {
+    let client = KeycloakClient::new("http://localhost:8080".to_string());
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path();
+    let mut changed_files = Vec::new();
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+    let ui = DialoguerUi::new();
+
+    let options = PlanOptions {
+        changes_only: false,
+        interactive: false,
+    };
+
+    let ctx = PlanContext {
+        client: &client,
+        workspace_dir,
+        options,
+        resolver,
+        realm_name: "master",
+        ui: &ui,
+    };
+
+    let components_dir = workspace_dir.join("components");
+    fs::create_dir_all(&components_dir).await.unwrap();
+    // Component with NO name and NO id (missing both)
+    fs::write(components_dir.join("empty.yaml"), "providerId: ldap\n")
+        .await
+        .unwrap();
+
+    let res = plan_components_or_keys(&ctx, "components", &mut changed_files).await;
+    // It should fail to get identity
     assert!(res.is_err());
 }

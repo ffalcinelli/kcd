@@ -1,6 +1,6 @@
 use crate::client::KeycloakClient;
 use crate::models::{ClientScopeRepresentation, KeycloakResource};
-use crate::utils::secrets::substitute_secrets;
+use crate::utils::secrets::{SecretResolver, substitute_secrets};
 use crate::utils::ui::{SUCCESS_CREATE, SUCCESS_UPDATE};
 use anyhow::{Context, Result};
 use console::style;
@@ -13,7 +13,7 @@ use tokio::task::JoinSet;
 pub async fn apply_client_scopes(
     client: &KeycloakClient,
     workspace_dir: &std::path::Path,
-    env_vars: Arc<HashMap<String, String>>,
+    resolver: Arc<dyn SecretResolver>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
     realm_name: &str,
 ) -> Result<()> {
@@ -43,13 +43,13 @@ pub async fn apply_client_scopes(
             if path.extension().is_some_and(|ext| ext == "yaml") {
                 let client = client.clone();
                 let existing_scopes_map = Arc::clone(&existing_scopes_map);
-                let env_vars = Arc::clone(&env_vars);
+                let resolver = Arc::clone(&resolver);
                 let realm_name = realm_name.to_string();
                 set.spawn(async move {
                     let content = async_fs::read_to_string(&path).await?;
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
                         .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-                    substitute_secrets(&mut val, &env_vars).map_err(|e| anyhow::anyhow!(e))?;
+                    substitute_secrets(&mut val, resolver).await?;
                     let mut scope_rep: ClientScopeRepresentation = serde_json::from_value(val)?;
 
                     let identity = scope_rep.get_identity().context(format!(
@@ -110,6 +110,7 @@ pub async fn apply_client_scopes(
 mod tests {
     use super::*;
     use crate::client::KeycloakClient;
+    use crate::utils::secrets::EnvResolver;
     use axum::{
         Json, Router,
         http::StatusCode,
@@ -190,6 +191,8 @@ mod tests {
         let scopes_dir = temp.path().join("client-scopes");
         fs::create_dir(&scopes_dir)?;
 
+        let resolver = Arc::new(EnvResolver::new(HashMap::new()));
+
         // 1. Test update failure
         call_count.store(0, std::sync::atomic::Ordering::SeqCst);
         let scope_existing = scopes_dir.join("existing.yaml");
@@ -198,7 +201,7 @@ mod tests {
         let res = apply_client_scopes(
             &client,
             temp.path(),
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )
@@ -220,7 +223,7 @@ mod tests {
         let res = apply_client_scopes(
             &client,
             temp.path(),
-            Arc::new(HashMap::new()),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
         )
