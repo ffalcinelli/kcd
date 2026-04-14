@@ -2,6 +2,8 @@ mod common;
 use common::start_mock_server;
 use kcd::client::KeycloakClient;
 use kcd::plan;
+use kcd::utils::secrets::{EnvResolver, SecretResolver};
+use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -19,6 +21,9 @@ async fn test_plan_non_existent_workspace() {
         false,
         &[],
         Arc::new(DialoguerUi::new()),
+        Arc::new(kcd::utils::secrets::EnvResolver::new(
+            std::collections::HashMap::new(),
+        )),
     )
     .await;
     assert!(res.is_err());
@@ -26,6 +31,7 @@ async fn test_plan_non_existent_workspace() {
 
 #[tokio::test]
 async fn test_plan_empty_workspace() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let client = KeycloakClient::new(mock_url);
     let dir = tempdir().unwrap();
@@ -36,6 +42,7 @@ async fn test_plan_empty_workspace() {
         false,
         &[],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -43,6 +50,7 @@ async fn test_plan_empty_workspace() {
 
 #[tokio::test]
 async fn test_plan_with_secrets_file() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -65,6 +73,7 @@ async fn test_plan_with_secrets_file() {
         false,
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -72,6 +81,7 @@ async fn test_plan_with_secrets_file() {
 
 #[tokio::test]
 async fn test_plan_cleanup_old_plan_file() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -96,6 +106,7 @@ async fn test_plan_cleanup_old_plan_file() {
         false,
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -104,6 +115,7 @@ async fn test_plan_cleanup_old_plan_file() {
 
 #[tokio::test]
 async fn test_plan_realm_not_found_remote() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("new-realm".to_string());
@@ -137,6 +149,7 @@ async fn test_plan_realm_not_found_remote() {
         false,
         &["new-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -144,6 +157,7 @@ async fn test_plan_realm_not_found_remote() {
 
 #[tokio::test]
 async fn test_plan_resources_creation() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -178,6 +192,7 @@ async fn test_plan_resources_creation() {
         false,
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -190,6 +205,7 @@ async fn test_plan_resources_creation() {
 
 #[tokio::test]
 async fn test_plan_resources_with_secrets() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -224,6 +240,7 @@ description: ${ROLE_DESC}
         false,
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -236,6 +253,7 @@ description: ${ROLE_DESC}
 
 #[tokio::test]
 async fn test_plan_resources_invalid_yaml() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -260,6 +278,7 @@ async fn test_plan_resources_invalid_yaml() {
         false,
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_err());
@@ -267,6 +286,7 @@ async fn test_plan_resources_invalid_yaml() {
 
 #[tokio::test]
 async fn test_plan_resources_missing_identity() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -292,6 +312,7 @@ async fn test_plan_resources_missing_identity() {
         false,
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_err());
@@ -299,6 +320,7 @@ async fn test_plan_resources_missing_identity() {
 
 #[tokio::test]
 async fn test_plan_resources_update() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -334,6 +356,7 @@ async fn test_plan_resources_update() {
         false,
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -344,6 +367,7 @@ async fn test_plan_resources_update() {
 
 #[tokio::test]
 async fn test_plan_resources_changes_only() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -379,6 +403,7 @@ async fn test_plan_resources_changes_only() {
         false,
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -392,6 +417,7 @@ use std::sync::Mutex;
 
 #[tokio::test]
 async fn test_plan_interactive_include() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -433,6 +459,7 @@ async fn test_plan_interactive_include() {
         true, // interactive
         &["test-realm".to_string()],
         ui,
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -445,6 +472,7 @@ async fn test_plan_interactive_include() {
 
 #[tokio::test]
 async fn test_plan_interactive_exclude() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -486,6 +514,7 @@ async fn test_plan_interactive_exclude() {
         true, // interactive
         &["test-realm".to_string()],
         ui,
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -496,6 +525,7 @@ async fn test_plan_interactive_exclude() {
 
 #[tokio::test]
 async fn test_plan_error_paths() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("error-realm".to_string());
@@ -520,6 +550,7 @@ async fn test_plan_error_paths() {
         false,
         &["error-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_err());
@@ -539,6 +570,7 @@ async fn test_plan_error_paths() {
         false,
         &["error-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_err());
@@ -557,6 +589,7 @@ async fn test_plan_error_paths() {
         false,
         &["error-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_err());
@@ -569,6 +602,7 @@ async fn test_plan_error_paths() {
 
 #[tokio::test]
 async fn test_plan_empty_realms_list() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let client = KeycloakClient::new(mock_url);
     let dir = tempdir().unwrap();
@@ -582,6 +616,7 @@ async fn test_plan_empty_realms_list() {
         false,
         &[],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -618,6 +653,7 @@ fn test_print_diff_delete() {
 
 #[tokio::test]
 async fn test_plan_auto_discovery_no_realm_yaml() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_token("mock".to_string());
@@ -637,6 +673,7 @@ async fn test_plan_auto_discovery_no_realm_yaml() {
         false,
         &[],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -644,6 +681,7 @@ async fn test_plan_auto_discovery_no_realm_yaml() {
 
 #[tokio::test]
 async fn test_plan_resources_ignore_non_yaml() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -687,6 +725,7 @@ async fn test_plan_resources_ignore_non_yaml() {
         false,
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -694,6 +733,7 @@ async fn test_plan_resources_ignore_non_yaml() {
 
 #[tokio::test]
 async fn test_plan_resources_with_id_no_clear() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -730,6 +770,7 @@ async fn test_plan_resources_with_id_no_clear() {
         false,
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
     assert!(res.is_ok());
@@ -740,6 +781,7 @@ async fn test_plan_resources_with_id_no_clear() {
 
 #[tokio::test]
 async fn test_plan_resources_missing_secret_env_var() {
+    let resolver: Arc<dyn SecretResolver> = Arc::new(EnvResolver::new(HashMap::new()));
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -768,6 +810,7 @@ description: ${KEYCLOAK_ROLE_MISSING_SECRET}
         false,
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
+        resolver.clone(),
     )
     .await;
 
@@ -775,6 +818,6 @@ description: ${KEYCLOAK_ROLE_MISSING_SECRET}
     assert!(
         res.unwrap_err()
             .to_string()
-            .contains("Missing required environment variable")
+            .contains("Missing required secret or environment variable")
     );
 }

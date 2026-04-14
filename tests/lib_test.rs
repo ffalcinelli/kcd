@@ -15,6 +15,8 @@ async fn test_init_client_fail() {
         command: Commands::Validate {
             workspace: PathBuf::from("."),
         },
+        vault_addr: None,
+        vault_token: None,
     };
 
     let res = init_client(&cli).await;
@@ -33,6 +35,8 @@ async fn test_run_app_validate_non_existent() {
         command: Commands::Validate {
             workspace: PathBuf::from("non-existent-dir-123"),
         },
+        vault_addr: None,
+        vault_token: None,
     };
 
     let res = run_app(cli).await;

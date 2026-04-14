@@ -63,13 +63,19 @@ Located in `benches/`. Used to monitor performance for large workspaces with tho
 
 ## 🔐 Secret Management Logic
 
-The masking heuristic looks for keys matching these patterns:
+Secret handling is managed via the `SecretResolver` trait, which allows for multiple resolution strategies:
+
+- **EnvResolver**: Resolves `${VAR_NAME}` from the environment or a `.secrets` file.
+- **VaultResolver**: Resolves `${vault:mount/path#field}` from a HashiCorp Vault KV2 engine.
+- **CompositeResolver**: Chains multiple resolvers in a prioritized order.
+
+The masking heuristic during `inspect` looks for keys matching these patterns:
 -   Contains `secret` (case-insensitive)
 -   Contains `password`
 -   Matches exactly `value` (for certain component configurations)
 -   Matches exactly `hashedValue`
 
-When detected, the value is replaced by `${KEYCLOAK_<RESOURCE_TYPE>_<RESOURCE_NAME>_<FIELD_NAME>}` and written to the `.secrets` file.
+When detected, the value is replaced by `${KEYCLOAK_<RESOURCE_TYPE>_<RESOURCE_NAME>_<FIELD_NAME>}`.
 
 ---
 
@@ -89,7 +95,7 @@ When detected, the value is replaced by `${KEYCLOAK_<RESOURCE_TYPE>_<RESOURCE_NA
 
 -   [x] Parallel reconciliation (apply changes concurrently for resources within a realm).
 -   [x] Generic refactor for `inspect.rs`.
+-   [x] Integration with HashiCorp Vault for secret resolution.
 -   [ ] Support for custom SPIs and provider configurations.
 -   [ ] Support for multiple environment profiles (e.g., `prod.yaml`, `staging.yaml`).
--   [ ] Integration with HashiCorp Vault for secret resolution.
 -   [ ] Generic refactor for `plan.rs` and `apply.rs` (similar to `inspect.rs`).

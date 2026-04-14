@@ -3,7 +3,6 @@ use kcd::client::KeycloakClient;
 use kcd::plan::components::{check_keys_drift, plan_components_or_keys};
 use kcd::plan::{PlanContext, PlanOptions};
 use kcd::utils::ui::DialoguerUi;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
@@ -14,7 +13,9 @@ async fn test_plan_components_no_dir() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path();
     let mut changed_files = Vec::new();
-    let env_vars = Arc::new(HashMap::new());
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
     let ui = DialoguerUi::new();
 
     let options = PlanOptions {
@@ -26,7 +27,7 @@ async fn test_plan_components_no_dir() {
         client: &client,
         workspace_dir,
         options,
-        env_vars,
+        resolver,
         realm_name: "master",
         ui: &ui,
     };
@@ -61,7 +62,9 @@ async fn test_plan_components_with_invalid_yaml() {
         .unwrap();
 
     let mut changed_files = Vec::new();
-    let env_vars = Arc::new(HashMap::new());
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
     let ui = DialoguerUi::new();
 
     let options = PlanOptions {
@@ -73,7 +76,7 @@ async fn test_plan_components_with_invalid_yaml() {
         client: &client,
         workspace_dir,
         options,
-        env_vars,
+        resolver,
         realm_name: "master",
         ui: &ui,
     };
@@ -105,7 +108,9 @@ async fn test_plan_components_no_identity() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path();
     let mut changed_files = Vec::new();
-    let env_vars = Arc::new(HashMap::new());
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
     let ui = DialoguerUi::new();
 
     let options = PlanOptions {
@@ -117,7 +122,7 @@ async fn test_plan_components_no_identity() {
         client: &client,
         workspace_dir,
         options,
-        env_vars,
+        resolver,
         realm_name: "master",
         ui: &ui,
     };

@@ -17,6 +17,8 @@ async fn test_run_app_validate() -> Result<()> {
         password: None,
         client_id: "admin-cli".to_string(),
         client_secret: None,
+        vault_addr: None,
+        vault_token: None,
     };
 
     run_app(cli).await?;
@@ -42,6 +44,8 @@ async fn test_run_app_inspect() -> Result<()> {
         password: None,
         client_id: "admin-cli".to_string(),
         client_secret: Some("secret".to_string()),
+        vault_addr: None,
+        vault_token: None,
     };
 
     run_app(cli).await?;
@@ -70,6 +74,8 @@ async fn test_run_app_apply() -> Result<()> {
         password: None,
         client_id: "admin-cli".to_string(),
         client_secret: Some("secret".to_string()),
+        vault_addr: None,
+        vault_token: None,
     };
 
     run_app(cli).await?;
@@ -96,32 +102,13 @@ async fn test_run_app_plan() -> Result<()> {
         password: None,
         client_id: "admin-cli".to_string(),
         client_secret: Some("secret".to_string()),
+        vault_addr: None,
+        vault_token: None,
     };
 
     run_app(cli).await?;
     Ok(())
 }
-
-/*
-#[tokio::test]
-async fn test_run_app_cli() -> Result<()> {
-    let dir = tempdir().unwrap();
-    let workspace = dir.path().to_path_buf();
-
-    let cli = Cli {
-        command: Commands::Cli { workspace },
-        server: "http://localhost:8080".to_string(),
-        realms: vec![],
-        user: None,
-        password: None,
-        client_id: "admin-cli".to_string(),
-        client_secret: None,
-    };
-
-    run_app(cli).await?;
-    Ok(())
-}
-*/
 
 #[tokio::test]
 async fn test_run_app_clean() -> Result<()> {
@@ -139,6 +126,8 @@ async fn test_run_app_clean() -> Result<()> {
         password: None,
         client_id: "admin-cli".to_string(),
         client_secret: None,
+        vault_addr: None,
+        vault_token: None,
     };
 
     run_app(cli).await?;
@@ -162,6 +151,8 @@ async fn test_run_app_drift() -> Result<()> {
         password: None,
         client_id: "admin-cli".to_string(),
         client_secret: Some("secret".to_string()),
+        vault_addr: None,
+        vault_token: None,
     };
 
     run_app(cli).await?;
