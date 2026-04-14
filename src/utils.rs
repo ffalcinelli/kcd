@@ -6,7 +6,7 @@ use std::path::Path;
 use tokio::fs;
 
 #[cfg(unix)]
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::PermissionsExt;
 
 pub async fn write_secure(path: &Path, content: &str) -> anyhow::Result<()> {
     #[cfg(unix)]
@@ -357,11 +357,8 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(
-                &existing_path,
-                std::fs::Permissions::from_mode(0o644),
-            )
-            .unwrap();
+            std::fs::set_permissions(&existing_path, std::fs::Permissions::from_mode(0o644))
+                .unwrap();
             let metadata = std::fs::metadata(&existing_path).unwrap();
             assert_eq!(metadata.permissions().mode() & 0o777, 0o644);
         }
