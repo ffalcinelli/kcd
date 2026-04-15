@@ -157,9 +157,29 @@ async fn write_if_changed_with_mutex(
     if secure {
         crate::utils::write_secure(path, content).await?;
     } else {
-        fs::write(path, content)
-            .await
-            .context(format!("Failed to write {:?}", path))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            use tokio::io::AsyncWriteExt;
+            let mut options = std::fs::OpenOptions::new();
+            options.write(true).create(true).truncate(true).mode(0o600);
+            let mut file = fs::OpenOptions::from(options)
+                .open(path)
+                .await
+                .context(format!("Failed to open {:?}", path))?;
+            file.write_all(content.as_bytes())
+                .await
+                .context(format!("Failed to write {:?}", path))?;
+            file.flush()
+                .await
+                .context(format!("Failed to flush {:?}", path))?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::write(path, content)
+                .await
+                .context(format!("Failed to write {:?}", path))?;
+        }
     }
 
     Ok(())
@@ -417,4 +437,43 @@ fn spawn_inspect<T>(
         )
         .await
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_write_if_changed_with_mutex_insecure() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("insecure.txt");
+        let prompt_mutex = Arc::new(Mutex::new(()));
+
+        // Write new file
+        write_if_changed_with_mutex(
+            &file_path,
+            "test content",
+            true,
+            Arc::clone(&prompt_mutex),
+            false,
+        )
+        .await
+        .unwrap();
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        assert_eq!(content, "test content");
+
+        // Overwrite file
+        write_if_changed_with_mutex(
+            &file_path,
+            "new content",
+            true,
+            Arc::clone(&prompt_mutex),
+            false,
+        )
+        .await
+        .unwrap();
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        assert_eq!(content, "new content");
+    }
 }
