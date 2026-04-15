@@ -438,3 +438,26 @@ fn spawn_inspect<T>(
         .await
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_write_if_changed_with_mutex_insecure() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("insecure.txt");
+        let prompt_mutex = Arc::new(Mutex::new(()));
+
+        // Write new file
+        write_if_changed_with_mutex(&file_path, "test content", true, Arc::clone(&prompt_mutex), false).await.unwrap();
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        assert_eq!(content, "test content");
+
+        // Overwrite file
+        write_if_changed_with_mutex(&file_path, "new content", true, Arc::clone(&prompt_mutex), false).await.unwrap();
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        assert_eq!(content, "new content");
+    }
+}
