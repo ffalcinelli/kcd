@@ -157,9 +157,29 @@ async fn write_if_changed_with_mutex(
     if secure {
         crate::utils::write_secure(path, content).await?;
     } else {
-        fs::write(path, content)
-            .await
-            .context(format!("Failed to write {:?}", path))?;
+        #[cfg(unix)]
+        {
+            use tokio::io::AsyncWriteExt;
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut options = std::fs::OpenOptions::new();
+            options.write(true).create(true).truncate(true).mode(0o600);
+            let mut file = fs::OpenOptions::from(options)
+                .open(path)
+                .await
+                .context(format!("Failed to open {:?}", path))?;
+            file.write_all(content.as_bytes())
+                .await
+                .context(format!("Failed to write {:?}", path))?;
+            file.flush()
+                .await
+                .context(format!("Failed to flush {:?}", path))?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::write(path, content)
+                .await
+                .context(format!("Failed to write {:?}", path))?;
+        }
     }
 
     Ok(())
