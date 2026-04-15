@@ -159,8 +159,8 @@ async fn write_if_changed_with_mutex(
     } else {
         #[cfg(unix)]
         {
-            use tokio::io::AsyncWriteExt;
             use std::os::unix::fs::OpenOptionsExt;
+            use tokio::io::AsyncWriteExt;
             let mut options = std::fs::OpenOptions::new();
             options.write(true).create(true).truncate(true).mode(0o600);
             let mut file = fs::OpenOptions::from(options)
