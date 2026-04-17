@@ -184,17 +184,15 @@ pub async fn substitute_secrets(
                 substitute_secrets(v, Arc::clone(&resolver)).await?;
             }
         }
-        Value::String(s) => {
-            if s.starts_with("${") && s.ends_with("}") {
-                let var_name = &s[2..s.len() - 1];
-                if let Some(val) = resolver.resolve(var_name).await? {
-                    *s = val;
-                } else if var_name.starts_with("KEYCLOAK_") {
-                    return Err(anyhow::anyhow!(
-                        "Missing required secret or environment variable: {}",
-                        var_name
-                    ));
-                }
+        Value::String(s) if s.starts_with("${") && s.ends_with("}") => {
+            let var_name = &s[2..s.len() - 1];
+            if let Some(val) = resolver.resolve(var_name).await? {
+                *s = val;
+            } else if var_name.starts_with("KEYCLOAK_") {
+                return Err(anyhow::anyhow!(
+                    "Missing required secret or environment variable: {}",
+                    var_name
+                ));
             }
         }
         _ => {}
