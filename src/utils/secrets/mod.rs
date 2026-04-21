@@ -371,4 +371,24 @@ mod tests {
         assert_eq!(obfuscate_string("abc"), "***");
         assert_eq!(obfuscate_string("abcd"), "a***d");
     }
+
+    #[test]
+    fn test_is_boolean_string() {
+        assert!(is_boolean_string("true"));
+        assert!(is_boolean_string("false"));
+        assert!(is_boolean_string("on"));
+        assert!(is_boolean_string("off"));
+        assert!(is_boolean_string("TRUE"));
+        assert!(is_boolean_string("False"));
+        assert!(is_boolean_string("On"));
+        assert!(is_boolean_string("OFF"));
+
+        assert!(!is_boolean_string("yes"));
+        assert!(!is_boolean_string("no"));
+        assert!(!is_boolean_string("1"));
+        assert!(!is_boolean_string("0"));
+        assert!(!is_boolean_string("random"));
+        assert!(!is_boolean_string(""));
+        assert!(!is_boolean_string(" true "));
+    }
 }
