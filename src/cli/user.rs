@@ -1,6 +1,7 @@
 use crate::models::{CredentialRepresentation, UserRepresentation};
 use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
+use sanitize_filename::sanitize;
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
@@ -23,9 +24,9 @@ pub async fn change_user_password_yaml(
     new_password: &str,
 ) -> Result<()> {
     let file_path = workspace_dir
-        .join(realm)
+        .join(sanitize(realm))
         .join("users")
-        .join(format!("{}.yaml", username));
+        .join(format!("{}.yaml", sanitize(username)));
 
     if !tokio::fs::try_exists(&file_path).await.unwrap_or(false) {
         println!(
@@ -123,12 +124,12 @@ pub async fn create_user_yaml(
         extra: HashMap::new(),
     };
 
-    let realm_dir = workspace_dir.join(realm).join("users");
+    let realm_dir = workspace_dir.join(sanitize(realm)).join("users");
     fs::create_dir_all(&realm_dir)
         .await
         .context("Failed to create users directory")?;
 
-    let file_path = realm_dir.join(format!("{}.yaml", username));
+    let file_path = realm_dir.join(format!("{}.yaml", sanitize(username)));
     let yaml = serde_yaml::to_string(&user).context("Failed to serialize user to YAML")?;
 
     fs::write(&file_path, yaml)

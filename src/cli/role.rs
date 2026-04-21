@@ -1,6 +1,7 @@
 use crate::models::RoleRepresentation;
 use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
+use sanitize_filename::sanitize;
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
@@ -49,9 +50,9 @@ pub async fn create_role_yaml(
         extra: HashMap::new(),
     };
 
-    let realm_dir = workspace_dir.join(realm);
+    let realm_dir = workspace_dir.join(sanitize(realm));
     let roles_dir = if let Some(cid) = &client_id {
-        realm_dir.join("clients").join(cid).join("roles")
+        realm_dir.join("clients").join(sanitize(cid)).join("roles")
     } else {
         realm_dir.join("roles")
     };
@@ -60,7 +61,7 @@ pub async fn create_role_yaml(
         .await
         .context("Failed to create roles directory")?;
 
-    let file_path = roles_dir.join(format!("{}.yaml", name));
+    let file_path = roles_dir.join(format!("{}.yaml", sanitize(name)));
     let yaml = serde_yaml::to_string(&role).context("Failed to serialize role to YAML")?;
 
     fs::write(&file_path, yaml)
