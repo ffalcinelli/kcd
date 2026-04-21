@@ -108,8 +108,7 @@ impl KeycloakClient {
     }
 
     pub async fn update_realm(&self, realm_rep: &RealmRepresentation) -> Result<()> {
-        self.update_resource(&self.target_realm, realm_rep)
-            .await
+        self.update_resource(&self.target_realm, realm_rep).await
     }
 
     pub async fn create_client(&self, client_rep: &ClientRepresentation) -> Result<()> {
