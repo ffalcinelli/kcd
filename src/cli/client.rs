@@ -1,6 +1,7 @@
 use crate::models::{ClientRepresentation, ClientScopeRepresentation};
 use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
+use sanitize_filename::sanitize;
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
@@ -40,12 +41,12 @@ pub async fn create_client_yaml(
         extra: HashMap::new(),
     };
 
-    let realm_dir = workspace_dir.join(realm).join("clients");
+    let realm_dir = workspace_dir.join(sanitize(realm)).join("clients");
     fs::create_dir_all(&realm_dir)
         .await
         .context("Failed to create clients directory")?;
 
-    let file_path = realm_dir.join(format!("{}.yaml", client_id));
+    let file_path = realm_dir.join(format!("{}.yaml", sanitize(client_id)));
     let yaml = serde_yaml::to_string(&client).context("Failed to serialize client to YAML")?;
 
     fs::write(&file_path, yaml)
@@ -84,12 +85,12 @@ pub async fn create_client_scope_yaml(
         extra: HashMap::new(),
     };
 
-    let scopes_dir = workspace_dir.join(realm).join("client-scopes");
+    let scopes_dir = workspace_dir.join(sanitize(realm)).join("client-scopes");
     fs::create_dir_all(&scopes_dir)
         .await
         .context("Failed to create client-scopes directory")?;
 
-    let file_path = scopes_dir.join(format!("{}.yaml", name));
+    let file_path = scopes_dir.join(format!("{}.yaml", sanitize(name)));
     let yaml = serde_yaml::to_string(&scope).context("Failed to serialize client scope to YAML")?;
 
     fs::write(&file_path, yaml)

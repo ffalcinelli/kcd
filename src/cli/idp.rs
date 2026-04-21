@@ -1,6 +1,7 @@
 use crate::models::IdentityProviderRepresentation;
 use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
+use sanitize_filename::sanitize;
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
@@ -47,12 +48,14 @@ pub async fn create_idp_yaml(
         extra: HashMap::new(),
     };
 
-    let realm_dir = workspace_dir.join(realm).join("identity-providers");
+    let realm_dir = workspace_dir
+        .join(sanitize(realm))
+        .join("identity-providers");
     fs::create_dir_all(&realm_dir)
         .await
         .context("Failed to create identity-providers directory")?;
 
-    let file_path = realm_dir.join(format!("{}.yaml", alias));
+    let file_path = realm_dir.join(format!("{}.yaml", sanitize(alias)));
     let yaml = serde_yaml::to_string(&idp).context("Failed to serialize IDP to YAML")?;
 
     fs::write(&file_path, yaml)

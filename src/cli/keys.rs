@@ -1,6 +1,7 @@
 use crate::models::ComponentRepresentation;
 use crate::utils::ui::Ui;
 use anyhow::{Context, Result};
+use sanitize_filename::sanitize;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs;
@@ -26,7 +27,7 @@ pub async fn rotate_keys_interactive(workspace_dir: &Path, ui: &dyn Ui) -> Resul
 }
 
 pub async fn rotate_keys_yaml(workspace_dir: &Path, realm: &str) -> Result<usize> {
-    let keys_dir = workspace_dir.join(realm).join("components");
+    let keys_dir = workspace_dir.join(sanitize(realm)).join("components");
 
     if !tokio::fs::try_exists(&keys_dir).await.unwrap_or(false) {
         return Ok(0);
