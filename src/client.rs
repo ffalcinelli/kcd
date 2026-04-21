@@ -92,7 +92,7 @@ impl KeycloakClient {
     }
 
     pub async fn get_realm(&self) -> Result<RealmRepresentation> {
-        self.get_resource(&self.target_realm.clone()).await
+        self.get_resource(&self.target_realm).await
     }
 
     pub async fn get_clients(&self) -> Result<Vec<ClientRepresentation>> {
@@ -108,8 +108,7 @@ impl KeycloakClient {
     }
 
     pub async fn update_realm(&self, realm_rep: &RealmRepresentation) -> Result<()> {
-        self.update_resource(&self.target_realm.clone(), realm_rep)
-            .await
+        self.update_resource(&self.target_realm, realm_rep).await
     }
 
     pub async fn create_client(&self, client_rep: &ClientRepresentation) -> Result<()> {
@@ -248,26 +247,20 @@ impl KeycloakClient {
         &self,
         action_rep: &RequiredActionProviderRepresentation,
     ) -> Result<()> {
-        let url = format!(
-            "{}/admin/realms/{}/authentication/register-required-action",
-            self.base_url, self.target_realm
-        );
+        let url = self.realm_admin_url() + "/authentication/register-required-action";
 
         #[derive(Serialize)]
-        struct RegisterActionBody {
+        struct RegisterActionBody<'a> {
             #[serde(rename = "providerId")]
-            provider_id: String,
-            name: String,
+            provider_id: &'a str,
+            name: &'a str,
         }
 
         let provider_id = action_rep
             .provider_id
-            .clone()
+            .as_deref()
             .context("Provider ID required for registration")?;
-        let name = action_rep
-            .name
-            .clone()
-            .unwrap_or_else(|| provider_id.clone());
+        let name = action_rep.name.as_deref().unwrap_or(provider_id);
 
         let body = RegisterActionBody { provider_id, name };
         self.post(&url, &body).await
@@ -451,7 +444,7 @@ fn redact_url(url_str: &str) -> String {
 
 impl KeycloakClient {
     pub async fn get_keys(&self) -> Result<crate::models::KeysMetadataRepresentation> {
-        let url = format!("{}/admin/realms/{}/keys", self.base_url, self.target_realm);
+        let url = self.realm_admin_url() + "/keys";
         self.get(&url).await
     }
 }
@@ -502,6 +495,34 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .contains("Failed to send DELETE request")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_send_failure() {
+        let mut client = KeycloakClient::new("http://127.0.0.1:1".to_string());
+        client.token = Some("mock_token".to_string());
+        let result = client.get::<serde_json::Value>("http://127.0.0.1:1").await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to send GET request")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_put_send_failure() {
+        let mut client = KeycloakClient::new("http://127.0.0.1:1".to_string());
+        client.token = Some("mock_token".to_string());
+        let result = client.put("http://127.0.0.1:1", &"body").await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to send PUT request")
         );
     }
 }
