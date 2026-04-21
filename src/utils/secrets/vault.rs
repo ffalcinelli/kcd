@@ -48,6 +48,12 @@ impl SecretResolver for VaultResolver {
         let full_path = parts[0];
         let field = parts[1];
 
+        if full_path.contains("..") {
+            return Err(anyhow::anyhow!(
+                "Invalid vault path: path traversal detected"
+            ));
+        }
+
         // Split mount and path
         let path_parts: Vec<&str> = full_path.splitn(2, '/').collect();
         if path_parts.len() != 2 {
@@ -168,6 +174,19 @@ mod tests {
 
         let res = resolver.resolve("not-vault").await.unwrap();
         assert_eq!(res, None);
+    }
+
+    #[tokio::test]
+    async fn test_vault_resolver_path_traversal() {
+        let resolver = VaultResolver::new("http://localhost", "token").unwrap();
+
+        let res = resolver.resolve("vault:secret/../mysecret#field").await;
+        assert!(res.is_err());
+        assert!(
+            res.unwrap_err()
+                .to_string()
+                .contains("path traversal detected")
+        );
     }
 
     #[tokio::test]
