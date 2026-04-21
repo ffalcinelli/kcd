@@ -48,7 +48,9 @@ pub async fn create_idp_yaml(
         extra: HashMap::new(),
     };
 
-    let realm_dir = workspace_dir.join(sanitize(realm)).join("identity-providers");
+    let realm_dir = workspace_dir
+        .join(sanitize(realm))
+        .join("identity-providers");
     fs::create_dir_all(&realm_dir)
         .await
         .context("Failed to create identity-providers directory")?;
