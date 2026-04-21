@@ -92,7 +92,7 @@ impl KeycloakClient {
     }
 
     pub async fn get_realm(&self) -> Result<RealmRepresentation> {
-        self.get_resource(&self.target_realm.clone()).await
+        self.get_resource(&self.target_realm).await
     }
 
     pub async fn get_clients(&self) -> Result<Vec<ClientRepresentation>> {
@@ -108,7 +108,7 @@ impl KeycloakClient {
     }
 
     pub async fn update_realm(&self, realm_rep: &RealmRepresentation) -> Result<()> {
-        self.update_resource(&self.target_realm.clone(), realm_rep)
+        self.update_resource(&self.target_realm, realm_rep)
             .await
     }
 
