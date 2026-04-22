@@ -226,9 +226,14 @@ mod tests {
         let dir = tempdir().unwrap();
         let workspace_dir = dir.path();
 
-        create_client_scope_yaml(workspace_dir, "master", "../malicious/path", "openid-connect")
-            .await
-            .unwrap();
+        create_client_scope_yaml(
+            workspace_dir,
+            "master",
+            "../malicious/path",
+            "openid-connect",
+        )
+        .await
+        .unwrap();
 
         let sanitized_name = sanitize("../malicious/path");
         let file_path = workspace_dir
