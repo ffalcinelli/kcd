@@ -103,7 +103,68 @@ pub async fn create_client_scope_yaml(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::ui::MockUi;
     use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_create_client_interactive() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        let mock_ui = MockUi {
+            inputs: std::sync::Mutex::new(vec!["master".to_string(), "my-client".to_string()]),
+            confirms: std::sync::Mutex::new(vec![true]),
+            selects: std::sync::Mutex::new(vec![]),
+            passwords: std::sync::Mutex::new(vec![]),
+        };
+
+        create_client_interactive(workspace_dir, &mock_ui)
+            .await
+            .unwrap();
+
+        let file_path = workspace_dir
+            .join("master")
+            .join("clients")
+            .join("my-client.yaml");
+        assert!(file_path.exists());
+
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        let client: ClientRepresentation = serde_yaml::from_str(&content).unwrap();
+        assert_eq!(client.client_id.as_deref(), Some("my-client"));
+        assert_eq!(client.public_client, Some(true));
+    }
+
+    #[tokio::test]
+    async fn test_create_client_scope_interactive() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        let mock_ui = MockUi {
+            inputs: std::sync::Mutex::new(vec![
+                "master".to_string(),
+                "my-scope".to_string(),
+                "openid-connect".to_string(),
+            ]),
+            confirms: std::sync::Mutex::new(vec![]),
+            selects: std::sync::Mutex::new(vec![]),
+            passwords: std::sync::Mutex::new(vec![]),
+        };
+
+        create_client_scope_interactive(workspace_dir, &mock_ui)
+            .await
+            .unwrap();
+
+        let file_path = workspace_dir
+            .join("master")
+            .join("client-scopes")
+            .join("my-scope.yaml");
+        assert!(file_path.exists());
+
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        let scope: ClientScopeRepresentation = serde_yaml::from_str(&content).unwrap();
+        assert_eq!(scope.name.as_deref(), Some("my-scope"));
+        assert_eq!(scope.protocol.as_deref(), Some("openid-connect"));
+    }
 
     #[tokio::test]
     async fn test_create_client_yaml() {
@@ -157,6 +218,33 @@ mod tests {
         let content = fs::read_to_string(&file_path).await.unwrap();
         let scope: ClientScopeRepresentation = serde_yaml::from_str(&content).unwrap();
         assert_eq!(scope.name.as_deref(), Some("my-scope"));
+        assert_eq!(scope.protocol.as_deref(), Some("openid-connect"));
+    }
+
+    #[tokio::test]
+    async fn test_create_client_scope_yaml_sanitization() {
+        let dir = tempdir().unwrap();
+        let workspace_dir = dir.path();
+
+        create_client_scope_yaml(
+            workspace_dir,
+            "master",
+            "../malicious/path",
+            "openid-connect",
+        )
+        .await
+        .unwrap();
+
+        let sanitized_name = sanitize("../malicious/path");
+        let file_path = workspace_dir
+            .join("master")
+            .join("client-scopes")
+            .join(format!("{}.yaml", sanitized_name));
+
+        assert!(file_path.exists());
+        let content = fs::read_to_string(&file_path).await.unwrap();
+        let scope: ClientScopeRepresentation = serde_yaml::from_str(&content).unwrap();
+        assert_eq!(scope.name.as_deref(), Some("../malicious/path"));
         assert_eq!(scope.protocol.as_deref(), Some("openid-connect"));
     }
 }
