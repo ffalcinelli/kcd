@@ -248,4 +248,28 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_apply_authentication_flows_empty_dir() -> Result<()> {
+        let (server_url, _) = start_mock_server().await?;
+        let mut client = KeycloakClient::new(server_url);
+        client.set_target_realm("test".to_string());
+        client.set_token("mock_token".to_string());
+
+        let temp = tempdir()?;
+        let resolver = Arc::new(EnvResolver::new(HashMap::new()));
+
+        let res = apply_authentication_flows(
+            &client,
+            temp.path(),
+            Arc::clone(&resolver) as Arc<dyn SecretResolver>,
+            Arc::new(None),
+            "test",
+        )
+        .await;
+
+        assert!(res.is_ok());
+
+        Ok(())
+    }
 }
