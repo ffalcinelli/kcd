@@ -107,6 +107,7 @@ impl KeycloakClient {
         self.get_resources().await
     }
 
+    /// Updates the target realm representation, passing the realm string by reference to avoid allocations.
     pub async fn update_realm(&self, realm_rep: &RealmRepresentation) -> Result<()> {
         self.update_resource(&self.target_realm, realm_rep).await
     }
