@@ -257,6 +257,7 @@ mod tests {
         client.set_token("mock_token".to_string());
 
         let temp = tempdir()?;
+        // Missing edge case for missing authentication-flows folder tested here by NOT creating the dir.
         let resolver = Arc::new(EnvResolver::new(HashMap::new()));
 
         let res = apply_authentication_flows(
