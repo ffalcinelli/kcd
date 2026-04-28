@@ -69,8 +69,8 @@ pub fn recursive_sort(value: &mut serde_json::Value) {
                     s_a.cmp(&s_b)
                 });
             } else if arr.iter().all(|v| v.is_object()) {
-                // Try to find a common sorting key: id, alias, or name
-                let keys = ["id", "alias", "name"];
+                // Try to find a common sorting key: id, clientId, username, alias, or name
+                let keys = ["id", "clientId", "username", "alias", "name"];
                 for key in keys {
                     if arr.iter().all(|v| v.get(key).is_some()) {
                         arr.sort_by(|a, b| {
@@ -374,5 +374,66 @@ mod tests {
             let mode = metadata.permissions().mode();
             assert_eq!(mode & 0o777, 0o600);
         }
+    }
+
+    #[test]
+    fn test_recursive_sort_keycloak_identifiers() {
+        // Test clientId sorting
+        let mut val_client = serde_json::json!([
+            { "clientId": "z", "name": "app1" },
+            { "clientId": "a", "name": "app2" }
+        ]);
+        recursive_sort(&mut val_client);
+        assert_eq!(
+            val_client,
+            serde_json::json!([
+                { "clientId": "a", "name": "app2" },
+                { "clientId": "z", "name": "app1" }
+            ])
+        );
+
+        // Test username sorting (with id omitted to ensure username is the sort key)
+        let mut val_user = serde_json::json!([
+            { "username": "user2" },
+            { "username": "user1" }
+        ]);
+        recursive_sort(&mut val_user);
+        assert_eq!(
+            val_user,
+            serde_json::json!([
+                { "username": "user1" },
+                { "username": "user2" }
+            ])
+        );
+
+        // Test nested recursive sorting
+        let mut val_nested = serde_json::json!({
+            "users": [
+                { "username": "user2" },
+                { "username": "user1" }
+            ],
+            "config": {
+                "clients": [
+                    { "clientId": "z" },
+                    { "clientId": "a" }
+                ]
+            }
+        });
+        recursive_sort(&mut val_nested);
+        assert_eq!(
+            val_nested,
+            serde_json::json!({
+                "users": [
+                    { "username": "user1" },
+                    { "username": "user2" }
+                ],
+                "config": {
+                    "clients": [
+                        { "clientId": "a" },
+                        { "clientId": "z" }
+                    ]
+                }
+            })
+        );
     }
 }
