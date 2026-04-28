@@ -58,7 +58,7 @@ pub async fn create_idp_yaml(
     let file_path = realm_dir.join(format!("{}.yaml", sanitize(alias)));
     let yaml = serde_yaml::to_string(&idp).context("Failed to serialize IDP to YAML")?;
 
-    fs::write(&file_path, yaml)
+    crate::utils::write_secure(&file_path, &yaml)
         .await
         .context("Failed to write IDP YAML file")?;
 

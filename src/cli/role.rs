@@ -64,7 +64,7 @@ pub async fn create_role_yaml(
     let file_path = roles_dir.join(format!("{}.yaml", sanitize(name)));
     let yaml = serde_yaml::to_string(&role).context("Failed to serialize role to YAML")?;
 
-    fs::write(&file_path, yaml)
+    crate::utils::write_secure(&file_path, &yaml)
         .await
         .context("Failed to write role YAML file")?;
 
