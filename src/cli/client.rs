@@ -49,7 +49,7 @@ pub async fn create_client_yaml(
     let file_path = realm_dir.join(format!("{}.yaml", sanitize(client_id)));
     let yaml = serde_yaml::to_string(&client).context("Failed to serialize client to YAML")?;
 
-    fs::write(&file_path, yaml)
+    crate::utils::write_secure(&file_path, &yaml)
         .await
         .context("Failed to write client YAML file")?;
 
@@ -93,7 +93,7 @@ pub async fn create_client_scope_yaml(
     let file_path = scopes_dir.join(format!("{}.yaml", sanitize(name)));
     let yaml = serde_yaml::to_string(&scope).context("Failed to serialize client scope to YAML")?;
 
-    fs::write(&file_path, yaml)
+    crate::utils::write_secure(&file_path, &yaml)
         .await
         .context("Failed to write client scope YAML file")?;
 

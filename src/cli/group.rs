@@ -36,7 +36,7 @@ pub async fn create_group_yaml(workspace_dir: &Path, realm: &str, name: &str) ->
     let file_path = realm_dir.join(format!("{}.yaml", sanitize(name)));
     let yaml = serde_yaml::to_string(&group).context("Failed to serialize group to YAML")?;
 
-    fs::write(&file_path, yaml)
+    crate::utils::write_secure(&file_path, &yaml)
         .await
         .context("Failed to write group YAML file")?;
 

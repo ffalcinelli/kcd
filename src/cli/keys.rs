@@ -96,7 +96,7 @@ pub async fn rotate_keys_yaml(workspace_dir: &Path, realm: &str) -> Result<usize
 
                     let yaml = serde_yaml::to_string(&new_component)
                         .context("Failed to serialize rotated key to YAML")?;
-                    fs::write(&new_file_path, yaml)
+                    crate::utils::write_secure(&new_file_path, &yaml)
                         .await
                         .context("Failed to write rotated key YAML file")?;
 
