@@ -9,6 +9,56 @@ pub mod roles;
 pub mod scopes;
 pub mod users;
 
+#[macro_export]
+macro_rules! handle_upsert {
+    (
+        client: $client:expr,
+        realm: $realm_name:expr,
+        rep: $rep:expr,
+        id_opt: $id_expr:expr,
+        id_field: $id_field:ident,
+        resource_name: $resource_name:expr,
+        update_call: |$update_id:ident, $update_rep:ident| $update_expr:expr,
+        create_call: |$create_rep:ident| $create_expr:expr
+    ) => {
+        if let Some(id) = $id_expr {
+            $rep.$id_field = Some(id.clone());
+            #[allow(unused_variables)]
+            let $update_id = id;
+            let $update_rep = &$rep;
+            $update_expr.await.with_context(|| {
+                format!(
+                    "Failed to update {} '{}' in realm '{}'",
+                    $resource_name,
+                    $rep.get_name(),
+                    $realm_name
+                )
+            })?;
+            println!(
+                "  {} {}",
+                $crate::utils::ui::SUCCESS_UPDATE,
+                console::style(format!("Updated {} {}", $resource_name, $rep.get_name())).cyan()
+            );
+        } else {
+            $rep.$id_field = None;
+            let $create_rep = &$rep;
+            $create_expr.await.with_context(|| {
+                format!(
+                    "Failed to create {} '{}' in realm '{}'",
+                    $resource_name,
+                    $rep.get_name(),
+                    $realm_name
+                )
+            })?;
+            println!(
+                "  {} {}",
+                $crate::utils::ui::SUCCESS_CREATE,
+                console::style(format!("Created {} {}", $resource_name, $rep.get_name())).green()
+            );
+        }
+    };
+}
+
 use crate::client::KeycloakClient;
 use crate::utils::secrets::SecretResolver;
 pub use crate::utils::ui::{ACTION, SUCCESS_CREATE, SUCCESS_UPDATE, WARN};

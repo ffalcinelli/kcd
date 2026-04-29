@@ -2,14 +2,11 @@ use crate::client::KeycloakClient;
 use crate::models::{ComponentRepresentation, KeycloakResource};
 use crate::utils::secrets::{SecretResolver, substitute_secrets};
 use anyhow::{Context, Result};
-use console::style;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
 use tokio::task::JoinSet;
-
-use super::{SUCCESS_CREATE, SUCCESS_UPDATE};
 
 pub type ComponentKey = (
     Option<String>,
@@ -76,42 +73,15 @@ pub async fn process_component_file(
         by_details.get(&key)
     };
 
-    if let Some(existing) = existing {
-        if let Some(id) = &existing.id {
-            component_rep.id = Some(id.clone());
-            client
-                .update_component(id, &component_rep)
-                .await
-                .with_context(|| {
-                    format!(
-                        "Failed to update component '{}' in realm '{}'",
-                        component_rep.get_name(),
-                        realm_name
-                    )
-                })?;
-            println!(
-                "  {} {}",
-                SUCCESS_UPDATE,
-                style(format!("Updated component {}", component_rep.get_name())).cyan()
-            );
-        }
-    } else {
-        component_rep.id = None;
-        client
-            .create_component(&component_rep)
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to create component '{}' in realm '{}'",
-                    component_rep.get_name(),
-                    realm_name
-                )
-            })?;
-        println!(
-            "  {} {}",
-            SUCCESS_CREATE,
-            style(format!("Created component {}", component_rep.get_name())).green()
-        );
+    crate::handle_upsert! {
+        client: client,
+        realm: realm_name,
+        rep: component_rep,
+        id_opt: existing.and_then(|e| e.id.as_ref()),
+        id_field: id,
+        resource_name: "component",
+        update_call: |id, rep| client.update_component(id, rep),
+        create_call: |rep| client.create_component(rep)
     }
     Ok(())
 }

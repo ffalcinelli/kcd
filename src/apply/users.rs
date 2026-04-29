@@ -2,14 +2,11 @@ use crate::client::KeycloakClient;
 use crate::models::{KeycloakResource, UserRepresentation};
 use crate::utils::secrets::{SecretResolver, substitute_secrets};
 use anyhow::{Context, Result};
-use console::style;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
 use tokio::task::JoinSet;
-
-use super::{SUCCESS_CREATE, SUCCESS_UPDATE};
 
 pub async fn apply_users(
     client: &KeycloakClient,
@@ -57,36 +54,15 @@ pub async fn apply_users(
                         .get_identity()
                         .context(format!("Failed to get identity for user in {:?}", path))?;
 
-                    if let Some(existing) = existing_users_map.get(&identity) {
-                        if let Some(id) = &existing.id {
-                            user_rep.id = Some(id.clone());
-                            client.update_user(id, &user_rep).await.with_context(|| {
-                                format!(
-                                    "Failed to update user '{}' in realm '{}'",
-                                    user_rep.get_name(),
-                                    realm_name
-                                )
-                            })?;
-                            println!(
-                                "  {} {}",
-                                SUCCESS_UPDATE,
-                                style(format!("Updated user {}", user_rep.get_name())).cyan()
-                            );
-                        }
-                    } else {
-                        user_rep.id = None;
-                        client.create_user(&user_rep).await.with_context(|| {
-                            format!(
-                                "Failed to create user '{}' in realm '{}'",
-                                user_rep.get_name(),
-                                realm_name
-                            )
-                        })?;
-                        println!(
-                            "  {} {}",
-                            SUCCESS_CREATE,
-                            style(format!("Created user {}", user_rep.get_name())).green()
-                        );
+                    crate::handle_upsert! {
+                        client: client,
+                        realm: realm_name,
+                        rep: user_rep,
+                        id_opt: existing_users_map.get(&identity).and_then(|e| e.id.as_ref()),
+                        id_field: id,
+                        resource_name: "user",
+                        update_call: |id, rep| client.update_user(id, rep),
+                        create_call: |rep| client.create_user(rep)
                     }
                     Ok::<(), anyhow::Error>(())
                 });

@@ -1,9 +1,7 @@
 use crate::client::KeycloakClient;
 use crate::models::{KeycloakResource, RoleRepresentation};
 use crate::utils::secrets::{SecretResolver, substitute_secrets};
-use crate::utils::ui::{SUCCESS_CREATE, SUCCESS_UPDATE};
 use anyhow::{Context, Result};
-use console::style;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -63,34 +61,15 @@ pub async fn apply_roles(
                         .get_identity()
                         .context(format!("Failed to get identity for role in {:?}", path))?;
 
-                    if let Some(id) = existing_roles_map.get(&identity) {
-                        role_rep.id = Some(id.clone()); // Use remote ID
-                        client.update_role(id, &role_rep).await.with_context(|| {
-                            format!(
-                                "Failed to update role '{}' in realm '{}'",
-                                role_rep.get_name(),
-                                realm_name
-                            )
-                        })?;
-                        println!(
-                            "  {} {}",
-                            SUCCESS_UPDATE,
-                            style(format!("Updated role {}", role_rep.get_name())).cyan()
-                        );
-                    } else {
-                        role_rep.id = None; // Don't send ID on create
-                        client.create_role(&role_rep).await.with_context(|| {
-                            format!(
-                                "Failed to create role '{}' in realm '{}'",
-                                role_rep.get_name(),
-                                realm_name
-                            )
-                        })?;
-                        println!(
-                            "  {} {}",
-                            SUCCESS_CREATE,
-                            style(format!("Created role {}", role_rep.get_name())).green()
-                        );
+                    crate::handle_upsert! {
+                        client: client,
+                        realm: realm_name,
+                        rep: role_rep,
+                        id_opt: existing_roles_map.get(&identity),
+                        id_field: id,
+                        resource_name: "role",
+                        update_call: |id, rep| client.update_role(id, rep),
+                        create_call: |rep| client.create_role(rep)
                     }
                     Ok::<(), anyhow::Error>(())
                 });
