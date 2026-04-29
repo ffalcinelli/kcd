@@ -1,9 +1,7 @@
 use crate::client::KeycloakClient;
 use crate::models::{ClientScopeRepresentation, KeycloakResource};
 use crate::utils::secrets::{SecretResolver, substitute_secrets};
-use crate::utils::ui::{SUCCESS_CREATE, SUCCESS_UPDATE};
 use anyhow::{Context, Result};
-use console::style;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -57,43 +55,15 @@ pub async fn apply_client_scopes(
                         path
                     ))?;
 
-                    if let Some(existing) = existing_scopes_map.get(&identity) {
-                        if let Some(id) = &existing.id {
-                            scope_rep.id = Some(id.clone());
-                            client
-                                .update_client_scope(id, &scope_rep)
-                                .await
-                                .with_context(|| {
-                                    format!(
-                                        "Failed to update client scope '{}' in realm '{}'",
-                                        scope_rep.get_name(),
-                                        realm_name
-                                    )
-                                })?;
-                            println!(
-                                "  {} {}",
-                                SUCCESS_UPDATE,
-                                style(format!("Updated client scope {}", scope_rep.get_name()))
-                                    .cyan()
-                            );
-                        }
-                    } else {
-                        scope_rep.id = None;
-                        client
-                            .create_client_scope(&scope_rep)
-                            .await
-                            .with_context(|| {
-                                format!(
-                                    "Failed to create client scope '{}' in realm '{}'",
-                                    scope_rep.get_name(),
-                                    realm_name
-                                )
-                            })?;
-                        println!(
-                            "  {} {}",
-                            SUCCESS_CREATE,
-                            style(format!("Created client scope {}", scope_rep.get_name())).green()
-                        );
+                    crate::handle_upsert! {
+                        client: client,
+                        realm: realm_name,
+                        rep: scope_rep,
+                        id_opt: existing_scopes_map.get(&identity).and_then(|e| e.id.as_ref()),
+                        id_field: id,
+                        resource_name: "client scope",
+                        update_call: |id, rep| client.update_client_scope(id, rep),
+                        create_call: |rep| client.create_client_scope(rep)
                     }
                     Ok::<(), anyhow::Error>(())
                 });

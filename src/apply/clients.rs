@@ -1,9 +1,7 @@
 use crate::client::KeycloakClient;
 use crate::models::{ClientRepresentation, KeycloakResource};
 use crate::utils::secrets::{SecretResolver, substitute_secrets};
-use crate::utils::ui::{SUCCESS_CREATE, SUCCESS_UPDATE};
 use anyhow::{Context, Result};
-use console::style;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -56,39 +54,15 @@ pub async fn apply_clients(
                         .get_identity()
                         .context(format!("Failed to get identity for client in {:?}", path))?;
 
-                    if let Some(existing) = existing_clients_map.get(&identity) {
-                        if let Some(id) = &existing.id {
-                            client_rep.id = Some(id.clone()); // Use remote ID
-                            client
-                                .update_client(id, &client_rep)
-                                .await
-                                .with_context(|| {
-                                    format!(
-                                        "Failed to update client '{}' in realm '{}'",
-                                        client_rep.get_name(),
-                                        realm_name
-                                    )
-                                })?;
-                            println!(
-                                "  {} {}",
-                                SUCCESS_UPDATE,
-                                style(format!("Updated client {}", client_rep.get_name())).cyan()
-                            );
-                        }
-                    } else {
-                        client_rep.id = None; // Don't send ID on create
-                        client.create_client(&client_rep).await.with_context(|| {
-                            format!(
-                                "Failed to create client '{}' in realm '{}'",
-                                client_rep.get_name(),
-                                realm_name
-                            )
-                        })?;
-                        println!(
-                            "  {} {}",
-                            SUCCESS_CREATE,
-                            style(format!("Created client {}", client_rep.get_name())).green()
-                        );
+                    crate::handle_upsert! {
+                        client: client,
+                        realm: realm_name,
+                        rep: client_rep,
+                        id_opt: existing_clients_map.get(&identity).and_then(|e| e.id.as_ref()),
+                        id_field: id,
+                        resource_name: "client",
+                        update_call: |id, rep| client.update_client(id, rep),
+                        create_call: |rep| client.create_client(rep)
                     }
                     Ok::<(), anyhow::Error>(())
                 });

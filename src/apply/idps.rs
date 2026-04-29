@@ -1,9 +1,7 @@
 use crate::client::KeycloakClient;
 use crate::models::{IdentityProviderRepresentation, KeycloakResource};
 use crate::utils::secrets::{SecretResolver, substitute_secrets};
-use crate::utils::ui::{SUCCESS_CREATE, SUCCESS_UPDATE};
 use anyhow::{Context, Result};
-use console::style;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -58,44 +56,15 @@ pub async fn apply_identity_providers(
                         .get_identity()
                         .context(format!("Failed to get identity for IDP in {:?}", path))?;
 
-                    if let Some(existing) = existing_idps_map.get(&identity) {
-                        if let Some(internal_id) = &existing.internal_id {
-                            idp_rep.internal_id = Some(internal_id.clone());
-                            client
-                                .update_identity_provider(&identity, &idp_rep)
-                                .await
-                                .with_context(|| {
-                                    format!(
-                                        "Failed to update identity provider '{}' in realm '{}'",
-                                        idp_rep.get_name(),
-                                        realm_name
-                                    )
-                                })?;
-                            println!(
-                                "  {} {}",
-                                SUCCESS_UPDATE,
-                                style(format!("Updated identity provider {}", idp_rep.get_name()))
-                                    .cyan()
-                            );
-                        }
-                    } else {
-                        idp_rep.internal_id = None;
-                        client
-                            .create_identity_provider(&idp_rep)
-                            .await
-                            .with_context(|| {
-                                format!(
-                                    "Failed to create identity provider '{}' in realm '{}'",
-                                    idp_rep.get_name(),
-                                    realm_name
-                                )
-                            })?;
-                        println!(
-                            "  {} {}",
-                            SUCCESS_CREATE,
-                            style(format!("Created identity provider {}", idp_rep.get_name()))
-                                .green()
-                        );
+                    crate::handle_upsert! {
+                        client: client,
+                        realm: realm_name,
+                        rep: idp_rep,
+                        id_opt: existing_idps_map.get(&identity).and_then(|e| e.internal_id.as_ref()),
+                        id_field: internal_id,
+                        resource_name: "identity provider",
+                        update_call: |id, rep| client.update_identity_provider(&identity, rep),
+                        create_call: |rep| client.create_identity_provider(rep)
                     }
                     Ok::<(), anyhow::Error>(())
                 });

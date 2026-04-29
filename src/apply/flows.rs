@@ -2,14 +2,11 @@ use crate::client::KeycloakClient;
 use crate::models::{AuthenticationFlowRepresentation, KeycloakResource};
 use crate::utils::secrets::{SecretResolver, substitute_secrets};
 use anyhow::{Context, Result};
-use console::style;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
 use tokio::task::JoinSet;
-
-use super::{SUCCESS_CREATE, SUCCESS_UPDATE};
 
 pub async fn apply_authentication_flows(
     client: &KeycloakClient,
@@ -60,50 +57,15 @@ pub async fn apply_authentication_flows(
                         .get_identity()
                         .context(format!("Failed to get identity for flow in {:?}", path))?;
 
-                    if let Some(existing) = existing_flows_map.get(&identity) {
-                        if let Some(id) = &existing.id {
-                            flow_rep.id = Some(id.clone());
-                            client
-                                .update_authentication_flow(id, &flow_rep)
-                                .await
-                                .with_context(|| {
-                                    format!(
-                                        "Failed to update authentication flow '{}' in realm '{}'",
-                                        flow_rep.get_name(),
-                                        realm_name
-                                    )
-                                })?;
-                            println!(
-                                "  {} {}",
-                                SUCCESS_UPDATE,
-                                style(format!(
-                                    "Updated authentication flow {}",
-                                    flow_rep.get_name()
-                                ))
-                                .cyan()
-                            );
-                        }
-                    } else {
-                        flow_rep.id = None;
-                        client
-                            .create_authentication_flow(&flow_rep)
-                            .await
-                            .with_context(|| {
-                                format!(
-                                    "Failed to create authentication flow '{}' in realm '{}'",
-                                    flow_rep.get_name(),
-                                    realm_name
-                                )
-                            })?;
-                        println!(
-                            "  {} {}",
-                            SUCCESS_CREATE,
-                            style(format!(
-                                "Created authentication flow {}",
-                                flow_rep.get_name()
-                            ))
-                            .green()
-                        );
+                    crate::handle_upsert! {
+                        client: client,
+                        realm: realm_name,
+                        rep: flow_rep,
+                        id_opt: existing_flows_map.get(&identity).and_then(|e| e.id.as_ref()),
+                        id_field: id,
+                        resource_name: "authentication flow",
+                        update_call: |id, rep| client.update_authentication_flow(id, rep),
+                        create_call: |rep| client.create_authentication_flow(rep)
                     }
                     Ok::<(), anyhow::Error>(())
                 });

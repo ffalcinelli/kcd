@@ -51,7 +51,8 @@ pub async fn apply_required_actions(
                     let mut val: serde_json::Value = serde_yaml::from_str(&content)
                         .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
                     substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
-                    let action_rep: RequiredActionProviderRepresentation =
+                    #[allow(unused_mut)]
+                    let mut action_rep: RequiredActionProviderRepresentation =
                         serde_json::from_value(val)?;
 
                     let identity = action_rep.get_identity().context(format!(
