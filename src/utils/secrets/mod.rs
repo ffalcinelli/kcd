@@ -336,11 +336,31 @@ mod tests {
 
     #[test]
     fn test_is_secret_key() {
+        // Whitelist hits
         assert!(is_secret_key("secret", ""));
         assert!(is_secret_key("password", ""));
+        assert!(is_secret_key("myToken", ""));
+        assert!(is_secret_key("user_credential", ""));
+
+        // Blacklist hits (override whitelist)
         assert!(!is_secret_key("passwordPolicy", ""));
+        assert!(!is_secret_key("isPasswordless", ""));
+        assert!(!is_secret_key("creationDate", ""));
+        assert!(!is_secret_key("deliveryMethod", ""));
+        assert!(!is_secret_key("resetCredentials", ""));
+
+        // "value" special case
         assert!(is_secret_key("value", "credential"));
+        assert!(is_secret_key("value", "my_secret_key"));
+        assert!(is_secret_key("value", "password_field"));
+        assert!(is_secret_key("value", "some_token"));
         assert!(!is_secret_key("value", "other"));
+        assert!(!is_secret_key("value", ""));
+
+        // General non-secret
+        assert!(!is_secret_key("username", ""));
+        assert!(!is_secret_key("clientId", ""));
+        assert!(!is_secret_key("email", ""));
     }
 
     #[test]
