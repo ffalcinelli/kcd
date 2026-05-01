@@ -471,6 +471,55 @@ async fn test_validate_empty_username() {
 }
 
 #[tokio::test]
+async fn test_validate_missing_username() {
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+    let realm_dir = workspace_dir.join("test-realm");
+    std::fs::create_dir_all(&realm_dir).unwrap();
+
+    let realm = RealmRepresentation {
+        realm: "test-realm".to_string(),
+        enabled: Some(true),
+        display_name: None,
+        extra: std::collections::HashMap::new(),
+    };
+    fs::write(
+        realm_dir.join("realm.yaml"),
+        serde_yaml::to_string(&realm).unwrap(),
+    )
+    .unwrap();
+
+    let users_dir = realm_dir.join("users");
+    fs::create_dir(&users_dir).unwrap();
+
+    let user = UserRepresentation {
+        id: None,
+        username: None,
+        enabled: None,
+        first_name: None,
+        last_name: None,
+        email: None,
+        email_verified: None,
+        credentials: None,
+        extra: std::collections::HashMap::new(),
+    };
+    fs::write(
+        users_dir.join("user.yaml"),
+        serde_yaml::to_string(&user).unwrap(),
+    )
+    .unwrap();
+
+    let result = validate::run(workspace_dir.clone(), &["test-realm".to_string()]).await;
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("User username is missing or empty")
+    );
+}
+
+#[tokio::test]
 async fn test_validate_empty_auth_flow_alias() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
