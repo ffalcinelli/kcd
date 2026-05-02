@@ -455,6 +455,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_get_token() {
+        let mut client = KeycloakClient::new("http://127.0.0.1:1".to_string());
+
+        // Initially, there's no token
+        let result = client.get_token();
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "Not authenticated");
+
+        // Set token
+        client.set_token("mock_token".to_string());
+
+        // After setting token, we can get it
+        let result = client.get_token();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "mock_token");
+    }
+
+    #[test]
     fn test_redact_url() {
         assert_eq!(
             redact_url("http://localhost:8080"),
