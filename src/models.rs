@@ -24,6 +24,24 @@ pub trait ResourceMeta {
     fn secret_prefix() -> &'static str;
 }
 
+fn obfuscate_config<T>(
+    config: &Option<HashMap<String, T>>,
+    prefix: &str,
+) -> Option<HashMap<String, T>>
+where
+    T: From<&'static str> + Clone,
+{
+    let mut obfuscated_config = config.clone();
+    if let Some(cfg) = &mut obfuscated_config {
+        for (key, val) in cfg.iter_mut() {
+            if crate::utils::secrets::is_secret_key(key, prefix) {
+                *val = T::from("********");
+            }
+        }
+    }
+    obfuscated_config
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RealmRepresentation {
     pub realm: String,
@@ -101,14 +119,7 @@ pub struct IdentityProviderRepresentation {
 
 impl std::fmt::Debug for IdentityProviderRepresentation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut obfuscated_config = self.config.clone();
-        if let Some(config) = &mut obfuscated_config {
-            for (key, val) in config.iter_mut() {
-                if crate::utils::secrets::is_secret_key(key, "idp") {
-                    *val = "********".to_string();
-                }
-            }
-        }
+        let obfuscated_config = obfuscate_config(&self.config, "idp");
 
         f.debug_struct("IdentityProviderRepresentation")
             .field("internal_id", &self.internal_id)
@@ -616,14 +627,7 @@ pub struct ComponentRepresentation {
 
 impl std::fmt::Debug for ComponentRepresentation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut obfuscated_config = self.config.clone();
-        if let Some(config) = &mut obfuscated_config {
-            for (key, val) in config.iter_mut() {
-                if crate::utils::secrets::is_secret_key(key, "component") {
-                    *val = serde_json::json!("********");
-                }
-            }
-        }
+        let obfuscated_config = obfuscate_config(&self.config, "component");
 
         f.debug_struct("ComponentRepresentation")
             .field("id", &self.id)
