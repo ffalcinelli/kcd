@@ -439,7 +439,13 @@ fn redact_url(url_str: &str) -> String {
             }
             url.to_string()
         }
-        Err(_) => url_str.to_string(),
+        Err(_) => {
+            if let Some(pos) = url_str.rfind('@') {
+                format!("<redacted>@{}", &url_str[pos + 1..])
+            } else {
+                url_str.to_string()
+            }
+        }
     }
 }
 
@@ -487,6 +493,10 @@ mod tests {
             "http://localhost:8080/path"
         );
         assert_eq!(redact_url("invalid-url"), "invalid-url");
+        assert_eq!(
+            redact_url("https://user:password@example.com:99999"),
+            "<redacted>@example.com:99999"
+        );
     }
 
     #[tokio::test]
