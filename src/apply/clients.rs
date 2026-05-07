@@ -77,80 +77,15 @@ pub async fn apply_clients(
 
 #[cfg(test)]
 mod tests {
+    use crate::apply::test_utils::start_mock_server;
+
     use super::*;
     use crate::client::KeycloakClient;
     use crate::utils::secrets::EnvResolver;
-    use axum::{
-        Json, Router,
-        http::StatusCode,
-        routing::{get, put},
-    };
+
     use std::fs;
     use std::sync::Arc;
     use tempfile::tempdir;
-    use tokio::net::TcpListener;
-
-    async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::AtomicUsize>)> {
-        let call_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let count_clone = Arc::clone(&call_count);
-
-        let app = Router::new()
-            .route(
-                "/admin/realms/test/clients",
-                get(|| async {
-                    Json(vec![ClientRepresentation {
-                        id: Some("existing-id".to_string()),
-                        client_id: Some("existing-client".to_string()),
-                        name: Some("Existing Client".to_string()),
-                        description: None,
-                        enabled: Some(true),
-                        protocol: None,
-                        redirect_uris: None,
-                        web_origins: None,
-                        public_client: None,
-                        bearer_only: None,
-                        service_accounts_enabled: None,
-                        extra: Default::default(),
-                    }])
-                })
-                .post({
-                    let count = Arc::clone(&count_clone);
-                    move || {
-                        let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                        async move {
-                            if c == 0 {
-                                StatusCode::INTERNAL_SERVER_ERROR
-                            } else {
-                                StatusCode::CREATED
-                            }
-                        }
-                    }
-                }),
-            )
-            .route(
-                "/admin/realms/test/clients/existing-id",
-                put({
-                    let count = Arc::clone(&count_clone);
-                    move || {
-                        let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                        async move {
-                            if c == 0 {
-                                StatusCode::INTERNAL_SERVER_ERROR
-                            } else {
-                                StatusCode::OK
-                            }
-                        }
-                    }
-                }),
-            );
-
-        let listener = TcpListener::bind("127.0.0.1:0").await?;
-        let addr = listener.local_addr()?;
-        tokio::spawn(async move {
-            let _ = axum::serve(listener, app).await;
-        });
-        Ok((format!("http://{}", addr), call_count))
-    }
 
     #[tokio::test]
     async fn test_apply_clients_error_paths() -> Result<()> {

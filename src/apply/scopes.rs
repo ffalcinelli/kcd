@@ -78,77 +78,15 @@ pub async fn apply_client_scopes(
 
 #[cfg(test)]
 mod tests {
+    use crate::apply::test_utils::start_mock_server;
+
     use super::*;
     use crate::client::KeycloakClient;
     use crate::utils::secrets::EnvResolver;
-    use axum::{
-        Json, Router,
-        http::StatusCode,
-        routing::{get, post, put},
-    };
+
     use std::fs;
     use std::sync::Arc;
     use tempfile::tempdir;
-    use tokio::net::TcpListener;
-
-    async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::AtomicUsize>)> {
-        let call_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let count_clone = Arc::clone(&call_count);
-
-        let app = Router::new()
-            .route(
-                "/admin/realms/test/client-scopes",
-                get(|| async {
-                    Json(vec![ClientScopeRepresentation {
-                        id: Some("existing-id".to_string()),
-                        name: Some("existing-scope".to_string()),
-                        description: None,
-                        protocol: None,
-                        attributes: None,
-                        extra: Default::default(),
-                    }])
-                }),
-            )
-            .route(
-                "/admin/realms/test/client-scopes/existing-id",
-                put({
-                    let count = Arc::clone(&count_clone);
-                    move || {
-                        let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                        async move {
-                            if c == 0 {
-                                StatusCode::INTERNAL_SERVER_ERROR
-                            } else {
-                                StatusCode::OK
-                            }
-                        }
-                    }
-                }),
-            )
-            .route(
-                "/admin/realms/test/client-scopes",
-                post({
-                    let count = Arc::clone(&count_clone);
-                    move || {
-                        let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                        async move {
-                            if c == 0 {
-                                StatusCode::INTERNAL_SERVER_ERROR
-                            } else {
-                                StatusCode::CREATED
-                            }
-                        }
-                    }
-                }),
-            );
-
-        let listener = TcpListener::bind("127.0.0.1:0").await?;
-        let addr = listener.local_addr()?;
-        tokio::spawn(async move {
-            let _ = axum::serve(listener, app).await;
-        });
-        Ok((format!("http://{}", addr), call_count))
-    }
 
     #[tokio::test]
     async fn test_apply_client_scopes_error_paths() -> Result<()> {
