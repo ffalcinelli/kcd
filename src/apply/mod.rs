@@ -9,6 +9,9 @@ pub mod roles;
 pub mod scopes;
 pub mod users;
 
+#[cfg(test)]
+pub mod test_utils;
+
 #[macro_export]
 macro_rules! handle_upsert {
     (
