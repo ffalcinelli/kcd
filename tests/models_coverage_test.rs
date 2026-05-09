@@ -14,8 +14,8 @@ fn test_models_resource_trait() {
     assert!(!realm.has_id());
     realm.clear_metadata();
     assert_eq!(realm.realm, "test");
-    assert_eq!(RealmRepresentation::dir_name(), "realms");
-    assert_eq!(RealmRepresentation::api_path(), "realms");
+    assert_eq!(RealmRepresentation::DIR_NAME, "realms");
+    assert_eq!(RealmRepresentation::API_PATH, "realms");
 
     let mut idp = IdentityProviderRepresentation {
         internal_id: Some("id1".to_string()),
@@ -40,14 +40,11 @@ fn test_models_resource_trait() {
     idp.clear_metadata();
     assert!(idp.internal_id.is_none());
     assert_eq!(
-        IdentityProviderRepresentation::dir_name(),
+        IdentityProviderRepresentation::DIR_NAME,
         "identity-providers"
     );
-    assert_eq!(
-        IdentityProviderRepresentation::label(),
-        "identity providers"
-    );
-    assert_eq!(IdentityProviderRepresentation::secret_prefix(), "idp");
+    assert_eq!(IdentityProviderRepresentation::LABEL, "identity providers");
+    assert_eq!(IdentityProviderRepresentation::SECRET_PREFIX, "idp");
 
     let mut client = ClientRepresentation {
         id: Some("id2".to_string()),
@@ -68,9 +65,9 @@ fn test_models_resource_trait() {
     assert!(client.has_id());
     client.clear_metadata();
     assert!(client.id.is_none());
-    assert_eq!(ClientRepresentation::dir_name(), "clients");
-    assert_eq!(ClientRepresentation::label(), "clients");
-    assert_eq!(ClientRepresentation::secret_prefix(), "client");
+    assert_eq!(ClientRepresentation::DIR_NAME, "clients");
+    assert_eq!(ClientRepresentation::LABEL, "clients");
+    assert_eq!(ClientRepresentation::SECRET_PREFIX, "client");
 
     let mut role = RoleRepresentation {
         id: Some("id3".to_string()),
@@ -87,9 +84,9 @@ fn test_models_resource_trait() {
     role.clear_metadata();
     assert!(role.id.is_none());
     assert!(role.container_id.is_none());
-    assert_eq!(RoleRepresentation::dir_name(), "roles");
-    assert_eq!(RoleRepresentation::label(), "roles");
-    assert_eq!(RoleRepresentation::secret_prefix(), "role");
+    assert_eq!(RoleRepresentation::DIR_NAME, "roles");
+    assert_eq!(RoleRepresentation::LABEL, "roles");
+    assert_eq!(RoleRepresentation::SECRET_PREFIX, "role");
 
     let mut group = GroupRepresentation {
         id: Some("id4".to_string()),
@@ -103,9 +100,9 @@ fn test_models_resource_trait() {
     assert!(group.has_id());
     group.clear_metadata();
     assert!(group.id.is_none());
-    assert_eq!(GroupRepresentation::dir_name(), "groups");
-    assert_eq!(GroupRepresentation::label(), "groups");
-    assert_eq!(GroupRepresentation::secret_prefix(), "group");
+    assert_eq!(GroupRepresentation::DIR_NAME, "groups");
+    assert_eq!(GroupRepresentation::LABEL, "groups");
+    assert_eq!(GroupRepresentation::SECRET_PREFIX, "group");
 
     let mut user = UserRepresentation {
         id: Some("id5".to_string()),
@@ -123,9 +120,9 @@ fn test_models_resource_trait() {
     assert!(user.has_id());
     user.clear_metadata();
     assert!(user.id.is_none());
-    assert_eq!(UserRepresentation::dir_name(), "users");
-    assert_eq!(UserRepresentation::label(), "users");
-    assert_eq!(UserRepresentation::secret_prefix(), "user");
+    assert_eq!(UserRepresentation::DIR_NAME, "users");
+    assert_eq!(UserRepresentation::LABEL, "users");
+    assert_eq!(UserRepresentation::SECRET_PREFIX, "user");
 
     let mut scope = ClientScopeRepresentation {
         id: Some("id6".to_string()),
@@ -140,9 +137,9 @@ fn test_models_resource_trait() {
     assert!(scope.has_id());
     scope.clear_metadata();
     assert!(scope.id.is_none());
-    assert_eq!(ClientScopeRepresentation::dir_name(), "client-scopes");
-    assert_eq!(ClientScopeRepresentation::label(), "client scopes");
-    assert_eq!(ClientScopeRepresentation::secret_prefix(), "client_scope");
+    assert_eq!(ClientScopeRepresentation::DIR_NAME, "client-scopes");
+    assert_eq!(ClientScopeRepresentation::LABEL, "client scopes");
+    assert_eq!(ClientScopeRepresentation::SECRET_PREFIX, "client_scope");
 
     let mut flow = AuthenticationFlowRepresentation {
         id: Some("id7".to_string()),
@@ -160,14 +157,14 @@ fn test_models_resource_trait() {
     flow.clear_metadata();
     assert!(flow.id.is_none());
     assert_eq!(
-        AuthenticationFlowRepresentation::dir_name(),
+        AuthenticationFlowRepresentation::DIR_NAME,
         "authentication-flows"
     );
     assert_eq!(
-        AuthenticationFlowRepresentation::label(),
+        AuthenticationFlowRepresentation::LABEL,
         "authentication flows"
     );
-    assert_eq!(AuthenticationFlowRepresentation::secret_prefix(), "flow");
+    assert_eq!(AuthenticationFlowRepresentation::SECRET_PREFIX, "flow");
 
     let mut action = RequiredActionProviderRepresentation {
         alias: Some("aalias".to_string()),
@@ -185,15 +182,15 @@ fn test_models_resource_trait() {
     action.clear_metadata();
     assert!(action.alias.is_some());
     assert_eq!(
-        RequiredActionProviderRepresentation::dir_name(),
+        RequiredActionProviderRepresentation::DIR_NAME,
         "required-actions"
     );
     assert_eq!(
-        RequiredActionProviderRepresentation::label(),
+        RequiredActionProviderRepresentation::LABEL,
         "required actions"
     );
     assert_eq!(
-        RequiredActionProviderRepresentation::secret_prefix(),
+        RequiredActionProviderRepresentation::SECRET_PREFIX,
         "action"
     );
 
@@ -212,7 +209,7 @@ fn test_models_resource_trait() {
     assert!(comp.has_id());
     comp.clear_metadata();
     assert!(comp.id.is_none());
-    assert_eq!(ComponentRepresentation::dir_name(), "components");
-    assert_eq!(ComponentRepresentation::label(), "components");
-    assert_eq!(ComponentRepresentation::secret_prefix(), "component");
+    assert_eq!(ComponentRepresentation::DIR_NAME, "components");
+    assert_eq!(ComponentRepresentation::LABEL, "components");
+    assert_eq!(ComponentRepresentation::SECRET_PREFIX, "component");
 }

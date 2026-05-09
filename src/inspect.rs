@@ -205,15 +205,15 @@ where
     let resources = client
         .get_resources::<T>()
         .await
-        .with_context(|| format!("Failed to fetch {} for realm '{}'", T::label(), realm_name))?;
+        .with_context(|| format!("Failed to fetch {} for realm '{}'", T::LABEL, realm_name))?;
 
     if !fs::try_exists(&*target_dir)
         .await
-        .context(format!("Failed to check {} directory", T::label()))?
+        .context(format!("Failed to check {} directory", T::LABEL))?
     {
         fs::create_dir_all(&*target_dir)
             .await
-            .context(format!("Failed to create {} directory", T::label()))?;
+            .context(format!("Failed to create {} directory", T::LABEL))?;
     }
 
     let mut set = tokio::task::JoinSet::new();
@@ -226,9 +226,9 @@ where
             let filename = format!("{}.yaml", sanitize(res.get_filename()));
             let path = target_dir.join(filename);
             let mut local_secrets = HashMap::new();
-            let prefix = format!("realm_{}_{}", realm_name, T::secret_prefix());
+            let prefix = format!("realm_{}_{}", realm_name, T::SECRET_PREFIX);
             let yaml = to_sorted_yaml_with_secrets(&res, &prefix, &mut local_secrets).context(
-                format!("Failed to serialize {} {}", T::label(), res.get_name()),
+                format!("Failed to serialize {} {}", T::LABEL, res.get_name()),
             )?;
             all_secrets.lock().await.extend(local_secrets);
             write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex, true).await
@@ -244,7 +244,7 @@ where
             SUCCESS,
             style(format!(
                 "Exported {} to {}/",
-                T::label(),
+                T::LABEL,
                 target_dir
                     .file_name()
                     .and_then(|n| n.to_str())
@@ -422,7 +422,7 @@ fn spawn_inspect<T>(
 {
     let client = client.clone();
     let realm_name = realm_name.to_string();
-    let target_dir = Arc::new(workspace_dir.join(T::dir_name()));
+    let target_dir = Arc::new(workspace_dir.join(T::DIR_NAME));
     let all_secrets = Arc::clone(all_secrets);
     let prompt_mutex = Arc::clone(prompt_mutex);
 

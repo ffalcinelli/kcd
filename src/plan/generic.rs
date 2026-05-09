@@ -23,19 +23,16 @@ where
         + Clone
         + 'static,
 {
-    let dir_name = T::dir_name();
+    let dir_name = T::DIR_NAME;
     let resources_dir = ctx.workspace_dir.join(dir_name);
     if !async_fs::try_exists(&resources_dir).await? {
         return Ok(());
     }
 
-    let existing_resources = ctx.client.get_resources::<T>().await.with_context(|| {
-        format!(
-            "Failed to get {} for realm '{}'",
-            T::label(),
-            ctx.realm_name
-        )
-    })?;
+    let existing_resources =
+        ctx.client.get_resources::<T>().await.with_context(|| {
+            format!("Failed to get {} for realm '{}'", T::LABEL, ctx.realm_name)
+        })?;
 
     let existing_map: HashMap<String, T> = existing_resources
         .into_iter()
@@ -73,7 +70,7 @@ where
                 let identity = local.get_identity().with_context(|| {
                     format!(
                         "Failed to get identity for {} in {:?} in realm '{}'",
-                        T::label(),
+                        T::LABEL,
                         path,
                         realm_name
                     )
@@ -95,20 +92,20 @@ where
                 remote_clone.clear_metadata();
             }
             print_diff(
-                &format!("{} {}", T::label(), local.get_name()),
+                &format!("{} {}", T::LABEL, local.get_name()),
                 Some(&remote_clone),
                 &local,
                 ctx.options.changes_only,
-                T::secret_prefix(),
+                T::SECRET_PREFIX,
             )?
         } else {
-            println!("\n{} Will create {}", SPARKLE, T::label());
+            println!("\n{} Will create {}", SPARKLE, T::LABEL);
             print_diff(
-                &format!("{} {}", T::label(), local.get_name()),
+                &format!("{} {}", T::LABEL, local.get_name()),
                 None::<&T>,
                 &local,
                 ctx.options.changes_only,
-                T::secret_prefix(),
+                T::SECRET_PREFIX,
             )?
         };
 

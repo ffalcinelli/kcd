@@ -43,15 +43,15 @@ impl KeycloakClient {
     }
 
     fn resource_url<T: KeycloakResource>(&self) -> String {
-        if T::api_path() == "realms" {
+        if T::API_PATH == "realms" {
             format!("{}/admin/realms", self.base_url)
         } else {
-            format!("{}/{}", self.realm_admin_url(), T::api_path())
+            format!("{}/{}", self.realm_admin_url(), T::API_PATH)
         }
     }
 
     fn object_url<T: KeycloakResource>(&self, id: &str) -> String {
-        if T::api_path() == "realms" {
+        if T::API_PATH == "realms" {
             format!("{}/admin/realms/{}", self.base_url, id)
         } else {
             format!("{}/{}", self.realm_admin_url(), T::object_path(id))

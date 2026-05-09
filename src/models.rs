@@ -3,12 +3,12 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 pub trait KeycloakResource {
+    const API_PATH: &'static str;
+    const DIR_NAME: &'static str = Self::API_PATH;
     fn get_identity(&self) -> Option<String>;
     fn get_name(&self) -> String;
-    fn api_path() -> &'static str;
-    fn dir_name() -> &'static str;
     fn object_path(id: &str) -> String {
-        format!("{}/{}", Self::api_path(), id)
+        format!("{}/{}", Self::API_PATH, id)
     }
     fn get_filename(&self) -> String {
         self.get_name()
@@ -20,8 +20,44 @@ pub trait KeycloakResource {
 }
 
 pub trait ResourceMeta {
-    fn label() -> &'static str;
-    fn secret_prefix() -> &'static str;
+    const LABEL: &'static str;
+    const SECRET_PREFIX: &'static str;
+}
+
+macro_rules! impl_keycloak_resource {
+    (
+        $type:ty,
+        api_path = $api_path:expr,
+        $(dir_name = $dir_name:expr,)?
+        identity = |$id_self:ident| $id_expr:expr,
+        name = |$name_self:ident| $name_expr:expr
+        $(, has_id = |$has_id_self:ident| $has_id_expr:expr)?
+        $(, clear_metadata = |$clear_self:ident| $clear_expr:block)?
+        $(, get_filename = |$filename_self:ident| $filename_expr:expr)?
+        $(, object_path = |$obj_id:ident| $obj_path_expr:expr)?
+    ) => {
+        impl KeycloakResource for $type {
+            const API_PATH: &'static str = $api_path;
+            $(const DIR_NAME: &'static str = $dir_name;)?
+
+            fn get_identity(&$id_self) -> Option<String> { $id_expr }
+            fn get_name(&$name_self) -> String { $name_expr }
+
+            $(fn has_id(&$has_id_self) -> bool { $has_id_expr })?
+            $(fn clear_metadata(&mut $clear_self) $clear_expr)?
+            $(fn get_filename(&$filename_self) -> String { $filename_expr })?
+            $(fn object_path($obj_id: &str) -> String { $obj_path_expr })?
+        }
+    };
+}
+
+macro_rules! impl_resource_meta {
+    ($type:ty, label = $label:expr, secret_prefix = $secret_prefix:expr) => {
+        impl ResourceMeta for $type {
+            const LABEL: &'static str = $label;
+            const SECRET_PREFIX: &'static str = $secret_prefix;
+        }
+    };
 }
 
 fn obfuscate_config<T>(
@@ -53,20 +89,12 @@ pub struct RealmRepresentation {
     pub extra: HashMap<String, Value>,
 }
 
-impl KeycloakResource for RealmRepresentation {
-    fn get_identity(&self) -> Option<String> {
-        Some(self.realm.clone())
-    }
-    fn get_name(&self) -> String {
-        self.realm.clone()
-    }
-    fn api_path() -> &'static str {
-        "realms"
-    }
-    fn dir_name() -> &'static str {
-        "realms"
-    }
-}
+impl_keycloak_resource!(
+    RealmRepresentation,
+    api_path = "realms",
+    identity = |self| Some(self.realm.clone()),
+    name = |self| self.realm.clone()
+);
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct IdentityProviderRepresentation {
@@ -153,35 +181,23 @@ impl std::fmt::Debug for IdentityProviderRepresentation {
     }
 }
 
-impl KeycloakResource for IdentityProviderRepresentation {
-    fn get_identity(&self) -> Option<String> {
-        self.alias.clone().or_else(|| self.internal_id.clone())
-    }
-    fn get_name(&self) -> String {
-        self.alias.clone().unwrap_or_else(|| "unknown".to_string())
-    }
-    fn api_path() -> &'static str {
-        "identity-provider/instances"
-    }
-    fn dir_name() -> &'static str {
-        "identity-providers"
-    }
-    fn has_id(&self) -> bool {
-        self.internal_id.is_some()
-    }
-    fn clear_metadata(&mut self) {
+impl_keycloak_resource!(
+    IdentityProviderRepresentation,
+    api_path = "identity-provider/instances",
+    dir_name = "identity-providers",
+    identity = |self| self.alias.clone().or_else(|| self.internal_id.clone()),
+    name = |self| self.alias.clone().unwrap_or_else(|| "unknown".to_string()),
+    has_id = |self| self.internal_id.is_some(),
+    clear_metadata = |self| {
         self.internal_id = None;
     }
-}
+);
 
-impl ResourceMeta for IdentityProviderRepresentation {
-    fn label() -> &'static str {
-        "identity providers"
-    }
-    fn secret_prefix() -> &'static str {
-        "idp"
-    }
-}
+impl_resource_meta!(
+    IdentityProviderRepresentation,
+    label = "identity providers",
+    secret_prefix = "idp"
+);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClientRepresentation {
@@ -214,38 +230,26 @@ pub struct ClientRepresentation {
     pub extra: HashMap<String, Value>,
 }
 
-impl KeycloakResource for ClientRepresentation {
-    fn get_identity(&self) -> Option<String> {
-        self.client_id.clone().or_else(|| self.id.clone())
-    }
-    fn get_name(&self) -> String {
-        self.client_id
-            .clone()
-            .or_else(|| self.name.clone())
-            .unwrap_or_else(|| "unknown".to_string())
-    }
-    fn api_path() -> &'static str {
-        "clients"
-    }
-    fn dir_name() -> &'static str {
-        "clients"
-    }
-    fn has_id(&self) -> bool {
-        self.id.is_some()
-    }
-    fn clear_metadata(&mut self) {
+impl_keycloak_resource!(
+    ClientRepresentation,
+    api_path = "clients",
+    identity = |self| self.client_id.clone().or_else(|| self.id.clone()),
+    name = |self| self
+        .client_id
+        .clone()
+        .or_else(|| self.name.clone())
+        .unwrap_or_else(|| "unknown".to_string()),
+    has_id = |self| self.id.is_some(),
+    clear_metadata = |self| {
         self.id = None;
     }
-}
+);
 
-impl ResourceMeta for ClientRepresentation {
-    fn label() -> &'static str {
-        "clients"
-    }
-    fn secret_prefix() -> &'static str {
-        "client"
-    }
-}
+impl_resource_meta!(
+    ClientRepresentation,
+    label = "clients",
+    secret_prefix = "client"
+);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RoleRepresentation {
@@ -264,39 +268,20 @@ pub struct RoleRepresentation {
     pub extra: HashMap<String, Value>,
 }
 
-impl KeycloakResource for RoleRepresentation {
-    fn get_identity(&self) -> Option<String> {
-        Some(self.name.clone()).or_else(|| self.id.clone())
-    }
-    fn get_name(&self) -> String {
-        self.name.clone()
-    }
-    fn api_path() -> &'static str {
-        "roles"
-    }
-    fn dir_name() -> &'static str {
-        "roles"
-    }
-    fn object_path(id: &str) -> String {
-        format!("roles-by-id/{}", id)
-    }
-    fn has_id(&self) -> bool {
-        self.id.is_some()
-    }
-    fn clear_metadata(&mut self) {
+impl_keycloak_resource!(
+    RoleRepresentation,
+    api_path = "roles",
+    identity = |self| Some(self.name.clone()).or_else(|| self.id.clone()),
+    name = |self| self.name.clone(),
+    has_id = |self| self.id.is_some(),
+    clear_metadata = |self| {
         self.id = None;
         self.container_id = None;
-    }
-}
+    },
+    object_path = |id| format!("roles-by-id/{}", id)
+);
 
-impl ResourceMeta for RoleRepresentation {
-    fn label() -> &'static str {
-        "roles"
-    }
-    fn secret_prefix() -> &'static str {
-        "role"
-    }
-}
+impl_resource_meta!(RoleRepresentation, label = "roles", secret_prefix = "role");
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClientScopeRepresentation {
@@ -314,35 +299,22 @@ pub struct ClientScopeRepresentation {
     pub extra: HashMap<String, Value>,
 }
 
-impl KeycloakResource for ClientScopeRepresentation {
-    fn get_identity(&self) -> Option<String> {
-        self.name.clone().or_else(|| self.id.clone())
-    }
-    fn get_name(&self) -> String {
-        self.name.clone().unwrap_or_else(|| "unknown".to_string())
-    }
-    fn api_path() -> &'static str {
-        "client-scopes"
-    }
-    fn dir_name() -> &'static str {
-        "client-scopes"
-    }
-    fn has_id(&self) -> bool {
-        self.id.is_some()
-    }
-    fn clear_metadata(&mut self) {
+impl_keycloak_resource!(
+    ClientScopeRepresentation,
+    api_path = "client-scopes",
+    identity = |self| self.name.clone().or_else(|| self.id.clone()),
+    name = |self| self.name.clone().unwrap_or_else(|| "unknown".to_string()),
+    has_id = |self| self.id.is_some(),
+    clear_metadata = |self| {
         self.id = None;
     }
-}
+);
 
-impl ResourceMeta for ClientScopeRepresentation {
-    fn label() -> &'static str {
-        "client scopes"
-    }
-    fn secret_prefix() -> &'static str {
-        "client_scope"
-    }
-}
+impl_resource_meta!(
+    ClientScopeRepresentation,
+    label = "client scopes",
+    secret_prefix = "client_scope"
+);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GroupRepresentation {
@@ -358,48 +330,35 @@ pub struct GroupRepresentation {
     pub extra: HashMap<String, Value>,
 }
 
-impl KeycloakResource for GroupRepresentation {
-    fn get_identity(&self) -> Option<String> {
-        self.path
-            .clone()
-            .or_else(|| self.id.clone())
-            .or_else(|| self.name.clone())
-    }
-    fn get_name(&self) -> String {
-        self.name
-            .clone()
-            .or_else(|| self.path.clone())
-            .unwrap_or_else(|| "unknown".to_string())
-    }
-    fn api_path() -> &'static str {
-        "groups"
-    }
-    fn dir_name() -> &'static str {
-        "groups"
-    }
-    fn get_filename(&self) -> String {
-        format!(
-            "{}-{}",
-            self.get_name(),
-            self.id.as_deref().unwrap_or("unknown")
-        )
-    }
-    fn has_id(&self) -> bool {
-        self.id.is_some()
-    }
-    fn clear_metadata(&mut self) {
+impl_keycloak_resource!(
+    GroupRepresentation,
+    api_path = "groups",
+    identity = |self| self
+        .path
+        .clone()
+        .or_else(|| self.id.clone())
+        .or_else(|| self.name.clone()),
+    name = |self| self
+        .name
+        .clone()
+        .or_else(|| self.path.clone())
+        .unwrap_or_else(|| "unknown".to_string()),
+    has_id = |self| self.id.is_some(),
+    clear_metadata = |self| {
         self.id = None;
-    }
-}
+    },
+    get_filename = |self| format!(
+        "{}-{}",
+        self.get_name(),
+        self.id.as_deref().unwrap_or("unknown")
+    )
+);
 
-impl ResourceMeta for GroupRepresentation {
-    fn label() -> &'static str {
-        "groups"
-    }
-    fn secret_prefix() -> &'static str {
-        "group"
-    }
-}
+impl_resource_meta!(
+    GroupRepresentation,
+    label = "groups",
+    secret_prefix = "group"
+);
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CredentialRepresentation {
@@ -449,41 +408,26 @@ pub struct UserRepresentation {
     pub extra: HashMap<String, Value>,
 }
 
-impl KeycloakResource for UserRepresentation {
-    fn get_identity(&self) -> Option<String> {
-        self.username
-            .as_ref()
-            .map(|s| s.chars().collect::<String>())
-            .or_else(|| self.id.as_ref().map(|s| s.chars().collect::<String>()))
-    }
-    fn get_name(&self) -> String {
-        self.username
-            .as_ref()
-            .map(|s| s.chars().collect::<String>())
-            .unwrap_or_else(|| "unknown".to_string())
-    }
-    fn api_path() -> &'static str {
-        "users"
-    }
-    fn dir_name() -> &'static str {
-        "users"
-    }
-    fn has_id(&self) -> bool {
-        self.id.is_some()
-    }
-    fn clear_metadata(&mut self) {
+impl_keycloak_resource!(
+    UserRepresentation,
+    api_path = "users",
+    identity = |self| self
+        .username
+        .as_ref()
+        .map(|s| s.chars().collect::<String>())
+        .or_else(|| self.id.as_ref().map(|s| s.chars().collect::<String>())),
+    name = |self| self
+        .username
+        .as_ref()
+        .map(|s| s.chars().collect::<String>())
+        .unwrap_or_else(|| "unknown".to_string()),
+    has_id = |self| self.id.is_some(),
+    clear_metadata = |self| {
         self.id = None;
     }
-}
+);
 
-impl ResourceMeta for UserRepresentation {
-    fn label() -> &'static str {
-        "users"
-    }
-    fn secret_prefix() -> &'static str {
-        "user"
-    }
-}
+impl_resource_meta!(UserRepresentation, label = "users", secret_prefix = "user");
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AuthenticationExecutionExportRepresentation {
@@ -531,35 +475,23 @@ pub struct AuthenticationFlowRepresentation {
     pub extra: HashMap<String, Value>,
 }
 
-impl KeycloakResource for AuthenticationFlowRepresentation {
-    fn get_identity(&self) -> Option<String> {
-        self.alias.clone().or_else(|| self.id.clone())
-    }
-    fn get_name(&self) -> String {
-        self.alias.clone().unwrap_or_else(|| "unknown".to_string())
-    }
-    fn api_path() -> &'static str {
-        "authentication/flows"
-    }
-    fn dir_name() -> &'static str {
-        "authentication-flows"
-    }
-    fn has_id(&self) -> bool {
-        self.id.is_some()
-    }
-    fn clear_metadata(&mut self) {
+impl_keycloak_resource!(
+    AuthenticationFlowRepresentation,
+    api_path = "authentication/flows",
+    dir_name = "authentication-flows",
+    identity = |self| self.alias.clone().or_else(|| self.id.clone()),
+    name = |self| self.alias.clone().unwrap_or_else(|| "unknown".to_string()),
+    has_id = |self| self.id.is_some(),
+    clear_metadata = |self| {
         self.id = None;
     }
-}
+);
 
-impl ResourceMeta for AuthenticationFlowRepresentation {
-    fn label() -> &'static str {
-        "authentication flows"
-    }
-    fn secret_prefix() -> &'static str {
-        "flow"
-    }
-}
+impl_resource_meta!(
+    AuthenticationFlowRepresentation,
+    label = "authentication flows",
+    secret_prefix = "flow"
+);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RequiredActionProviderRepresentation {
@@ -581,29 +513,19 @@ pub struct RequiredActionProviderRepresentation {
     pub extra: HashMap<String, Value>,
 }
 
-impl KeycloakResource for RequiredActionProviderRepresentation {
-    fn get_identity(&self) -> Option<String> {
-        self.alias.clone()
-    }
-    fn get_name(&self) -> String {
-        self.alias.clone().unwrap_or_else(|| "unknown".to_string())
-    }
-    fn api_path() -> &'static str {
-        "authentication/required-actions"
-    }
-    fn dir_name() -> &'static str {
-        "required-actions"
-    }
-}
+impl_keycloak_resource!(
+    RequiredActionProviderRepresentation,
+    api_path = "authentication/required-actions",
+    dir_name = "required-actions",
+    identity = |self| self.alias.clone(),
+    name = |self| self.alias.clone().unwrap_or_else(|| "unknown".to_string())
+);
 
-impl ResourceMeta for RequiredActionProviderRepresentation {
-    fn label() -> &'static str {
-        "required actions"
-    }
-    fn secret_prefix() -> &'static str {
-        "action"
-    }
-}
+impl_resource_meta!(
+    RequiredActionProviderRepresentation,
+    label = "required actions",
+    secret_prefix = "action"
+);
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ComponentRepresentation {
@@ -642,42 +564,27 @@ impl std::fmt::Debug for ComponentRepresentation {
     }
 }
 
-impl KeycloakResource for ComponentRepresentation {
-    fn get_identity(&self) -> Option<String> {
-        self.id.clone().or_else(|| self.name.clone())
-    }
-    fn get_name(&self) -> String {
-        self.name.clone().unwrap_or_else(|| "unknown".to_string())
-    }
-    fn api_path() -> &'static str {
-        "components"
-    }
-    fn dir_name() -> &'static str {
-        "components"
-    }
-    fn get_filename(&self) -> String {
-        format!(
-            "{}-{}",
-            self.get_name(),
-            self.id.as_deref().unwrap_or("unknown")
-        )
-    }
-    fn has_id(&self) -> bool {
-        self.id.is_some()
-    }
-    fn clear_metadata(&mut self) {
+impl_keycloak_resource!(
+    ComponentRepresentation,
+    api_path = "components",
+    identity = |self| self.id.clone().or_else(|| self.name.clone()),
+    name = |self| self.name.clone().unwrap_or_else(|| "unknown".to_string()),
+    has_id = |self| self.id.is_some(),
+    clear_metadata = |self| {
         self.id = None;
-    }
-}
+    },
+    get_filename = |self| format!(
+        "{}-{}",
+        self.get_name(),
+        self.id.as_deref().unwrap_or("unknown")
+    )
+);
 
-impl ResourceMeta for ComponentRepresentation {
-    fn label() -> &'static str {
-        "components"
-    }
-    fn secret_prefix() -> &'static str {
-        "component"
-    }
-}
+impl_resource_meta!(
+    ComponentRepresentation,
+    label = "components",
+    secret_prefix = "component"
+);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KeyMetadataRepresentation {
