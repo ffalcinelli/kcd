@@ -203,6 +203,7 @@ async fn apply_single_realm(
     .await?;
 
     let mut set = JoinSet::new();
+    let shared_realm_name: Arc<str> = Arc::from(realm_name);
 
     // Roles
     {
@@ -210,7 +211,7 @@ async fn apply_single_realm(
         let workspace_dir = workspace_dir.clone();
         let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
-        let realm_name = realm_name.to_string();
+        let realm_name = Arc::clone(&shared_realm_name);
         set.spawn(async move {
             roles::apply_roles(
                 &client,
@@ -229,7 +230,7 @@ async fn apply_single_realm(
         let workspace_dir = workspace_dir.clone();
         let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
-        let realm_name = realm_name.to_string();
+        let realm_name = Arc::clone(&shared_realm_name);
         set.spawn(async move {
             idps::apply_identity_providers(
                 &client,
@@ -248,7 +249,7 @@ async fn apply_single_realm(
         let workspace_dir = workspace_dir.clone();
         let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
-        let realm_name = realm_name.to_string();
+        let realm_name = Arc::clone(&shared_realm_name);
         set.spawn(async move {
             clients::apply_clients(
                 &client,
@@ -267,7 +268,7 @@ async fn apply_single_realm(
         let workspace_dir = workspace_dir.clone();
         let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
-        let realm_name = realm_name.to_string();
+        let realm_name = Arc::clone(&shared_realm_name);
         set.spawn(async move {
             scopes::apply_client_scopes(
                 &client,
@@ -286,7 +287,7 @@ async fn apply_single_realm(
         let workspace_dir = workspace_dir.clone();
         let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
-        let realm_name = realm_name.to_string();
+        let realm_name = Arc::clone(&shared_realm_name);
         set.spawn(async move {
             groups::apply_groups(
                 &client,
@@ -305,7 +306,7 @@ async fn apply_single_realm(
         let workspace_dir = workspace_dir.clone();
         let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
-        let realm_name = realm_name.to_string();
+        let realm_name = Arc::clone(&shared_realm_name);
         set.spawn(async move {
             users::apply_users(
                 &client,
@@ -324,7 +325,7 @@ async fn apply_single_realm(
         let workspace_dir = workspace_dir.clone();
         let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
-        let realm_name = realm_name.to_string();
+        let realm_name = Arc::clone(&shared_realm_name);
         set.spawn(async move {
             flows::apply_authentication_flows(
                 &client,
@@ -343,7 +344,7 @@ async fn apply_single_realm(
         let workspace_dir = workspace_dir.clone();
         let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
-        let realm_name = realm_name.to_string();
+        let realm_name = Arc::clone(&shared_realm_name);
         set.spawn(async move {
             actions::apply_required_actions(
                 &client,
@@ -362,7 +363,7 @@ async fn apply_single_realm(
         let workspace_dir = workspace_dir.clone();
         let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
-        let realm_name = realm_name.to_string();
+        let realm_name = Arc::clone(&shared_realm_name);
         set.spawn(async move {
             components::apply_components_or_keys(
                 &client,
@@ -382,7 +383,7 @@ async fn apply_single_realm(
         let workspace_dir = workspace_dir.clone();
         let resolver = Arc::clone(&resolver);
         let planned_files = Arc::clone(&planned_files);
-        let realm_name = realm_name.to_string();
+        let realm_name = Arc::clone(&shared_realm_name);
         set.spawn(async move {
             components::apply_components_or_keys(
                 &client,
