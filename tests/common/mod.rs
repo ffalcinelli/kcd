@@ -125,6 +125,15 @@ async fn token_handler(axum::Form(payload): axum::Form<TokenRequest>) -> impl In
         && payload.client_id == "admin-cli"
         && payload.client_secret.as_deref() == Some("secret");
 
+    if payload.username.as_deref() == Some("bad_json") {
+        return (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "not_an_access_token": "something"
+            })),
+        );
+    }
+
     if is_password_grant || is_client_credentials_grant {
         (
             StatusCode::OK,
