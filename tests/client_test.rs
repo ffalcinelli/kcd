@@ -51,10 +51,12 @@ async fn test_login_parse_failure() {
         .login("admin-cli", None, Some("bad_json"), Some("admin"))
         .await;
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("Failed to parse token response"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to parse token response")
+    );
 }
 
 #[tokio::test]
