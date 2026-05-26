@@ -11,6 +11,7 @@ pub struct VaultResolver {
 
 impl VaultResolver {
     pub fn new(address: &str, token: &str) -> Result<Self> {
+        reqwest::Url::parse(address)?;
         Ok(Self {
             address: address.trim_end_matches('/').to_string(),
             token: token.to_string(),
@@ -207,5 +208,14 @@ mod tests {
                 .to_string()
                 .contains("Vault error (500 Internal Server Error)")
         );
+    }
+
+    #[tokio::test]
+    async fn test_vault_resolver_invalid_address() {
+        let res = VaultResolver::new("invalid_addr", "token");
+        assert!(res.is_err());
+        if let Err(e) = res {
+            assert!(e.to_string().contains("relative URL without a base"));
+        }
     }
 }
