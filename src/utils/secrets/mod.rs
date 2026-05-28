@@ -24,6 +24,10 @@ impl EnvResolver {
 #[async_trait]
 impl SecretResolver for EnvResolver {
     async fn resolve(&self, key: &str) -> Result<Option<String>> {
+        if !key.starts_with("KEYCLOAK_") {
+            return Ok(None);
+        }
+
         if let Some(val) = self.vars.get(key) {
             return Ok(Some(val.clone()));
         }
@@ -314,24 +318,24 @@ mod tests {
     #[tokio::test]
     async fn test_composite_resolver() {
         let mut vars1 = HashMap::new();
-        vars1.insert("KEY1".to_string(), "VAL1".to_string());
+        vars1.insert("KEYCLOAK_KEY1".to_string(), "VAL1".to_string());
         let res1 = Box::new(EnvResolver::new(vars1));
 
         let mut vars2 = HashMap::new();
-        vars2.insert("KEY2".to_string(), "VAL2".to_string());
+        vars2.insert("KEYCLOAK_KEY2".to_string(), "VAL2".to_string());
         let res2 = Box::new(EnvResolver::new(vars2));
 
         let composite = CompositeResolver::new(vec![res1, res2]);
 
         assert_eq!(
-            composite.resolve("KEY1").await.unwrap(),
+            composite.resolve("KEYCLOAK_KEY1").await.unwrap(),
             Some("VAL1".to_string())
         );
         assert_eq!(
-            composite.resolve("KEY2").await.unwrap(),
+            composite.resolve("KEYCLOAK_KEY2").await.unwrap(),
             Some("VAL2".to_string())
         );
-        assert_eq!(composite.resolve("KEY3").await.unwrap(), None);
+        assert_eq!(composite.resolve("KEYCLOAK_KEY3").await.unwrap(), None);
     }
 
     #[test]

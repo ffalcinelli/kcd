@@ -221,14 +221,14 @@ async fn test_plan_resources_with_secrets() {
 
     // Use environment variable for secret
     unsafe {
-        std::env::set_var("ROLE_DESC", "Secret Description");
+        std::env::set_var("KEYCLOAK_ROLE_DESC", "Secret Description");
     }
 
     let roles_dir = realm_dir.join("roles");
     fs::create_dir_all(&roles_dir).unwrap();
     let role_yaml = "
 name: secret-role
-description: ${ROLE_DESC}
+description: ${KEYCLOAK_ROLE_DESC}
 ";
     let role_path = roles_dir.join("secret-role.yaml");
     fs::write(&role_path, role_yaml).unwrap();
