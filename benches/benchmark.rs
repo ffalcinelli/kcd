@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use kcd::validate;
 use std::path::PathBuf;
 
@@ -7,7 +7,8 @@ fn criterion_benchmark(c: &mut Criterion) {
     let workspace_dir = PathBuf::from("dummy_workspace");
 
     c.bench_function("validate_realm", |b| {
-        b.to_async(&runtime).iter(|| validate::run(workspace_dir.clone(), &[]));
+        b.to_async(&runtime)
+            .iter(|| validate::run(workspace_dir.clone(), &[]));
     });
 }
 
