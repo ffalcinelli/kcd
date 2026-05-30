@@ -127,27 +127,45 @@ use crate::models::{
 };
 
 async fn plan_single_realm(ctx: PlanContext<'_>, changed_files: &mut Vec<PathBuf>) -> Result<()> {
-    realm::plan_realm(&ctx, changed_files).await?;
+    let (
+        mut realm_changes,
+        mut role_changes,
+        mut client_changes,
+        mut idp_changes,
+        mut client_scope_changes,
+        mut group_changes,
+        mut user_changes,
+        mut auth_flow_changes,
+        mut required_action_changes,
+        mut component_changes,
+        mut key_changes,
+        _,
+    ) = tokio::try_join!(
+        realm::plan_realm(&ctx),
+        generic::plan_resources::<RoleRepresentation>(&ctx),
+        generic::plan_resources::<ClientRepresentation>(&ctx),
+        generic::plan_resources::<IdentityProviderRepresentation>(&ctx),
+        generic::plan_resources::<ClientScopeRepresentation>(&ctx),
+        generic::plan_resources::<GroupRepresentation>(&ctx),
+        generic::plan_resources::<UserRepresentation>(&ctx),
+        generic::plan_resources::<AuthenticationFlowRepresentation>(&ctx),
+        generic::plan_resources::<RequiredActionProviderRepresentation>(&ctx),
+        components::plan_components_or_keys(&ctx, "components"),
+        components::plan_components_or_keys(&ctx, "keys"),
+        components::check_keys_drift(ctx.client, ctx.options, ctx.realm_name),
+    )?;
 
-    generic::plan_resources::<RoleRepresentation>(&ctx, changed_files).await?;
-
-    generic::plan_resources::<ClientRepresentation>(&ctx, changed_files).await?;
-
-    generic::plan_resources::<IdentityProviderRepresentation>(&ctx, changed_files).await?;
-
-    generic::plan_resources::<ClientScopeRepresentation>(&ctx, changed_files).await?;
-
-    generic::plan_resources::<GroupRepresentation>(&ctx, changed_files).await?;
-
-    generic::plan_resources::<UserRepresentation>(&ctx, changed_files).await?;
-
-    generic::plan_resources::<AuthenticationFlowRepresentation>(&ctx, changed_files).await?;
-
-    generic::plan_resources::<RequiredActionProviderRepresentation>(&ctx, changed_files).await?;
-
-    components::plan_components_or_keys(&ctx, "components", changed_files).await?;
-    components::plan_components_or_keys(&ctx, "keys", changed_files).await?;
-    components::check_keys_drift(ctx.client, ctx.options, ctx.realm_name).await?;
+    changed_files.append(&mut realm_changes);
+    changed_files.append(&mut role_changes);
+    changed_files.append(&mut client_changes);
+    changed_files.append(&mut idp_changes);
+    changed_files.append(&mut client_scope_changes);
+    changed_files.append(&mut group_changes);
+    changed_files.append(&mut user_changes);
+    changed_files.append(&mut auth_flow_changes);
+    changed_files.append(&mut required_action_changes);
+    changed_files.append(&mut component_changes);
+    changed_files.append(&mut key_changes);
 
     Ok(())
 }
