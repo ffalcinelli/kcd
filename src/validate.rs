@@ -119,11 +119,29 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
         style(&realm.realm).green()
     );
 
-    // 2. Validate Roles
+    // Read all resource directories concurrently
     let roles_dir = workspace_dir.join("roles");
-    let mut role_names = HashSet::new();
-    let roles: Vec<(PathBuf, RoleRepresentation)> = read_yaml_files(&roles_dir, "role").await?;
+    let clients_dir = workspace_dir.join("clients");
+    let idps_dir = workspace_dir.join("identity-providers");
+    let scopes_dir = workspace_dir.join("client-scopes");
+    let groups_dir = workspace_dir.join("groups");
+    let users_dir = workspace_dir.join("users");
+    let flows_dir = workspace_dir.join("authentication-flows");
+    let actions_dir = workspace_dir.join("required-actions");
 
+    let (roles, clients, idps, scopes, groups, users, flows, actions) = tokio::try_join!(
+        read_yaml_files::<RoleRepresentation>(&roles_dir, "role"),
+        read_yaml_files::<ClientRepresentation>(&clients_dir, "client"),
+        read_yaml_files::<IdentityProviderRepresentation>(&idps_dir, "idp"),
+        read_yaml_files::<ClientScopeRepresentation>(&scopes_dir, "client-scope"),
+        read_yaml_files::<GroupRepresentation>(&groups_dir, "group"),
+        read_yaml_files::<UserRepresentation>(&users_dir, "user"),
+        read_yaml_files::<AuthenticationFlowRepresentation>(&flows_dir, "authentication-flow"),
+        read_yaml_files::<RequiredActionProviderRepresentation>(&actions_dir, "required-action"),
+    )?;
+
+    // 2. Validate Roles
+    let mut role_names = HashSet::new();
     for (path, role) in &roles {
         if role.name.is_empty() {
             anyhow::bail!("Role name is empty in {:?}", path);
@@ -141,10 +159,6 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     );
 
     // 3. Validate Clients
-    let clients_dir = workspace_dir.join("clients");
-    let clients: Vec<(PathBuf, ClientRepresentation)> =
-        read_yaml_files(&clients_dir, "client").await?;
-
     for (path, client) in &clients {
         if client.client_id.as_deref().unwrap_or_default().is_empty() {
             anyhow::bail!("Client ID is missing or empty in {:?}", path);
@@ -158,10 +172,6 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     );
 
     // 4. Validate Identity Providers
-    let idps_dir = workspace_dir.join("identity-providers");
-    let idps: Vec<(PathBuf, IdentityProviderRepresentation)> =
-        read_yaml_files(&idps_dir, "idp").await?;
-
     for (path, idp) in &idps {
         if idp.alias.as_deref().unwrap_or_default().is_empty() {
             anyhow::bail!("Identity Provider alias is missing or empty in {:?}", path);
@@ -181,9 +191,6 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     );
 
     // 5. Validate Client Scopes
-    let scopes_dir = workspace_dir.join("client-scopes");
-    let scopes: Vec<(PathBuf, ClientScopeRepresentation)> =
-        read_yaml_files(&scopes_dir, "client-scope").await?;
     for (path, scope) in &scopes {
         if scope.name.as_deref().unwrap_or_default().is_empty() {
             anyhow::bail!("Client Scope name is missing or empty in {:?}", path);
@@ -197,8 +204,6 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     );
 
     // 6. Validate Groups
-    let groups_dir = workspace_dir.join("groups");
-    let groups: Vec<(PathBuf, GroupRepresentation)> = read_yaml_files(&groups_dir, "group").await?;
     for (path, group) in &groups {
         if group.name.as_deref().unwrap_or_default().is_empty() {
             anyhow::bail!("Group name is missing or empty in {:?}", path);
@@ -212,8 +217,6 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     );
 
     // 7. Validate Users
-    let users_dir = workspace_dir.join("users");
-    let users: Vec<(PathBuf, UserRepresentation)> = read_yaml_files(&users_dir, "user").await?;
     for (path, user) in &users {
         if user.username.as_deref().unwrap_or_default().is_empty() {
             anyhow::bail!("User username is missing or empty in {:?}", path);
@@ -227,9 +230,6 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     );
 
     // 8. Validate Authentication Flows
-    let flows_dir = workspace_dir.join("authentication-flows");
-    let flows: Vec<(PathBuf, AuthenticationFlowRepresentation)> =
-        read_yaml_files(&flows_dir, "authentication-flow").await?;
     for (path, flow) in &flows {
         if flow.alias.as_deref().unwrap_or_default().is_empty() {
             anyhow::bail!(
@@ -246,9 +246,6 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
     );
 
     // 9. Validate Required Actions
-    let actions_dir = workspace_dir.join("required-actions");
-    let actions: Vec<(PathBuf, RequiredActionProviderRepresentation)> =
-        read_yaml_files(&actions_dir, "required-action").await?;
     for (path, action) in &actions {
         if action.alias.as_deref().unwrap_or_default().is_empty() {
             anyhow::bail!("Required Action alias is missing or empty in {:?}", path);
