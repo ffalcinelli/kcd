@@ -15,8 +15,8 @@ use super::{PlanContext, PlanOptions, print_diff};
 pub async fn plan_components_or_keys(
     ctx: &PlanContext<'_>,
     dir_name: &str,
-    changed_files: &mut Vec<PathBuf>,
-) -> Result<()> {
+) -> Result<Vec<PathBuf>> {
+    let mut changed_files = Vec::new();
     let components_dir = ctx.workspace_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
         let existing_components =
@@ -163,7 +163,7 @@ pub async fn plan_components_or_keys(
             }
         }
     }
-    Ok(())
+    Ok(changed_files)
 }
 
 pub async fn check_keys_drift(

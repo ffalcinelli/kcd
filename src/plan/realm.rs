@@ -6,7 +6,8 @@ use tokio::fs as async_fs;
 
 use super::{PlanContext, print_diff};
 
-pub async fn plan_realm(ctx: &PlanContext<'_>, changed_files: &mut Vec<PathBuf>) -> Result<()> {
+pub async fn plan_realm(ctx: &PlanContext<'_>) -> Result<Vec<PathBuf>> {
+    let mut changed_files = Vec::new();
     let realm_path = ctx.workspace_dir.join("realm.yaml");
     if async_fs::try_exists(&realm_path).await? {
         let content = async_fs::read_to_string(&realm_path).await?;
@@ -48,5 +49,5 @@ pub async fn plan_realm(ctx: &PlanContext<'_>, changed_files: &mut Vec<PathBuf>)
             }
         }
     }
-    Ok(())
+    Ok(changed_files)
 }
