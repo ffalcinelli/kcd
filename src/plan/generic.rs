@@ -9,9 +9,7 @@ use tokio::fs as async_fs;
 
 use super::{PlanContext, print_diff};
 
-pub async fn plan_resources<T>(
-    ctx: &PlanContext<'_>,
-) -> Result<Vec<PathBuf>>
+pub async fn plan_resources<T>(ctx: &PlanContext<'_>) -> Result<Vec<PathBuf>>
 where
     T: KeycloakResource
         + ResourceMeta
