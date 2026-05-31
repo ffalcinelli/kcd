@@ -43,7 +43,7 @@ pub async fn apply_authentication_flows(
         {
             continue;
         }
-        if !path.extension().is_some_and(|ext| ext == "yaml") {
+        if path.extension().is_none_or(|ext| ext != "yaml") {
             continue;
         }
 
@@ -56,8 +56,7 @@ pub async fn apply_authentication_flows(
             let mut val: serde_json::Value = serde_yaml::from_str(&content)
                 .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
             substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
-            let mut flow_rep: AuthenticationFlowRepresentation =
-                serde_json::from_value(val)?;
+            let mut flow_rep: AuthenticationFlowRepresentation = serde_json::from_value(val)?;
 
             let identity = flow_rep
                 .get_identity()

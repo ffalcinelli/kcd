@@ -43,7 +43,7 @@ pub async fn apply_identity_providers(
         {
             continue;
         }
-        if !path.extension().is_some_and(|ext| ext == "yaml") {
+        if path.extension().is_none_or(|ext| ext != "yaml") {
             continue;
         }
 

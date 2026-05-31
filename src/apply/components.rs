@@ -118,7 +118,7 @@ pub async fn apply_components_or_keys(
         {
             continue;
         }
-        if !path.extension().is_some_and(|ext| ext == "yaml") {
+        if path.extension().is_none_or(|ext| ext != "yaml") {
             continue;
         }
 
@@ -128,15 +128,8 @@ pub async fn apply_components_or_keys(
         let resolver = Arc::clone(&resolver);
         let realm_name = realm_name.to_string();
         set.spawn(async move {
-            process_component_file(
-                path,
-                client,
-                by_identity,
-                by_details,
-                resolver,
-                realm_name,
-            )
-            .await
+            process_component_file(path, client, by_identity, by_details, resolver, realm_name)
+                .await
         });
     }
     while let Some(res) = set.join_next().await {

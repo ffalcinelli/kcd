@@ -24,9 +24,10 @@ pub async fn apply_required_actions(
         return Ok(());
     }
 
-    let existing_actions = client.get_required_actions().await.with_context(|| {
-        format!("Failed to get required actions for realm '{}'", realm_name)
-    })?;
+    let existing_actions = client
+        .get_required_actions()
+        .await
+        .with_context(|| format!("Failed to get required actions for realm '{}'", realm_name))?;
     let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
         existing_actions
             .into_iter()
@@ -44,7 +45,7 @@ pub async fn apply_required_actions(
         {
             continue;
         }
-        if !path.extension().is_some_and(|ext| ext == "yaml") {
+        if path.extension().is_none_or(|ext| ext != "yaml") {
             continue;
         }
 
@@ -58,8 +59,7 @@ pub async fn apply_required_actions(
                 .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
             substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
             #[allow(unused_mut)]
-            let mut action_rep: RequiredActionProviderRepresentation =
-                serde_json::from_value(val)?;
+            let mut action_rep: RequiredActionProviderRepresentation = serde_json::from_value(val)?;
 
             let identity = action_rep.get_identity().context(format!(
                 "Failed to get identity for required action in {:?}",
@@ -80,8 +80,7 @@ pub async fn apply_required_actions(
                 println!(
                     "  {} {}",
                     SUCCESS_UPDATE,
-                    style(format!("Updated required action {}", action_rep.get_name()))
-                        .cyan()
+                    style(format!("Updated required action {}", action_rep.get_name())).cyan()
                 );
             } else {
                 // Register
