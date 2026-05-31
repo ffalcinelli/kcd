@@ -17,61 +17,65 @@ pub async fn apply_client_scopes(
 ) -> Result<()> {
     // 5. Apply Client Scopes
     let scopes_dir = workspace_dir.join("client-scopes");
-    if async_fs::try_exists(&scopes_dir).await? {
-        let existing_scopes = client
-            .get_client_scopes()
-            .await
-            .with_context(|| format!("Failed to get client scopes for realm '{}'", realm_name))?;
-        let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
-            .into_iter()
-            .filter_map(|s| s.get_identity().map(|id| (id, s)))
-            .collect();
-        let existing_scopes_map = Arc::new(existing_scopes_map);
+    if !async_fs::try_exists(&scopes_dir).await? {
+        return Ok(());
+    }
 
-        let mut entries = async_fs::read_dir(&scopes_dir).await?;
-        let mut set = JoinSet::new();
+    let existing_scopes = client
+        .get_client_scopes()
+        .await
+        .with_context(|| format!("Failed to get client scopes for realm '{}'", realm_name))?;
+    let existing_scopes_map: HashMap<String, ClientScopeRepresentation> = existing_scopes
+        .into_iter()
+        .filter_map(|s| s.get_identity().map(|id| (id, s)))
+        .collect();
+    let existing_scopes_map = Arc::new(existing_scopes_map);
 
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
-            if let Some(plan) = &*planned_files
-                && !plan.contains(&path)
-            {
-                continue;
-            }
-            if path.extension().is_some_and(|ext| ext == "yaml") {
-                let client = client.clone();
-                let existing_scopes_map = Arc::clone(&existing_scopes_map);
-                let resolver = Arc::clone(&resolver);
-                let realm_name = realm_name.to_string();
-                set.spawn(async move {
-                    let content = async_fs::read_to_string(&path).await?;
-                    let mut val: serde_json::Value = serde_yaml::from_str(&content)
-                        .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-                    substitute_secrets(&mut val, resolver).await?;
-                    let mut scope_rep: ClientScopeRepresentation = serde_json::from_value(val)?;
+    let mut entries = async_fs::read_dir(&scopes_dir).await?;
+    let mut set = JoinSet::new();
 
-                    let identity = scope_rep.get_identity().context(format!(
-                        "Failed to get identity for client scope in {:?}",
-                        path
-                    ))?;
-
-                    crate::handle_upsert! {
-                        client: client,
-                        realm: realm_name,
-                        rep: scope_rep,
-                        id_opt: existing_scopes_map.get(&identity).and_then(|e| e.id.as_ref()),
-                        id_field: id,
-                        resource_name: "client scope",
-                        update_call: |id, rep| client.update_client_scope(id, rep),
-                        create_call: |rep| client.create_client_scope(rep)
-                    }
-                    Ok::<(), anyhow::Error>(())
-                });
-            }
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if let Some(plan) = &*planned_files
+            && !plan.contains(&path)
+        {
+            continue;
         }
-        while let Some(res) = set.join_next().await {
-            res??;
+        if !path.extension().is_some_and(|ext| ext == "yaml") {
+            continue;
         }
+
+        let client = client.clone();
+        let existing_scopes_map = Arc::clone(&existing_scopes_map);
+        let resolver = Arc::clone(&resolver);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            let content = async_fs::read_to_string(&path).await?;
+            let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+            substitute_secrets(&mut val, resolver).await?;
+            let mut scope_rep: ClientScopeRepresentation = serde_json::from_value(val)?;
+
+            let identity = scope_rep.get_identity().context(format!(
+                "Failed to get identity for client scope in {:?}",
+                path
+            ))?;
+
+            crate::handle_upsert! {
+                client: client,
+                realm: realm_name,
+                rep: scope_rep,
+                id_opt: existing_scopes_map.get(&identity).and_then(|e| e.id.as_ref()),
+                id_field: id,
+                resource_name: "client scope",
+                update_call: |id, rep| client.update_client_scope(id, rep),
+                create_call: |rep| client.create_client_scope(rep)
+            }
+            Ok::<(), anyhow::Error>(())
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res??;
     }
     Ok(())
 }

@@ -17,60 +17,64 @@ pub async fn apply_clients(
 ) -> Result<()> {
     // 3. Apply Clients
     let clients_dir = workspace_dir.join("clients");
-    if async_fs::try_exists(&clients_dir).await? {
-        let existing_clients = client
-            .get_clients()
-            .await
-            .with_context(|| format!("Failed to get clients for realm '{}'", realm_name))?;
-        let existing_clients_map: HashMap<String, ClientRepresentation> = existing_clients
-            .into_iter()
-            .filter_map(|c| c.get_identity().map(|id| (id, c)))
-            .collect();
-        let existing_clients_map = std::sync::Arc::new(existing_clients_map);
+    if !async_fs::try_exists(&clients_dir).await? {
+        return Ok(());
+    }
 
-        let mut entries = async_fs::read_dir(&clients_dir).await?;
-        let mut set = JoinSet::new();
+    let existing_clients = client
+        .get_clients()
+        .await
+        .with_context(|| format!("Failed to get clients for realm '{}'", realm_name))?;
+    let existing_clients_map: HashMap<String, ClientRepresentation> = existing_clients
+        .into_iter()
+        .filter_map(|c| c.get_identity().map(|id| (id, c)))
+        .collect();
+    let existing_clients_map = std::sync::Arc::new(existing_clients_map);
 
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
-            if let Some(plan) = &*planned_files
-                && !plan.contains(&path)
-            {
-                continue;
-            }
-            if path.extension().is_some_and(|ext| ext == "yaml") {
-                let client = client.clone();
-                let existing_clients_map = existing_clients_map.clone();
-                let resolver = Arc::clone(&resolver);
-                let realm_name = realm_name.to_string();
-                set.spawn(async move {
-                    let content = async_fs::read_to_string(&path).await?;
-                    let mut val: serde_json::Value = serde_yaml::from_str(&content)
-                        .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-                    substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
-                    let mut client_rep: ClientRepresentation = serde_json::from_value(val)?;
+    let mut entries = async_fs::read_dir(&clients_dir).await?;
+    let mut set = JoinSet::new();
 
-                    let identity = client_rep
-                        .get_identity()
-                        .context(format!("Failed to get identity for client in {:?}", path))?;
-
-                    crate::handle_upsert! {
-                        client: client,
-                        realm: realm_name,
-                        rep: client_rep,
-                        id_opt: existing_clients_map.get(&identity).and_then(|e| e.id.as_ref()),
-                        id_field: id,
-                        resource_name: "client",
-                        update_call: |id, rep| client.update_client(id, rep),
-                        create_call: |rep| client.create_client(rep)
-                    }
-                    Ok::<(), anyhow::Error>(())
-                });
-            }
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if let Some(plan) = &*planned_files
+            && !plan.contains(&path)
+        {
+            continue;
         }
-        while let Some(res) = set.join_next().await {
-            res??;
+        if !path.extension().is_some_and(|ext| ext == "yaml") {
+            continue;
         }
+
+        let client = client.clone();
+        let existing_clients_map = existing_clients_map.clone();
+        let resolver = Arc::clone(&resolver);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            let content = async_fs::read_to_string(&path).await?;
+            let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+            substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
+            let mut client_rep: ClientRepresentation = serde_json::from_value(val)?;
+
+            let identity = client_rep
+                .get_identity()
+                .context(format!("Failed to get identity for client in {:?}", path))?;
+
+            crate::handle_upsert! {
+                client: client,
+                realm: realm_name,
+                rep: client_rep,
+                id_opt: existing_clients_map.get(&identity).and_then(|e| e.id.as_ref()),
+                id_field: id,
+                resource_name: "client",
+                update_call: |id, rep| client.update_client(id, rep),
+                create_call: |rep| client.create_client(rep)
+            }
+            Ok::<(), anyhow::Error>(())
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res??;
     }
     Ok(())
 }

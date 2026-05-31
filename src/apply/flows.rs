@@ -17,63 +17,67 @@ pub async fn apply_authentication_flows(
 ) -> Result<()> {
     // 8. Apply Authentication Flows
     let flows_dir = workspace_dir.join("authentication-flows");
-    if async_fs::try_exists(&flows_dir).await? {
-        let existing_flows = client.get_authentication_flows().await.with_context(|| {
-            format!(
-                "Failed to get authentication flows for realm '{}'",
-                realm_name
-            )
-        })?;
-        let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
-            .into_iter()
-            .filter_map(|f| f.get_identity().map(|id| (id, f)))
-            .collect();
-        let existing_flows_map = Arc::new(existing_flows_map);
+    if !async_fs::try_exists(&flows_dir).await? {
+        return Ok(());
+    }
 
-        let mut entries = async_fs::read_dir(&flows_dir).await?;
-        let mut set = JoinSet::new();
+    let existing_flows = client.get_authentication_flows().await.with_context(|| {
+        format!(
+            "Failed to get authentication flows for realm '{}'",
+            realm_name
+        )
+    })?;
+    let existing_flows_map: HashMap<String, AuthenticationFlowRepresentation> = existing_flows
+        .into_iter()
+        .filter_map(|f| f.get_identity().map(|id| (id, f)))
+        .collect();
+    let existing_flows_map = Arc::new(existing_flows_map);
 
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
-            if let Some(plan) = &*planned_files
-                && !plan.contains(&path)
-            {
-                continue;
-            }
-            if path.extension().is_some_and(|ext| ext == "yaml") {
-                let client = client.clone();
-                let existing_flows_map = Arc::clone(&existing_flows_map);
-                let resolver = Arc::clone(&resolver);
-                let realm_name = realm_name.to_string();
-                set.spawn(async move {
-                    let content = async_fs::read_to_string(&path).await?;
-                    let mut val: serde_json::Value = serde_yaml::from_str(&content)
-                        .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-                    substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
-                    let mut flow_rep: AuthenticationFlowRepresentation =
-                        serde_json::from_value(val)?;
+    let mut entries = async_fs::read_dir(&flows_dir).await?;
+    let mut set = JoinSet::new();
 
-                    let identity = flow_rep
-                        .get_identity()
-                        .context(format!("Failed to get identity for flow in {:?}", path))?;
-
-                    crate::handle_upsert! {
-                        client: client,
-                        realm: realm_name,
-                        rep: flow_rep,
-                        id_opt: existing_flows_map.get(&identity).and_then(|e| e.id.as_ref()),
-                        id_field: id,
-                        resource_name: "authentication flow",
-                        update_call: |id, rep| client.update_authentication_flow(id, rep),
-                        create_call: |rep| client.create_authentication_flow(rep)
-                    }
-                    Ok::<(), anyhow::Error>(())
-                });
-            }
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if let Some(plan) = &*planned_files
+            && !plan.contains(&path)
+        {
+            continue;
         }
-        while let Some(res) = set.join_next().await {
-            res??;
+        if !path.extension().is_some_and(|ext| ext == "yaml") {
+            continue;
         }
+
+        let client = client.clone();
+        let existing_flows_map = Arc::clone(&existing_flows_map);
+        let resolver = Arc::clone(&resolver);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            let content = async_fs::read_to_string(&path).await?;
+            let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+            substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
+            let mut flow_rep: AuthenticationFlowRepresentation =
+                serde_json::from_value(val)?;
+
+            let identity = flow_rep
+                .get_identity()
+                .context(format!("Failed to get identity for flow in {:?}", path))?;
+
+            crate::handle_upsert! {
+                client: client,
+                realm: realm_name,
+                rep: flow_rep,
+                id_opt: existing_flows_map.get(&identity).and_then(|e| e.id.as_ref()),
+                id_field: id,
+                resource_name: "authentication flow",
+                update_call: |id, rep| client.update_authentication_flow(id, rep),
+                create_call: |rep| client.create_authentication_flow(rep)
+            }
+            Ok::<(), anyhow::Error>(())
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res??;
     }
     Ok(())
 }
