@@ -20,102 +20,105 @@ pub async fn apply_required_actions(
 ) -> Result<()> {
     // 9. Apply Required Actions
     let actions_dir = workspace_dir.join("required-actions");
-    if async_fs::try_exists(&actions_dir).await? {
-        let existing_actions = client.get_required_actions().await.with_context(|| {
-            format!("Failed to get required actions for realm '{}'", realm_name)
-        })?;
-        let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
-            existing_actions
-                .into_iter()
-                .filter_map(|a| a.get_identity().map(|id| (id, a)))
-                .collect();
-        let existing_actions_map = Arc::new(existing_actions_map);
+    if !async_fs::try_exists(&actions_dir).await? {
+        return Ok(());
+    }
 
-        let mut entries = async_fs::read_dir(&actions_dir).await?;
-        let mut set = JoinSet::new();
+    let existing_actions = client
+        .get_required_actions()
+        .await
+        .with_context(|| format!("Failed to get required actions for realm '{}'", realm_name))?;
+    let existing_actions_map: HashMap<String, RequiredActionProviderRepresentation> =
+        existing_actions
+            .into_iter()
+            .filter_map(|a| a.get_identity().map(|id| (id, a)))
+            .collect();
+    let existing_actions_map = Arc::new(existing_actions_map);
 
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
-            if let Some(plan) = &*planned_files
-                && !plan.contains(&path)
-            {
-                continue;
-            }
-            if path.extension().is_some_and(|ext| ext == "yaml") {
-                let client = client.clone();
-                let existing_actions_map = Arc::clone(&existing_actions_map);
-                let resolver = Arc::clone(&resolver);
-                let realm_name = realm_name.to_string();
-                set.spawn(async move {
-                    let content = async_fs::read_to_string(&path).await?;
-                    let mut val: serde_json::Value = serde_yaml::from_str(&content)
-                        .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-                    substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
-                    #[allow(unused_mut)]
-                    let mut action_rep: RequiredActionProviderRepresentation =
-                        serde_json::from_value(val)?;
+    let mut entries = async_fs::read_dir(&actions_dir).await?;
+    let mut set = JoinSet::new();
 
-                    let identity = action_rep.get_identity().context(format!(
-                        "Failed to get identity for required action in {:?}",
-                        path
-                    ))?;
-
-                    if existing_actions_map.contains_key(&identity) {
-                        client
-                            .update_required_action(&identity, &action_rep)
-                            .await
-                            .with_context(|| {
-                                format!(
-                                    "Failed to update required action '{}' in realm '{}'",
-                                    action_rep.get_name(),
-                                    realm_name
-                                )
-                            })?;
-                        println!(
-                            "  {} {}",
-                            SUCCESS_UPDATE,
-                            style(format!("Updated required action {}", action_rep.get_name()))
-                                .cyan()
-                        );
-                    } else {
-                        // Register
-                        client
-                            .register_required_action(&action_rep)
-                            .await
-                            .with_context(|| {
-                                format!(
-                                    "Failed to register required action '{}' in realm '{}'",
-                                    action_rep.get_name(),
-                                    realm_name
-                                )
-                            })?;
-                        client
-                            .update_required_action(&identity, &action_rep)
-                            .await
-                            .with_context(|| {
-                                format!(
-                                    "Failed to configure registered required action '{}' in realm '{}'",
-                                    action_rep.get_name(),
-                                    realm_name
-                                )
-                            })?;
-                        println!(
-                            "  {} {}",
-                            SUCCESS_CREATE,
-                            style(format!(
-                                "Registered required action {}",
-                                action_rep.get_name()
-                            ))
-                            .green()
-                        );
-                    }
-                    Ok::<(), anyhow::Error>(())
-                });
-            }
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if let Some(plan) = &*planned_files
+            && !plan.contains(&path)
+        {
+            continue;
         }
-        while let Some(res) = set.join_next().await {
-            res??;
+        if path.extension().is_none_or(|ext| ext != "yaml") {
+            continue;
         }
+
+        let client = client.clone();
+        let existing_actions_map = Arc::clone(&existing_actions_map);
+        let resolver = Arc::clone(&resolver);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            let content = async_fs::read_to_string(&path).await?;
+            let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+            substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
+            #[allow(unused_mut)]
+            let mut action_rep: RequiredActionProviderRepresentation = serde_json::from_value(val)?;
+
+            let identity = action_rep.get_identity().context(format!(
+                "Failed to get identity for required action in {:?}",
+                path
+            ))?;
+
+            if existing_actions_map.contains_key(&identity) {
+                client
+                    .update_required_action(&identity, &action_rep)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to update required action '{}' in realm '{}'",
+                            action_rep.get_name(),
+                            realm_name
+                        )
+                    })?;
+                println!(
+                    "  {} {}",
+                    SUCCESS_UPDATE,
+                    style(format!("Updated required action {}", action_rep.get_name())).cyan()
+                );
+            } else {
+                // Register
+                client
+                    .register_required_action(&action_rep)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to register required action '{}' in realm '{}'",
+                            action_rep.get_name(),
+                            realm_name
+                        )
+                    })?;
+                client
+                    .update_required_action(&identity, &action_rep)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to configure registered required action '{}' in realm '{}'",
+                            action_rep.get_name(),
+                            realm_name
+                        )
+                    })?;
+                println!(
+                    "  {} {}",
+                    SUCCESS_CREATE,
+                    style(format!(
+                        "Registered required action {}",
+                        action_rep.get_name()
+                    ))
+                    .green()
+                );
+            }
+            Ok::<(), anyhow::Error>(())
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res??;
     }
     Ok(())
 }

@@ -17,67 +17,71 @@ pub async fn apply_roles(
 ) -> Result<()> {
     // 2. Apply Roles
     let roles_dir = workspace_dir.join("roles");
-    if async_fs::try_exists(&roles_dir).await? {
-        let existing_roles = client
-            .get_roles()
-            .await
-            .with_context(|| format!("Failed to get roles for realm '{}'", realm_name))?;
-        let existing_roles_map: HashMap<String, String> = existing_roles
-            .into_iter()
-            .filter_map(|r| {
-                let identity = r.get_identity();
-                let id = r.id;
-                match (identity, id) {
-                    (Some(identity), Some(id)) => Some((identity, id)),
-                    _ => None,
-                }
-            })
-            .collect();
-        let existing_roles_map = std::sync::Arc::new(existing_roles_map);
+    if !async_fs::try_exists(&roles_dir).await? {
+        return Ok(());
+    }
 
-        let mut entries = async_fs::read_dir(&roles_dir).await?;
-        let mut set = JoinSet::new();
-
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
-            if let Some(plan) = &*planned_files
-                && !plan.contains(&path)
-            {
-                continue;
+    let existing_roles = client
+        .get_roles()
+        .await
+        .with_context(|| format!("Failed to get roles for realm '{}'", realm_name))?;
+    let existing_roles_map: HashMap<String, String> = existing_roles
+        .into_iter()
+        .filter_map(|r| {
+            let identity = r.get_identity();
+            let id = r.id;
+            match (identity, id) {
+                (Some(identity), Some(id)) => Some((identity, id)),
+                _ => None,
             }
-            if path.extension().is_some_and(|ext| ext == "yaml") {
-                let client = client.clone();
-                let existing_roles_map = existing_roles_map.clone();
-                let resolver = Arc::clone(&resolver);
-                let realm_name = realm_name.to_string();
-                set.spawn(async move {
-                    let content = async_fs::read_to_string(&path).await?;
-                    let mut val: serde_json::Value = serde_yaml::from_str(&content)
-                        .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-                    substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
-                    let mut role_rep: RoleRepresentation = serde_json::from_value(val)?;
+        })
+        .collect();
+    let existing_roles_map = std::sync::Arc::new(existing_roles_map);
 
-                    let identity = role_rep
-                        .get_identity()
-                        .context(format!("Failed to get identity for role in {:?}", path))?;
+    let mut entries = async_fs::read_dir(&roles_dir).await?;
+    let mut set = JoinSet::new();
 
-                    crate::handle_upsert! {
-                        client: client,
-                        realm: realm_name,
-                        rep: role_rep,
-                        id_opt: existing_roles_map.get(&identity),
-                        id_field: id,
-                        resource_name: "role",
-                        update_call: |id, rep| client.update_role(id, rep),
-                        create_call: |rep| client.create_role(rep)
-                    }
-                    Ok::<(), anyhow::Error>(())
-                });
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if let Some(plan) = &*planned_files
+            && !plan.contains(&path)
+        {
+            continue;
+        }
+        if path.extension().is_none_or(|ext| ext != "yaml") {
+            continue;
+        }
+
+        let client = client.clone();
+        let existing_roles_map = existing_roles_map.clone();
+        let resolver = Arc::clone(&resolver);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            let content = async_fs::read_to_string(&path).await?;
+            let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+            substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
+            let mut role_rep: RoleRepresentation = serde_json::from_value(val)?;
+
+            let identity = role_rep
+                .get_identity()
+                .context(format!("Failed to get identity for role in {:?}", path))?;
+
+            crate::handle_upsert! {
+                client: client,
+                realm: realm_name,
+                rep: role_rep,
+                id_opt: existing_roles_map.get(&identity),
+                id_field: id,
+                resource_name: "role",
+                update_call: |id, rep| client.update_role(id, rep),
+                create_call: |rep| client.create_role(rep)
             }
-        }
-        while let Some(res) = set.join_next().await {
-            res??;
-        }
+            Ok::<(), anyhow::Error>(())
+        });
+    }
+    while let Some(res) = set.join_next().await {
+        res??;
     }
     Ok(())
 }
