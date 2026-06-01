@@ -99,6 +99,25 @@ fn is_boolean_string(s: &str) -> bool {
     lower == "true" || lower == "false" || lower == "on" || lower == "off"
 }
 
+/// Helper to format environment variable names
+fn format_env_var_name(prefix: &str, key: &str) -> String {
+    let env_var_name = if prefix.is_empty() {
+        format!("KEYCLOAK_{}", key)
+    } else {
+        format!("KEYCLOAK_{}_{}", prefix, key)
+    };
+    env_var_name
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c.to_ascii_uppercase()
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
 /// Recursively extract secrets and replace them with ${ENV_VAR}
 pub fn extract_secrets(value: &mut Value, prefix: &str, secrets: &mut HashMap<String, String>) {
     match value {
@@ -141,21 +160,7 @@ pub fn extract_secrets(value: &mut Value, prefix: &str, secrets: &mut HashMap<St
 
             for k in keys_to_update {
                 if let Some(Value::String(s)) = map.get_mut(&k) {
-                    let mut env_var_name = if current_prefix.is_empty() {
-                        format!("KEYCLOAK_{}", k)
-                    } else {
-                        format!("KEYCLOAK_{}_{}", current_prefix, k)
-                    };
-                    env_var_name = env_var_name
-                        .chars()
-                        .map(|c| {
-                            if c.is_alphanumeric() {
-                                c.to_ascii_uppercase()
-                            } else {
-                                '_'
-                            }
-                        })
-                        .collect();
+                    let env_var_name = format_env_var_name(&current_prefix, &k);
                     secrets.insert(env_var_name.clone(), s.clone());
                     *s = format!("${{{}}}", env_var_name);
                 }
