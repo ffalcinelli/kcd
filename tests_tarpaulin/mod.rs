@@ -101,12 +101,12 @@ fn is_boolean_string(s: &str) -> bool {
 
 /// Helper to format environment variable names
 fn format_env_var_name(prefix: &str, key: &str) -> String {
-    let env_var_name = if prefix.is_empty() {
+    let mut env_var_name = if prefix.is_empty() {
         format!("KEYCLOAK_{}", key)
     } else {
         format!("KEYCLOAK_{}_{}", prefix, key)
     };
-    env_var_name
+    env_var_name = env_var_name
         .chars()
         .map(|c| {
             if c.is_alphanumeric() {
@@ -115,7 +115,8 @@ fn format_env_var_name(prefix: &str, key: &str) -> String {
                 '_'
             }
         })
-        .collect()
+        .collect();
+    env_var_name
 }
 
 /// Recursively extract secrets and replace them with ${ENV_VAR}
@@ -307,24 +308,13 @@ mod tests {
         let mut secrets2 = HashMap::new();
         extract_secrets(&mut val2, "", &mut secrets2);
         assert_eq!(val2["clientSecret"], "${KEYCLOAK_CLIENTSECRET}");
-        assert_eq!(
-            secrets2.get("KEYCLOAK_CLIENTSECRET").unwrap(),
-            "secret_value_2"
-        );
+        assert_eq!(secrets2.get("KEYCLOAK_CLIENTSECRET").unwrap(), "secret_value_2");
 
         let mut val3 = json!({"clientSecret-special": "secret_value_3"});
         let mut secrets3 = HashMap::new();
         extract_secrets(&mut val3, "prefix", &mut secrets3);
-        assert_eq!(
-            val3["clientSecret-special"],
-            "${KEYCLOAK_PREFIX_CLIENTSECRET_SPECIAL}"
-        );
-        assert_eq!(
-            secrets3
-                .get("KEYCLOAK_PREFIX_CLIENTSECRET_SPECIAL")
-                .unwrap(),
-            "secret_value_3"
-        );
+        assert_eq!(val3["clientSecret-special"], "${KEYCLOAK_PREFIX_CLIENTSECRET_SPECIAL}");
+        assert_eq!(secrets3.get("KEYCLOAK_PREFIX_CLIENTSECRET_SPECIAL").unwrap(), "secret_value_3");
     }
 
     #[tokio::test]
