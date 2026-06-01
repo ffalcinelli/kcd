@@ -12,6 +12,32 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
     let call_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let count_clone = Arc::clone(&call_count);
 
+    macro_rules! mock_handler {
+        ($status:expr) => {{
+            let count = Arc::clone(&count_clone);
+            move || {
+                let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                async move {
+                    if c == 0 {
+                        StatusCode::INTERNAL_SERVER_ERROR
+                    } else {
+                        $status
+                    }
+                }
+            }
+        }};
+    }
+
+    macro_rules! mock_error_handler {
+        () => {{
+            let count = Arc::clone(&count_clone);
+            move || {
+                count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                async { StatusCode::INTERNAL_SERVER_ERROR }
+            }
+        }};
+    }
+
     let app = Router::new()
         .route(
             "/admin/realms/test/client-scopes",
@@ -28,35 +54,11 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/client-scopes/existing-id",
-            put({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::OK
-                        }
-                    }
-                }
-            }),
+            put(mock_handler!(StatusCode::OK)),
         )
         .route(
             "/admin/realms/test/client-scopes",
-            post({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::CREATED
-                        }
-                    }
-                }
-            }),
+            post(mock_handler!(StatusCode::CREATED)),
         )
         .route(
             "/admin/realms/test/groups",
@@ -72,35 +74,11 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/groups/existing-id",
-            put({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::OK
-                        }
-                    }
-                }
-            }),
+            put(mock_handler!(StatusCode::OK)),
         )
         .route(
             "/admin/realms/test/groups",
-            post({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::CREATED
-                        }
-                    }
-                }
-            }),
+            post(mock_handler!(StatusCode::CREATED)),
         )
         .route(
             "/admin/realms/test/roles",
@@ -118,35 +96,11 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/roles-by-id/existing-id",
-            put({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::OK
-                        }
-                    }
-                }
-            }),
+            put(mock_handler!(StatusCode::OK)),
         )
         .route(
             "/admin/realms/test/roles",
-            post({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::CREATED
-                        }
-                    }
-                }
-            }),
+            post(mock_handler!(StatusCode::CREATED)),
         )
         .route(
             "/admin/realms/test/authentication/required-actions",
@@ -165,39 +119,15 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/authentication/required-actions/existing-action",
-            put({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async { StatusCode::INTERNAL_SERVER_ERROR }
-                }
-            }),
+            put(mock_error_handler!()),
         )
         .route(
             "/admin/realms/test/authentication/register-required-action",
-            post({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::OK
-                        }
-                    }
-                }
-            }),
+            post(mock_handler!(StatusCode::OK)),
         )
         .route(
             "/admin/realms/test/authentication/required-actions/new-action",
-            put({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async { StatusCode::INTERNAL_SERVER_ERROR }
-                }
-            }),
+            put(mock_error_handler!()),
         )
         .route(
             "/admin/realms/test/authentication/flows",
@@ -216,35 +146,11 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/authentication/flows/existing-id",
-            put({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::OK
-                        }
-                    }
-                }
-            }),
+            put(mock_handler!(StatusCode::OK)),
         )
         .route(
             "/admin/realms/test/authentication/flows",
-            post({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::CREATED
-                        }
-                    }
-                }
-            }),
+            post(mock_handler!(StatusCode::CREATED)),
         )
         .route(
             "/admin/realms/test/users",
@@ -264,35 +170,11 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/users/existing-id",
-            put({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::OK
-                        }
-                    }
-                }
-            }),
+            put(mock_handler!(StatusCode::OK)),
         )
         .route(
             "/admin/realms/test/users",
-            post({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::CREATED
-                        }
-                    }
-                }
-            }),
+            post(mock_handler!(StatusCode::CREATED)),
         )
         .route(
             "/admin/realms/test/components",
@@ -311,35 +193,11 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/components/existing-id",
-            put({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::OK
-                        }
-                    }
-                }
-            }),
+            put(mock_handler!(StatusCode::OK)),
         )
         .route(
             "/admin/realms/test/components",
-            post({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::CREATED
-                        }
-                    }
-                }
-            }),
+            post(mock_handler!(StatusCode::CREATED)),
         )
         .route(
             "/admin/realms/test/clients",
@@ -359,35 +217,11 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
                     extra: Default::default(),
                 }])
             })
-            .post({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::CREATED
-                        }
-                    }
-                }
-            }),
+            .post(mock_handler!(StatusCode::CREATED)),
         )
         .route(
             "/admin/realms/test/clients/existing-id",
-            put({
-                let count = Arc::clone(&count_clone);
-                move || {
-                    let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    async move {
-                        if c == 0 {
-                            StatusCode::INTERNAL_SERVER_ERROR
-                        } else {
-                            StatusCode::OK
-                        }
-                    }
-                }
-            }),
+            put(mock_handler!(StatusCode::OK)),
         );
 
     let listener = TcpListener::bind("127.0.0.1:0").await?;
