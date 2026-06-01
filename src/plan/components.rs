@@ -77,28 +77,19 @@ pub async fn plan_components_or_keys(
                             )
                         })?;
 
-                    let remote = if let Some(identity) = local_component.get_identity() {
-                        by_identity
-                            .get(&identity)
-                            .or_else(|| {
-                                let key = (
-                                    local_component.name.clone(),
-                                    local_component.sub_type.clone(),
-                                    local_component.provider_id.clone(),
-                                    local_component.parent_id.clone(),
-                                );
-                                by_details.get(&key)
-                            })
-                            .cloned()
-                    } else {
-                        let key = (
-                            local_component.name.clone(),
-                            local_component.sub_type.clone(),
-                            local_component.provider_id.clone(),
-                            local_component.parent_id.clone(),
-                        );
-                        by_details.get(&key).cloned()
-                    };
+                    let remote = local_component
+                        .get_identity()
+                        .and_then(|id| by_identity.get(&id))
+                        .or_else(|| {
+                            let key = (
+                                local_component.name.clone(),
+                                local_component.sub_type.clone(),
+                                local_component.provider_id.clone(),
+                                local_component.parent_id.clone(),
+                            );
+                            by_details.get(&key)
+                        })
+                        .cloned();
 
                     Ok::<
                         (
