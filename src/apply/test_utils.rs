@@ -19,10 +19,9 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
                 let c = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 async move {
                     if c == 0 {
-                        StatusCode::INTERNAL_SERVER_ERROR
-                    } else {
-                        $status
+                        return StatusCode::INTERNAL_SERVER_ERROR;
                     }
+                    $status
                 }
             }
         }};
@@ -38,18 +37,22 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         }};
     }
 
+    macro_rules! mock_get {
+        ($val:expr) => {
+            get(|| async { Json(vec![$val]) })
+        };
+    }
+
     let app = Router::new()
         .route(
             "/admin/realms/test/client-scopes",
-            get(|| async {
-                Json(vec![ClientScopeRepresentation {
-                    id: Some("existing-id".to_string()),
-                    name: Some("existing-scope".to_string()),
-                    description: None,
-                    protocol: None,
-                    attributes: None,
-                    extra: Default::default(),
-                }])
+            mock_get!(ClientScopeRepresentation {
+                id: Some("existing-id".to_string()),
+                name: Some("existing-scope".to_string()),
+                description: None,
+                protocol: None,
+                attributes: None,
+                extra: Default::default(),
             }),
         )
         .route(
@@ -62,14 +65,12 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/groups",
-            get(|| async {
-                Json(vec![GroupRepresentation {
-                    id: Some("existing-id".to_string()),
-                    name: Some("Existing Group".to_string()),
-                    path: Some("/existing-group".to_string()),
-                    sub_groups: None,
-                    extra: Default::default(),
-                }])
+            mock_get!(GroupRepresentation {
+                id: Some("existing-id".to_string()),
+                name: Some("Existing Group".to_string()),
+                path: Some("/existing-group".to_string()),
+                sub_groups: None,
+                extra: Default::default(),
             }),
         )
         .route(
@@ -82,16 +83,14 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/roles",
-            get(|| async {
-                Json(vec![RoleRepresentation {
-                    id: Some("existing-id".to_string()),
-                    name: "existing-role".to_string(),
-                    description: None,
-                    container_id: None,
-                    composite: false,
-                    client_role: false,
-                    extra: Default::default(),
-                }])
+            mock_get!(RoleRepresentation {
+                id: Some("existing-id".to_string()),
+                name: "existing-role".to_string(),
+                description: None,
+                container_id: None,
+                composite: false,
+                client_role: false,
+                extra: Default::default(),
             }),
         )
         .route(
@@ -104,17 +103,15 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/authentication/required-actions",
-            get(|| async {
-                Json(vec![RequiredActionProviderRepresentation {
-                    alias: Some("existing-action".to_string()),
-                    name: Some("Existing Action".to_string()),
-                    provider_id: Some("existing-provider".to_string()),
-                    enabled: Some(true),
-                    default_action: Some(false),
-                    priority: Some(0),
-                    config: None,
-                    extra: Default::default(),
-                }])
+            mock_get!(RequiredActionProviderRepresentation {
+                alias: Some("existing-action".to_string()),
+                name: Some("Existing Action".to_string()),
+                provider_id: Some("existing-provider".to_string()),
+                enabled: Some(true),
+                default_action: Some(false),
+                priority: Some(0),
+                config: None,
+                extra: Default::default(),
             }),
         )
         .route(
@@ -131,17 +128,15 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/authentication/flows",
-            get(|| async {
-                Json(vec![AuthenticationFlowRepresentation {
-                    id: Some("existing-id".to_string()),
-                    alias: Some("existing-flow".to_string()),
-                    description: Some("Existing Flow".to_string()),
-                    provider_id: None,
-                    top_level: Some(true),
-                    built_in: Some(false),
-                    authentication_executions: None,
-                    extra: Default::default(),
-                }])
+            mock_get!(AuthenticationFlowRepresentation {
+                id: Some("existing-id".to_string()),
+                alias: Some("existing-flow".to_string()),
+                description: Some("Existing Flow".to_string()),
+                provider_id: None,
+                top_level: Some(true),
+                built_in: Some(false),
+                authentication_executions: None,
+                extra: Default::default(),
             }),
         )
         .route(
@@ -154,18 +149,16 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/users",
-            get(|| async {
-                Json(vec![UserRepresentation {
-                    id: Some("existing-id".to_string()),
-                    username: Some("existing-user".to_string()),
-                    enabled: Some(true),
-                    first_name: None,
-                    last_name: None,
-                    email: None,
-                    email_verified: None,
-                    credentials: None,
-                    extra: Default::default(),
-                }])
+            mock_get!(UserRepresentation {
+                id: Some("existing-id".to_string()),
+                username: Some("existing-user".to_string()),
+                enabled: Some(true),
+                first_name: None,
+                last_name: None,
+                email: None,
+                email_verified: None,
+                credentials: None,
+                extra: Default::default(),
             }),
         )
         .route(
@@ -178,17 +171,15 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/components",
-            get(|| async {
-                Json(vec![ComponentRepresentation {
-                    id: Some("existing-id".to_string()),
-                    name: Some("Existing Component".to_string()),
-                    provider_id: Some("existing-provider".to_string()),
-                    provider_type: Some("existing-type".to_string()),
-                    parent_id: Some("test".to_string()),
-                    sub_type: None,
-                    config: None,
-                    extra: Default::default(),
-                }])
+            mock_get!(ComponentRepresentation {
+                id: Some("existing-id".to_string()),
+                name: Some("Existing Component".to_string()),
+                provider_id: Some("existing-provider".to_string()),
+                provider_type: Some("existing-type".to_string()),
+                parent_id: Some("test".to_string()),
+                sub_type: None,
+                config: None,
+                extra: Default::default(),
             }),
         )
         .route(
@@ -201,21 +192,19 @@ pub async fn start_mock_server() -> Result<(String, Arc<std::sync::atomic::Atomi
         )
         .route(
             "/admin/realms/test/clients",
-            get(|| async {
-                Json(vec![ClientRepresentation {
-                    id: Some("existing-id".to_string()),
-                    client_id: Some("existing-client".to_string()),
-                    name: Some("Existing Client".to_string()),
-                    description: None,
-                    enabled: Some(true),
-                    protocol: None,
-                    redirect_uris: None,
-                    web_origins: None,
-                    public_client: None,
-                    bearer_only: None,
-                    service_accounts_enabled: None,
-                    extra: Default::default(),
-                }])
+            mock_get!(ClientRepresentation {
+                id: Some("existing-id".to_string()),
+                client_id: Some("existing-client".to_string()),
+                name: Some("Existing Client".to_string()),
+                description: None,
+                enabled: Some(true),
+                protocol: None,
+                redirect_uris: None,
+                web_origins: None,
+                public_client: None,
+                bearer_only: None,
+                service_accounts_enabled: None,
+                extra: Default::default(),
             })
             .post(mock_handler!(StatusCode::CREATED)),
         )
