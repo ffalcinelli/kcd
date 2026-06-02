@@ -99,6 +99,16 @@ fn is_boolean_string(s: &str) -> bool {
     lower == "true" || lower == "false" || lower == "on" || lower == "off"
 }
 
+/// Try to find an identifier for an object to make secret names better
+fn get_object_identifier(map: &serde_json::Map<String, Value>) -> Option<String> {
+    map.get("clientId")
+        .or_else(|| map.get("username"))
+        .or_else(|| map.get("alias"))
+        .or_else(|| map.get("name"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
 /// Helper to format environment variable names
 fn format_env_var_name(prefix: &str, key: &str) -> String {
     let env_var_name = if prefix.is_empty() {
@@ -124,14 +134,7 @@ pub fn extract_secrets(value: &mut Value, prefix: &str, secrets: &mut HashMap<St
         Value::Object(map) => {
             let mut keys_to_update = Vec::new();
 
-            // Try to find an identifier for this object to make secret names better
-            let id = map
-                .get("clientId")
-                .or_else(|| map.get("username"))
-                .or_else(|| map.get("alias"))
-                .or_else(|| map.get("name"))
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+            let id = get_object_identifier(map);
 
             let current_prefix = if let Some(id_str) = id {
                 if prefix.is_empty() {
@@ -234,14 +237,7 @@ pub fn obfuscate_secrets(value: &mut Value, prefix: &str) {
         Value::Object(map) => {
             let mut keys_to_obfuscate = Vec::new();
 
-            // Try to find an identifier for this object to make secret identification better
-            let id = map
-                .get("clientId")
-                .or_else(|| map.get("username"))
-                .or_else(|| map.get("alias"))
-                .or_else(|| map.get("name"))
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+            let id = get_object_identifier(map);
 
             let current_prefix = if let Some(id_str) = id {
                 if prefix.is_empty() {
