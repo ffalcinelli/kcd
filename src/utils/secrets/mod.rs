@@ -184,14 +184,18 @@ pub async fn substitute_secrets(
 ) -> Result<()> {
     match value {
         Value::Object(map) => {
-            for (_, v) in map.iter_mut() {
-                substitute_secrets(v, Arc::clone(&resolver)).await?;
-            }
+            let futures: Vec<_> = map
+                .values_mut()
+                .map(|v| substitute_secrets(v, Arc::clone(&resolver)))
+                .collect();
+            futures::future::try_join_all(futures).await?;
         }
         Value::Array(arr) => {
-            for v in arr.iter_mut() {
-                substitute_secrets(v, Arc::clone(&resolver)).await?;
-            }
+            let futures: Vec<_> = arr
+                .iter_mut()
+                .map(|v| substitute_secrets(v, Arc::clone(&resolver)))
+                .collect();
+            futures::future::try_join_all(futures).await?;
         }
         Value::String(s) if s.starts_with("${") && s.ends_with("}") => {
             let var_name = &s[2..s.len() - 1];
