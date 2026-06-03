@@ -75,9 +75,7 @@ pub async fn apply_authentication_flows(
             Ok::<(), anyhow::Error>(())
         });
     }
-    while let Some(res) = set.join_next().await {
-        res??;
-    }
+    crate::utils::join_all_tasks(set, None).await?;
     Ok(())
 }
 

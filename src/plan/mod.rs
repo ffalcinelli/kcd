@@ -102,9 +102,12 @@ pub async fn run(
     }
 
     let mut changed_files = Vec::new();
-    while let Some(res) = set.join_next().await {
-        changed_files.extend(res??);
-    }
+    changed_files.extend(
+        crate::utils::join_all_tasks(set, None)
+            .await?
+            .into_iter()
+            .flatten(),
+    );
     changed_files.sort();
 
     let plan_file = workspace_dir.join(".kcdplan");

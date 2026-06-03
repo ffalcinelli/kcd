@@ -80,8 +80,8 @@ where
         }
     }
 
-    while let Some(res) = set.join_next().await {
-        let (local, path, remote) = res??;
+    for res in crate::utils::join_all_tasks(set, None).await? {
+        let (local, path, remote) = res;
 
         let changed = if let Some(remote) = remote {
             let mut remote_clone = remote.clone();

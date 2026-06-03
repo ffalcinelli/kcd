@@ -174,9 +174,7 @@ pub async fn run(
         });
     }
 
-    while let Some(res) = set.join_next().await {
-        res??;
-    }
+    crate::utils::join_all_tasks(set, None).await?;
 
     // Success - remove plan
     if plan_path.exists() {
@@ -397,9 +395,7 @@ async fn apply_single_realm(
         });
     }
 
-    while let Some(res) = set.join_next().await {
-        res??;
-    }
+    crate::utils::join_all_tasks(set, None).await?;
 
     Ok(())
 }
