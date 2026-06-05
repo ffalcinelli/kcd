@@ -6,23 +6,50 @@ This document serves as the internal developer guide for `kcd`. It explains the 
 
 `kcd` follows a **Reconciliation Loop** pattern, similar to Kubernetes controllers.
 
-1.  **Desired State**: Defined in local YAML files within the workspace.
+1.  **Desired State**: Defined in local YAML files within the workspace. Support for **Environment Profiles & Overlays** allows for multi-environment configurations (e.g., `realm.yaml` + `realm.prod.yaml`).
 2.  **Current State**: Fetched from the Keycloak Admin API.
 3.  **Diff Engine (`plan.rs`)**: Compares the two states to identify what needs to be Created, Updated, or Deleted. It generates a `.kcdplan` file in the workspace containing the list of files that have pending changes.
-4.  **Reconciler (`apply.rs`)**: Executes the necessary API calls to bring the Current State in line with the Desired State. It optionally uses the `.kcdplan` file to only apply changes that were previously planned.
+4.  **Reconciler (`apply.rs`)**: Executes the necessary API calls to bring the Current State in line with the Desired State. It uses **Dependency-Aware (Staged) Reconciliation** to ensure resources are applied in the correct order (e.g., Realms before Roles, Roles before Users).
 
 ### Core Modules
 
 -   `src/client.rs`: Low-level wrapper for the Keycloak Admin REST API. Handles authentication and provides a **generic CRUD interface** for Keycloak resources.
 -   `src/models.rs`: Serde-based representations of Keycloak resources. Defines the `KeycloakResource` and `ResourceMeta` traits for generic resource management.
 -   `src/inspect.rs`: Deep-scans the remote Keycloak server and serializes resources into local files using a **generic, parallelized inspection pipeline**.
--   `src/plan/`: Contains the logic for calculating diffs for each resource type. It's structured into submodules for better maintainability.
--   `src/apply/`: Contains the logic for applying changes. It uses **parallelized reconciliation** at the resource type level within each realm (using `tokio::task::JoinSet`).
--   `src/utils/secrets.rs`: Uses heuristics to find and mask sensitive fields in configuration objects.
--   `src/utils/ui.rs`: Centralized module for CLI output formatting, emoji management, and consistent styling across the tool.
--   `src/clean.rs`: Removes local workspace representations of Keycloak realms and resources using **parallel I/O**.
--   `src/validate.rs`: Performs local validation of YAML configurations before they are applied using **async I/O**.
--   `src/cli/`: Logic for the interactive scaffolding of new resources.
+-   `src/plan/`: Contains the logic for calculating diffs. Uses a **generic planning engine** (`generic.rs`) for most resource types.
+-   `src/apply/`: Contains the logic for applying changes. Uses a **generic reconciliation engine** (`generic.rs`) and a **staged application pipeline** to ensure reliability.
+-   `src/utils/secrets/`: Manages secret resolution (Env, Vault, etc.).
+-   `src/utils/yaml.rs`: Handles YAML deep-merging and profile-specific overlays.
+-   `src/utils/ui.rs`: Centralized module for CLI output formatting, emoji management, and **indicatif progress bars**.
+
+---
+
+## 🛠️ Staged Reconciliation Pipeline
+
+To prevent race conditions and ensure correct dependency handling, `apply` is executed in stages:
+
+1.  **Stage 0**: Realms (Foundation).
+2.  **Stage 1**: Identity Providers, Roles (Infrastructure).
+3.  **Stage 2**: Clients, Client Scopes, Authentication Flows, Required Actions, Groups (Structure).
+4.  **Stage 3**: Users, Components, Keys (Data & Final Config).
+
+---
+
+## 🌍 Environment Profiles & Overlays
+
+`kcd` supports multi-environment configurations via the `--profile` (`-p`) flag.
+
+### Profiles
+Profiles are stored in the `profiles/` directory (e.g., `profiles/prod.yaml`). They define environment-specific connection details:
+```yaml
+server_url: "https://keycloak.prod.example.com"
+client_id: "kcd-cli"
+client_secret: "${PROD_KCD_SECRET}"
+secrets_file: ".secrets.prod"
+```
+
+### Overlays
+For any resource `resource.yaml`, `kcd` looks for `resource.{profile}.yaml` and deep-merges it onto the base configuration if that profile is active. This is handled by `src/utils/yaml.rs`.
 
 ---
 
@@ -35,8 +62,8 @@ To support a new Keycloak resource (e.g., "Event Listeners"):
     - Implement `KeycloakResource` (for name/ID handling and API paths).
     - Implement `ResourceMeta` (to define labels and secret prefixes).
 2.  **Update `inspect.rs`**: Add a `spawn_inspect::<NewResourceRepresentation>(...)` call in the `inspect_realm` function.
-3.  **Update `plan/`**: Create a new submodule (if needed) and add logic to compare the local and remote versions of the resource. Hook it into `src/plan/mod.rs`.
-4.  **Update `apply/`**: Create a new submodule (if needed) and add logic to execute API calls for Creating/Updating the resource. Hook it into `src/apply/mod.rs` (ensure it's added to the parallelized `JoinSet`).
+3.  **Update `plan/mod.rs`**: Add the new resource to `plan_single_realm` using `generic::plan_resources`.
+4.  **Update `apply/mod.rs`**: Add the new resource to the appropriate stage in `apply_single_realm` using `generic::apply_resources`.
 5.  **Update `validate.rs`**: (Optional) Add specific validation rules.
 6.  **Update `cli/`**: (Optional) Add interactive scaffolding for the new resource.
 
@@ -53,11 +80,29 @@ Located within the modules themselves (e.g., `src/utils/secrets.rs`). Focused on
 Located in `tests/`.
 -   **Common**: Shared utilities for setting up temporary workspaces and environment variables.
 -   **Mocked Tests**: Use `mockito` to simulate Keycloak responses for various scenarios.
--   **Real Integration**: Requires a live Keycloak instance (configured via environment variables). See `tests/real_integration_test.rs`.
+-   **Real Integration**: Requires a live Keycloak instance (configured via environment variables or **Profiles**). See `tests/real_integration_test.rs`.
 -   **Ultimate Coverage**: `tests/ultimate_coverage_test.rs` and `tests/models_coverage_test.rs` provide comprehensive checks for resource handling.
 
 ### Benchmarks
 Located in `benches/`. Used to monitor performance for large workspaces with thousands of files.
+
+---
+
+## 🌍 Environment Profiles & Overlays
+
+`kcd` supports multi-environment configurations via the `--profile` (`-p`) flag.
+
+### Profiles
+Profiles are stored in the `profiles/` directory (e.g., `profiles/prod.yaml`). They define environment-specific connection details:
+```yaml
+server_url: "https://keycloak.prod.example.com"
+client_id: "kcd-cli"
+client_secret: "${PROD_KCD_SECRET}"
+secrets_file: ".secrets.prod"
+```
+
+### Overlays
+For any resource `resource.yaml`, `kcd` looks for `resource.{profile}.yaml` and deep-merges it onto the base configuration if that profile is active. This allows for environment-specific tweaks without duplicating entire files.
 
 ---
 

@@ -1,18 +1,18 @@
 use crate::utils::secrets::substitute_secrets;
+use crate::utils::yaml::load_yaml_with_overlay;
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
 
-use super::{PlanContext, print_diff};
+use super::{PlanContext, PlanSummary, print_diff};
 
-pub async fn plan_realm(ctx: &PlanContext<'_>) -> Result<Vec<PathBuf>> {
+pub async fn plan_realm(ctx: &PlanContext<'_>) -> Result<(Vec<PathBuf>, PlanSummary)> {
     let mut changed_files = Vec::new();
+    let mut summary = PlanSummary::default();
     let realm_path = ctx.workspace_dir.join("realm.yaml");
     if async_fs::try_exists(&realm_path).await? {
-        let content = async_fs::read_to_string(&realm_path).await?;
-        let mut val: serde_json::Value = serde_yaml::from_str(&content)
-            .with_context(|| format!("Failed to parse YAML file: {:?}", realm_path))?;
+        let mut val = load_yaml_with_overlay(&realm_path, ctx.profile.as_deref()).await?;
         substitute_secrets(&mut val, Arc::clone(&ctx.resolver)).await?;
         let local_realm: crate::models::RealmRepresentation = serde_json::from_value(val)
             .with_context(|| format!("Failed to deserialize YAML file: {:?}", realm_path))?;
@@ -33,6 +33,7 @@ pub async fn plan_realm(ctx: &PlanContext<'_>) -> Result<Vec<PathBuf>> {
             }
         };
 
+        let is_update = remote_realm.is_some();
         if print_diff(
             "Realm",
             remote_realm.as_ref(),
@@ -46,8 +47,13 @@ pub async fn plan_realm(ctx: &PlanContext<'_>) -> Result<Vec<PathBuf>> {
             }
             if include {
                 changed_files.push(realm_path);
+                if is_update {
+                    summary.updated += 1;
+                } else {
+                    summary.created += 1;
+                }
             }
         }
     }
-    Ok(changed_files)
+    Ok((changed_files, summary))
 }

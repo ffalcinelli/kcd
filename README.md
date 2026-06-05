@@ -57,12 +57,14 @@ $ kcd cli
 
 - **Blazing Fast Performance**: Utilizes Rust's `tokio` for highly concurrent API interactions and parallel I/O operations.
 - **Declarative State**: Define your desired Keycloak state in human-readable YAML files.
+- **Environment Profiles & Overlays**: Manage multiple environments (Dev, Staging, Prod) with zero configuration duplication.
+- **Dependency-Aware Reconciliation**: Guaranteed correct application order through staged reconciliation (e.g., Realms -> Roles -> Users).
 - **Inspect & Export**: Bootstrap your project by exporting existing Keycloak configurations to local files.
-- **Dry-Run Planning**: Preview exactly what changes will be applied. It generates a `.kcdplan` file to track intended changes.
+- **Dry-Run Planning**: Preview exactly what changes will be applied with detailed diffs and summaries.
+- **Interactive Review**: Confirm individual changes before they are applied to the server using the `--review` flag.
 - **Drift Detection**: Identify discrepancies between your local configuration and the live server.
-- **Secret Masking**: Automatically handles sensitive data (secrets, passwords) by replacing them with environment variable placeholders and generating a `.secrets` file.
-- **Interactive Scaffolding**: Quickly generate resource templates through an interactive CLI.
-- **Resource Support**: Realms, Roles (Realm & Client), Identity Providers, Clients, Client Scopes, Groups, Users, Authentication Flows, Required Actions, and Components (including Keys).
+- **Secret Masking & Resolution**: Native support for Environment Variables and HashiCorp Vault.
+- **Resource Support**: Realms, Roles, Identity Providers, Clients, Client Scopes, Groups, Users, Authentication Flows, Required Actions, and Components (including Keys).
 
 ---
 
@@ -95,6 +97,53 @@ sudo cp target/release/kcd /usr/local/bin/
 
 ---
 
+## 🛠️ Development
+
+This project uses `cargo-husky` to manage Git hooks. To set up your development environment:
+
+1.  Clone the repository.
+2.  Run `cargo test`.
+
+Running tests will automatically install the Git hooks in your `.git/hooks` directory. The pre-commit hook ensures that `cargo fmt` and `cargo clippy` pass before any code is committed.
+
+---
+
+## 🌍 Environment Profiles
+
+`kcd` allows you to manage multiple Keycloak instances (e.g., Development, Staging, Production) using a native **Profiles** system.
+
+### 1. Define a Profile
+Create a YAML file in the `profiles/` directory:
+
+**`profiles/prod.yaml`**
+```yaml
+server_url: "https://keycloak.prod.example.com"
+client_id: "kcd-cli"
+client_secret: "${PROD_KCD_SECRET}"
+secrets_file: ".secrets.prod"  # Load environment secrets from this file
+```
+
+### 2. Use Overlays
+Avoid duplicating entire resource files for small environment-specific changes. Create an overlay file matching the pattern `resource.{profile}.yaml`:
+
+**`workspace/my-realm/clients/my-app.yaml` (Base)**
+```yaml
+clientId: my-app
+enabled: true
+redirectUris:
+  - "http://localhost:3000/*"
+```
+
+**`workspace/my-realm/clients/my-app.prod.yaml` (Overlay)**
+```yaml
+redirectUris:
+  - "https://app.example.com/*"
+```
+
+When running with `--profile prod`, `kcd` deep-merges the overlay onto the base configuration.
+
+---
+
 ## ⚙️ Configuration
 
 `kcd` uses environment variables for connection and authentication. You can export these in your shell or use a `.secrets` file.
@@ -111,20 +160,18 @@ sudo cp target/release/kcd /usr/local/bin/
 
 ### Workspace Structure
 
-By default, `kcd` looks for a `workspace/` directory:
-
 ```text
 workspace/
-├── .secrets                   # Generated during 'inspect', should be gitignored
-├── .kcdplan                   # Generated during 'plan', contains pending changes
-└── my-realm/                  # Realm folder
+├── .secrets                   # Default secrets file
+├── profiles/
+│   └── prod.yaml              # Profile definition
+├── my-realm/                  # Realm folder
     ├── realm.yaml             # Main realm settings
     ├── clients/
-    │   └── my-app.yaml        # Client configuration
-    ├── roles/
-    │   └── admin.yaml         # Realm role
-    └── users/
-        └── test-user.yaml     # User configuration (managed or scaffolded)
+    │   ├── my-app.yaml        # Base resource
+    │   └── my-app.prod.yaml   # Environment overlay
+    └── roles/
+        └── admin.yaml
 ```
 
 ---
@@ -136,9 +183,6 @@ Exports the remote server state to local YAML files.
 ```bash
 # Export everything to 'my-workspace'
 kcd inspect --workspace my-workspace --yes
-
-# Export specific realms
-kcd --realms master,demo inspect
 ```
 
 ### `validate`
@@ -150,26 +194,27 @@ kcd validate
 ### `plan`
 Calculates the "diff" between local files and the remote server.
 ```bash
-# Standard plan
-kcd plan
+# Plan for a specific profile
+kcd plan --profile prod
 
-# Interactive plan: decide for each change whether to include it in the plan
+# Interactive: decide for each change whether to include it in the plan
 kcd plan --interactive
-
-# Only show changes (hide 'No changes' messages)
-kcd plan --changes-only
 ```
 
 ### `apply`
-Reconciles the remote state to match your local configuration. If a `.kcdplan` exists, it will only apply the planned changes.
+Reconciles the remote state. It follows a **staged application order** (Realms -> Roles -> Clients -> Users) to ensure dependencies are met.
 ```bash
-kcd apply --yes
+# Apply planned changes for production
+kcd apply --profile prod --yes
+
+# Review mode: confirm each change before application
+kcd apply --profile prod --review
 ```
 
 ### `drift`
-A shortcut for `plan --changes-only`. Useful for scheduled CI jobs to detect manual changes on the server.
+A shortcut for `plan --changes-only`.
 ```bash
-kcd drift
+kcd drift --profile prod
 ```
 
 ### `clean`

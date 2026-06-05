@@ -37,3 +37,4 @@ cobertura.xml
 codeql-db/
 results.sarif
 dummy_workspace/
+.idea

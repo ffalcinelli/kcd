@@ -38,6 +38,10 @@ impl KeycloakClient {
         self.target_realm = target_realm;
     }
 
+    pub fn get_base_url(&self) -> &str {
+        &self.base_url
+    }
+
     fn realm_admin_url(&self) -> String {
         format!("{}/admin/realms/{}", self.base_url, self.target_realm)
     }

@@ -29,6 +29,7 @@ async-recursion = "1.1.1"
 console = "0.16.3"
 dialoguer = "0.12.0"
 futures = "0.3.32"
+indicatif = "0.18.4"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["async_tokio"] }
@@ -36,6 +37,7 @@ assert_cmd = "2.2.0"
 mockito = "1.7.2"
 predicates = "3.1.4"
 tempfile = "3.26.0"
+cargo-husky = { version = "1.5.0", features = ["run-cargo-fmt", "run-cargo-clippy", "precommit-hook"], default-features = false }
 
 [[bench]]
 name = "bench"

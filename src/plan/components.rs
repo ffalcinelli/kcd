@@ -2,6 +2,7 @@ use crate::client::KeycloakClient;
 use crate::models::{ComponentRepresentation, KeycloakResource};
 use crate::utils::secrets::substitute_secrets;
 use crate::utils::ui::{SPARKLE, WARN};
+use crate::utils::yaml::{is_overlay_file, load_yaml_with_overlay};
 use anyhow::{Context, Result};
 use console::style;
 use std::collections::HashMap;
@@ -10,13 +11,14 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs as async_fs;
 
-use super::{PlanContext, PlanOptions, print_diff};
+use super::{PlanContext, PlanOptions, PlanSummary, print_diff};
 
 pub async fn plan_components_or_keys(
     ctx: &PlanContext<'_>,
     dir_name: &str,
-) -> Result<Vec<PathBuf>> {
+) -> Result<(Vec<PathBuf>, PlanSummary)> {
     let mut changed_files = Vec::new();
+    let mut summary = PlanSummary::default();
     let components_dir = ctx.workspace_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
         let existing_components =
@@ -54,20 +56,19 @@ pub async fn plan_components_or_keys(
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "yaml") {
+                // Skip overlay files themselves
+                if is_overlay_file(&path, ctx.profile.as_deref()) {
+                    continue;
+                }
+
                 let resolver = Arc::clone(&ctx.resolver);
                 let by_identity = by_identity.clone();
                 let by_details = by_details.clone();
                 let realm_name = ctx.realm_name.to_string();
+                let profile = ctx.profile.clone();
 
                 set.spawn(async move {
-                    let content = async_fs::read_to_string(&path).await?;
-                    let mut val: serde_json::Value =
-                        serde_yaml::from_str(&content).with_context(|| {
-                            format!(
-                                "Failed to parse YAML file {:?} in realm '{}'",
-                                path, realm_name
-                            )
-                        })?;
+                    let mut val = load_yaml_with_overlay(&path, profile.as_deref()).await?;
                     substitute_secrets(&mut val, resolver).await?;
                     let local_component: ComponentRepresentation = serde_json::from_value(val)
                         .with_context(|| {
@@ -106,6 +107,7 @@ pub async fn plan_components_or_keys(
         for res in crate::utils::join_all_tasks(set, None).await? {
             let (local_component, path, remote) = res;
 
+            let is_update = remote.is_some();
             let changed = if let Some(remote) = remote {
                 let mut remote_clone = remote.clone();
                 if local_component.id.is_none() {
@@ -150,11 +152,16 @@ pub async fn plan_components_or_keys(
                 }
                 if include {
                     changed_files.push(path);
+                    if is_update {
+                        summary.updated += 1;
+                    } else {
+                        summary.created += 1;
+                    }
                 }
             }
         }
     }
-    Ok(changed_files)
+    Ok((changed_files, summary))
 }
 
 pub async fn check_keys_drift(
