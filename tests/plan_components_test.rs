@@ -12,7 +12,6 @@ async fn test_plan_components_no_dir() {
     let client = KeycloakClient::new("http://localhost:8080".to_string());
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path();
-    let mut changed_files = Vec::new();
     let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
         std::collections::HashMap::new(),
     )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
@@ -33,7 +32,7 @@ async fn test_plan_components_no_dir() {
     };
 
     // Should not fail if directory doesn't exist
-    let res = plan_components_or_keys(&ctx, "non-existent", &mut changed_files).await;
+    let res = plan_components_or_keys(&ctx, "non-existent").await;
     assert!(res.is_ok());
 }
 
@@ -61,7 +60,6 @@ async fn test_plan_components_with_invalid_yaml() {
         .await
         .unwrap();
 
-    let mut changed_files = Vec::new();
     let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
         std::collections::HashMap::new(),
     )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
@@ -81,7 +79,7 @@ async fn test_plan_components_with_invalid_yaml() {
         ui: &ui,
     };
 
-    let res = plan_components_or_keys(&ctx, "components", &mut changed_files).await;
+    let res = plan_components_or_keys(&ctx, "components").await;
     assert!(res.is_err());
 }
 
@@ -107,7 +105,6 @@ async fn test_plan_components_no_identity() {
     let client = KeycloakClient::new("http://localhost:8080".to_string());
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path();
-    let mut changed_files = Vec::new();
     let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
         std::collections::HashMap::new(),
     )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
@@ -134,7 +131,7 @@ async fn test_plan_components_no_identity() {
         .await
         .unwrap();
 
-    let res = plan_components_or_keys(&ctx, "components", &mut changed_files).await;
+    let res = plan_components_or_keys(&ctx, "components").await;
     // It should fail to get identity
     assert!(res.is_err());
 }

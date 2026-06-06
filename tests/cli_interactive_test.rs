@@ -20,6 +20,22 @@ async fn test_cli_run_exit() {
 }
 
 #[tokio::test]
+async fn test_cli_run_invalid_selection() {
+    let dir = tempdir().unwrap();
+    let workspace_dir = dir.path().to_path_buf();
+
+    let ui = MockUi {
+        inputs: Mutex::new(vec![]),
+        confirms: Mutex::new(vec![]),
+        selects: Mutex::new(vec![999, 8]), // Invalid option followed by Exit
+        passwords: Mutex::new(vec![]),
+    };
+
+    // The function should not panic and eventually exit when selecting 8
+    cli::run(workspace_dir, &ui).await.unwrap();
+}
+
+#[tokio::test]
 async fn test_create_user_interactive() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();

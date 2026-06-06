@@ -99,24 +99,14 @@ fn is_boolean_string(s: &str) -> bool {
     lower == "true" || lower == "false" || lower == "on" || lower == "off"
 }
 
-/// Try to find an identifier for an object to make secret names better
-fn get_object_identifier(map: &serde_json::Map<String, Value>) -> Option<String> {
-    map.get("clientId")
-        .or_else(|| map.get("username"))
-        .or_else(|| map.get("alias"))
-        .or_else(|| map.get("name"))
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-}
-
 /// Helper to format environment variable names
 fn format_env_var_name(prefix: &str, key: &str) -> String {
-    let env_var_name = if prefix.is_empty() {
+    let mut env_var_name = if prefix.is_empty() {
         format!("KEYCLOAK_{}", key)
     } else {
         format!("KEYCLOAK_{}_{}", prefix, key)
     };
-    env_var_name
+    env_var_name = env_var_name
         .chars()
         .map(|c| {
             if c.is_alphanumeric() {
@@ -125,7 +115,8 @@ fn format_env_var_name(prefix: &str, key: &str) -> String {
                 '_'
             }
         })
-        .collect()
+        .collect();
+    env_var_name
 }
 
 /// Recursively extract secrets and replace them with ${ENV_VAR}
@@ -134,7 +125,14 @@ pub fn extract_secrets(value: &mut Value, prefix: &str, secrets: &mut HashMap<St
         Value::Object(map) => {
             let mut keys_to_update = Vec::new();
 
-            let id = get_object_identifier(map);
+            // Try to find an identifier for this object to make secret names better
+            let id = map
+                .get("clientId")
+                .or_else(|| map.get("username"))
+                .or_else(|| map.get("alias"))
+                .or_else(|| map.get("name"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
 
             let current_prefix = if let Some(id_str) = id {
                 if prefix.is_empty() {
@@ -187,18 +185,14 @@ pub async fn substitute_secrets(
 ) -> Result<()> {
     match value {
         Value::Object(map) => {
-            let futures: Vec<_> = map
-                .values_mut()
-                .map(|v| substitute_secrets(v, Arc::clone(&resolver)))
-                .collect();
-            futures::future::try_join_all(futures).await?;
+            for (_, v) in map.iter_mut() {
+                substitute_secrets(v, Arc::clone(&resolver)).await?;
+            }
         }
         Value::Array(arr) => {
-            let futures: Vec<_> = arr
-                .iter_mut()
-                .map(|v| substitute_secrets(v, Arc::clone(&resolver)))
-                .collect();
-            futures::future::try_join_all(futures).await?;
+            for v in arr.iter_mut() {
+                substitute_secrets(v, Arc::clone(&resolver)).await?;
+            }
         }
         Value::String(s) if s.starts_with("${") && s.ends_with("}") => {
             let var_name = &s[2..s.len() - 1];
@@ -237,7 +231,14 @@ pub fn obfuscate_secrets(value: &mut Value, prefix: &str) {
         Value::Object(map) => {
             let mut keys_to_obfuscate = Vec::new();
 
-            let id = get_object_identifier(map);
+            // Try to find an identifier for this object to make secret identification better
+            let id = map
+                .get("clientId")
+                .or_else(|| map.get("username"))
+                .or_else(|| map.get("alias"))
+                .or_else(|| map.get("name"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
 
             let current_prefix = if let Some(id_str) = id {
                 if prefix.is_empty() {
@@ -307,24 +308,13 @@ mod tests {
         let mut secrets2 = HashMap::new();
         extract_secrets(&mut val2, "", &mut secrets2);
         assert_eq!(val2["clientSecret"], "${KEYCLOAK_CLIENTSECRET}");
-        assert_eq!(
-            secrets2.get("KEYCLOAK_CLIENTSECRET").unwrap(),
-            "secret_value_2"
-        );
+        assert_eq!(secrets2.get("KEYCLOAK_CLIENTSECRET").unwrap(), "secret_value_2");
 
         let mut val3 = json!({"clientSecret-special": "secret_value_3"});
         let mut secrets3 = HashMap::new();
         extract_secrets(&mut val3, "prefix", &mut secrets3);
-        assert_eq!(
-            val3["clientSecret-special"],
-            "${KEYCLOAK_PREFIX_CLIENTSECRET_SPECIAL}"
-        );
-        assert_eq!(
-            secrets3
-                .get("KEYCLOAK_PREFIX_CLIENTSECRET_SPECIAL")
-                .unwrap(),
-            "secret_value_3"
-        );
+        assert_eq!(val3["clientSecret-special"], "${KEYCLOAK_PREFIX_CLIENTSECRET_SPECIAL}");
+        assert_eq!(secrets3.get("KEYCLOAK_PREFIX_CLIENTSECRET_SPECIAL").unwrap(), "secret_value_3");
     }
 
     #[tokio::test]

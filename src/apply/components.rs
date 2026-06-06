@@ -95,49 +95,44 @@ pub async fn apply_components_or_keys(
     realm_name: &str,
 ) -> Result<()> {
     let components_dir = workspace_dir.join(dir_name);
-    if async_fs::try_exists(&components_dir).await? {
-        let existing_components = client
-            .get_components()
-            .await
-            .with_context(|| format!("Failed to get components/keys for realm '{}'", realm_name))?;
-
-        let (by_identity, by_details) = build_component_indices(existing_components);
-        let by_identity = Arc::new(by_identity);
-        let by_details = Arc::new(by_details);
-
-        let mut entries = async_fs::read_dir(&components_dir).await?;
-        let mut set = JoinSet::new();
-
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
-            if let Some(plan) = &*planned_files
-                && !plan.contains(&path)
-            {
-                continue;
-            }
-            if path.extension().is_some_and(|ext| ext == "yaml") {
-                let client = client.clone();
-                let by_identity = Arc::clone(&by_identity);
-                let by_details = Arc::clone(&by_details);
-                let resolver = Arc::clone(&resolver);
-                let realm_name = realm_name.to_string();
-                set.spawn(async move {
-                    process_component_file(
-                        path,
-                        client,
-                        by_identity,
-                        by_details,
-                        resolver,
-                        realm_name,
-                    )
-                    .await
-                });
-            }
-        }
-        while let Some(res) = set.join_next().await {
-            res??;
-        }
+    if !async_fs::try_exists(&components_dir).await? {
+        return Ok(());
     }
+
+    let existing_components = client
+        .get_components()
+        .await
+        .with_context(|| format!("Failed to get components/keys for realm '{}'", realm_name))?;
+
+    let (by_identity, by_details) = build_component_indices(existing_components);
+    let by_identity = Arc::new(by_identity);
+    let by_details = Arc::new(by_details);
+
+    let mut entries = async_fs::read_dir(&components_dir).await?;
+    let mut set = JoinSet::new();
+
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if let Some(plan) = &*planned_files
+            && !plan.contains(&path)
+        {
+            continue;
+        }
+        if path.extension().is_none_or(|ext| ext != "yaml") {
+            continue;
+        }
+
+        let client = client.clone();
+        let by_identity = Arc::clone(&by_identity);
+        let by_details = Arc::clone(&by_details);
+        let resolver = Arc::clone(&resolver);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            process_component_file(path, client, by_identity, by_details, resolver, realm_name)
+                .await
+        });
+    }
+    crate::utils::join_all_tasks(set, None).await?;
     Ok(())
 }
 

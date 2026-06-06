@@ -15,8 +15,8 @@ use super::{PlanContext, PlanOptions, print_diff};
 pub async fn plan_components_or_keys(
     ctx: &PlanContext<'_>,
     dir_name: &str,
-    changed_files: &mut Vec<PathBuf>,
-) -> Result<()> {
+) -> Result<Vec<PathBuf>> {
+    let mut changed_files = Vec::new();
     let components_dir = ctx.workspace_dir.join(dir_name);
     if async_fs::try_exists(&components_dir).await? {
         let existing_components =
@@ -77,28 +77,19 @@ pub async fn plan_components_or_keys(
                             )
                         })?;
 
-                    let remote = if let Some(identity) = local_component.get_identity() {
-                        by_identity
-                            .get(&identity)
-                            .or_else(|| {
-                                let key = (
-                                    local_component.name.clone(),
-                                    local_component.sub_type.clone(),
-                                    local_component.provider_id.clone(),
-                                    local_component.parent_id.clone(),
-                                );
-                                by_details.get(&key)
-                            })
-                            .cloned()
-                    } else {
-                        let key = (
-                            local_component.name.clone(),
-                            local_component.sub_type.clone(),
-                            local_component.provider_id.clone(),
-                            local_component.parent_id.clone(),
-                        );
-                        by_details.get(&key).cloned()
-                    };
+                    let remote = local_component
+                        .get_identity()
+                        .and_then(|id| by_identity.get(&id))
+                        .or_else(|| {
+                            let key = (
+                                local_component.name.clone(),
+                                local_component.sub_type.clone(),
+                                local_component.provider_id.clone(),
+                                local_component.parent_id.clone(),
+                            );
+                            by_details.get(&key)
+                        })
+                        .cloned();
 
                     Ok::<
                         (
@@ -112,8 +103,8 @@ pub async fn plan_components_or_keys(
             }
         }
 
-        while let Some(res) = set.join_next().await {
-            let (local_component, path, remote) = res??;
+        for res in crate::utils::join_all_tasks(set, None).await? {
+            let (local_component, path, remote) = res;
 
             let changed = if let Some(remote) = remote {
                 let mut remote_clone = remote.clone();
@@ -163,7 +154,7 @@ pub async fn plan_components_or_keys(
             }
         }
     }
-    Ok(())
+    Ok(changed_files)
 }
 
 pub async fn check_keys_drift(

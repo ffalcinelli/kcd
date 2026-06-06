@@ -9,10 +9,7 @@ use tokio::fs as async_fs;
 
 use super::{PlanContext, print_diff};
 
-pub async fn plan_resources<T>(
-    ctx: &PlanContext<'_>,
-    changed_files: &mut Vec<PathBuf>,
-) -> Result<()>
+pub async fn plan_resources<T>(ctx: &PlanContext<'_>) -> Result<Vec<PathBuf>>
 where
     T: KeycloakResource
         + ResourceMeta
@@ -25,8 +22,9 @@ where
 {
     let dir_name = T::DIR_NAME;
     let resources_dir = ctx.workspace_dir.join(dir_name);
+    let mut changed_files = Vec::new();
     if !async_fs::try_exists(&resources_dir).await? {
-        return Ok(());
+        return Ok(changed_files);
     }
 
     let existing_resources =
@@ -82,8 +80,8 @@ where
         }
     }
 
-    while let Some(res) = set.join_next().await {
-        let (local, path, remote) = res??;
+    for res in crate::utils::join_all_tasks(set, None).await? {
+        let (local, path, remote) = res;
 
         let changed = if let Some(remote) = remote {
             let mut remote_clone = remote.clone();
@@ -119,5 +117,5 @@ where
             }
         }
     }
-    Ok(())
+    Ok(changed_files)
 }

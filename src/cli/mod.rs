@@ -72,7 +72,9 @@ pub async fn run(workspace_dir: PathBuf, ui: &dyn Ui) -> Result<()> {
                 ui.print_info("Exiting...");
                 break;
             }
-            _ => unreachable!(),
+            _ => {
+                ui.print_error("Invalid selection. Please try again.");
+            }
         }
     }
 

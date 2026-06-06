@@ -69,20 +69,14 @@ pub async fn rotate_keys_yaml(workspace_dir: &Path, realm: &str) -> Result<usize
                         .as_secs();
                     new_component.name = Some(format!("{}-rotated-{}", old_name, timestamp));
 
-                    #[allow(clippy::collapsible_if)]
-                    if let Some(config) = &mut new_component.config {
-                        if let Some(priority_vals) = config.get_mut("priority") {
-                            if let Some(arr) = priority_vals.as_array_mut() {
-                                if let Some(first) = arr.first_mut() {
-                                    if let Some(p_str) = first.as_str() {
-                                        if let Ok(p_num) = p_str.parse::<i64>() {
-                                            *first =
-                                                serde_json::Value::String((p_num + 10).to_string());
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    if let Some(config) = &mut new_component.config
+                        && let Some(priority_vals) = config.get_mut("priority")
+                        && let Some(arr) = priority_vals.as_array_mut()
+                        && let Some(first) = arr.first_mut()
+                        && let Some(p_str) = first.as_str()
+                        && let Ok(p_num) = p_str.parse::<i64>()
+                    {
+                        *first = serde_json::Value::String((p_num + 10).to_string());
                     }
 
                     let new_filename = format!(

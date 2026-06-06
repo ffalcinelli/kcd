@@ -106,9 +106,7 @@ pub async fn run(workspace_dir: PathBuf, yes: bool, realms_to_clean: &[String]) 
         }
     }
 
-    while let Some(res) = set.join_next().await {
-        res.context("Join error")??;
-    }
+    crate::utils::join_all_tasks(set, Some("Join error")).await?;
 
     println!(
         "{} {}",

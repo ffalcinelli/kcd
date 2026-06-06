@@ -17,61 +17,63 @@ pub async fn apply_groups(
 ) -> Result<()> {
     // 6. Apply Groups
     let groups_dir = workspace_dir.join("groups");
-    if async_fs::try_exists(&groups_dir).await? {
-        let existing_groups = client
-            .get_groups()
-            .await
-            .with_context(|| format!("Failed to get groups for realm '{}'", realm_name))?;
-        let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
-            .into_iter()
-            .filter_map(|g| g.get_identity().map(|id| (id, g)))
-            .collect();
-        let existing_groups_map = Arc::new(existing_groups_map);
-
-        let mut entries = async_fs::read_dir(&groups_dir).await?;
-        let mut set = JoinSet::new();
-
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
-            if let Some(plan) = &*planned_files
-                && !plan.contains(&path)
-            {
-                continue;
-            }
-            if path.extension().is_some_and(|ext| ext == "yaml") {
-                let client = client.clone();
-                let existing_groups_map = Arc::clone(&existing_groups_map);
-                let resolver = Arc::clone(&resolver);
-                let realm_name = realm_name.to_string();
-                set.spawn(async move {
-                    let content = async_fs::read_to_string(&path).await?;
-                    let mut val: serde_json::Value = serde_yaml::from_str(&content)
-                        .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
-                    substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
-                    let mut group_rep: GroupRepresentation = serde_json::from_value(val)?;
-
-                    let identity = group_rep
-                        .get_identity()
-                        .context(format!("Failed to get identity for group in {:?}", path))?;
-
-                    crate::handle_upsert! {
-                        client: client,
-                        realm: realm_name,
-                        rep: group_rep,
-                        id_opt: existing_groups_map.get(&identity).and_then(|e| e.id.as_ref()),
-                        id_field: id,
-                        resource_name: "group",
-                        update_call: |id, rep| client.update_group(id, rep),
-                        create_call: |rep| client.create_group(rep)
-                    }
-                    Ok::<(), anyhow::Error>(())
-                });
-            }
-        }
-        while let Some(res) = set.join_next().await {
-            res??;
-        }
+    if !async_fs::try_exists(&groups_dir).await? {
+        return Ok(());
     }
+
+    let existing_groups = client
+        .get_groups()
+        .await
+        .with_context(|| format!("Failed to get groups for realm '{}'", realm_name))?;
+    let existing_groups_map: HashMap<String, GroupRepresentation> = existing_groups
+        .into_iter()
+        .filter_map(|g| g.get_identity().map(|id| (id, g)))
+        .collect();
+    let existing_groups_map = Arc::new(existing_groups_map);
+
+    let mut entries = async_fs::read_dir(&groups_dir).await?;
+    let mut set = JoinSet::new();
+
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if let Some(plan) = &*planned_files
+            && !plan.contains(&path)
+        {
+            continue;
+        }
+        if path.extension().is_none_or(|ext| ext != "yaml") {
+            continue;
+        }
+
+        let client = client.clone();
+        let existing_groups_map = Arc::clone(&existing_groups_map);
+        let resolver = Arc::clone(&resolver);
+        let realm_name = realm_name.to_string();
+        set.spawn(async move {
+            let content = async_fs::read_to_string(&path).await?;
+            let mut val: serde_json::Value = serde_yaml::from_str(&content)
+                .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+            substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
+            let mut group_rep: GroupRepresentation = serde_json::from_value(val)?;
+
+            let identity = group_rep
+                .get_identity()
+                .context(format!("Failed to get identity for group in {:?}", path))?;
+
+            crate::handle_upsert! {
+                client: client,
+                realm: realm_name,
+                rep: group_rep,
+                id_opt: existing_groups_map.get(&identity).and_then(|e| e.id.as_ref()),
+                id_field: id,
+                resource_name: "group",
+                update_call: |id, rep| client.update_group(id, rep),
+                create_call: |rep| client.create_group(rep)
+            }
+            Ok::<(), anyhow::Error>(())
+        });
+    }
+    crate::utils::join_all_tasks(set, None).await?;
     Ok(())
 }
 

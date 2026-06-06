@@ -63,20 +63,14 @@ pub fn recursive_sort(value: &mut serde_json::Value) {
                 .iter()
                 .all(|v| v.is_string() || v.is_number() || v.is_boolean())
             {
-                arr.sort_by(|a, b| {
-                    let s_a = a.to_string();
-                    let s_b = b.to_string();
-                    s_a.cmp(&s_b)
-                });
+                arr.sort_by_cached_key(|a| a.to_string());
             } else if arr.iter().all(|v| v.is_object()) {
                 // Try to find a common sorting key: id, clientId, username, alias, or name
                 let keys = ["id", "clientId", "username", "alias", "name"];
                 for key in keys {
                     if arr.iter().all(|v| v.get(key).is_some()) {
-                        arr.sort_by(|a, b| {
-                            let v_a = a.get(key).map_or(String::new(), |v| v.to_string());
-                            let v_b = b.get(key).map_or(String::new(), |v| v.to_string());
-                            v_a.cmp(&v_b)
+                        arr.sort_by_cached_key(|a| {
+                            a.get(key).map_or(String::new(), |v| v.to_string())
                         });
                         break;
                     }
@@ -436,4 +430,18 @@ mod tests {
             })
         );
     }
+}
+pub async fn join_all_tasks<T: 'static>(
+    mut set: tokio::task::JoinSet<anyhow::Result<T>>,
+    context_msg: Option<&str>,
+) -> anyhow::Result<Vec<T>> {
+    let mut results = Vec::new();
+    while let Some(res) = set.join_next().await {
+        if let Some(msg) = context_msg {
+            results.push(res.context(msg.to_string())??);
+        } else {
+            results.push(res??);
+        }
+    }
+    Ok(results)
 }

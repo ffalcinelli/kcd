@@ -77,9 +77,7 @@ pub async fn run(
         });
     }
 
-    while let Some(res) = set.join_next().await {
-        res.context("Task panicked")??;
-    }
+    crate::utils::join_all_tasks(set, Some("Task panicked")).await?;
 
     let secrets_lock = all_secrets.lock().await;
     if !secrets_lock.is_empty() {
@@ -234,9 +232,7 @@ where
             write_if_changed_with_mutex(&path, &yaml, yes, prompt_mutex, true).await
         });
     }
-    while let Some(res) = set.join_next().await {
-        res.context("Task panicked")??;
-    }
+    crate::utils::join_all_tasks(set, Some("Task panicked")).await?;
     {
         let _lock = prompt_mutex.lock().await;
         println!(
@@ -396,9 +392,7 @@ async fn inspect_realm(
         &prompt_mutex,
     );
 
-    while let Some(res) = set.join_next().await {
-        res.context("Task panicked")??;
-    }
+    crate::utils::join_all_tasks(set, Some("Task panicked")).await?;
 
     Ok(())
 }
