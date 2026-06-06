@@ -66,7 +66,7 @@ pub async fn start_mock_server() -> String {
         )
         .route(
             "/admin/realms/{realm}/authentication/required-actions",
-            axum::routing::get(get_required_actions_handler),
+            axum::routing::get(get_required_actions_handler).post(generic_handler),
         )
         .route(
             "/admin/realms/{realm}/authentication/register-required-action",

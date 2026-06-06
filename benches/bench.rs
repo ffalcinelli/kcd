@@ -35,6 +35,7 @@ fn main() {
                 &[],
                 ui.clone(),
                 resolver.clone(),
+                None,
             )
             .await
             .unwrap();

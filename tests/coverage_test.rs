@@ -7,7 +7,7 @@ use kcd::{apply, clean, inspect, plan};
 use std::fs;
 use tempfile::tempdir;
 
-use kcd::utils::ui::DialoguerUi;
+use kcd::utils::ui::MockUi;
 
 #[tokio::test]
 async fn test_plan_edge_cases() {
@@ -26,6 +26,13 @@ async fn test_plan_edge_cases() {
         std::collections::HashMap::new(),
     )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
 
+    let ui = Arc::new(MockUi {
+        inputs: std::sync::Mutex::new(Vec::new()),
+        confirms: std::sync::Mutex::new(Vec::new()),
+        selects: std::sync::Mutex::new(Vec::new()),
+        passwords: std::sync::Mutex::new(Vec::new()),
+    });
+
     // 1. Test run with non-existent directory
     let res = plan::run(
         &client,
@@ -33,8 +40,9 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &[],
-        Arc::new(DialoguerUi::new()),
+        ui.clone(),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_err());
@@ -46,8 +54,9 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &[],
-        Arc::new(DialoguerUi::new()),
+        ui.clone(),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -76,8 +85,9 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &[],
-        Arc::new(DialoguerUi::new()),
+        ui.clone(),
         resolver.clone(),
+        None,
     )
     .await
     .unwrap();
@@ -90,8 +100,9 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &["new-realm".to_string()],
-        Arc::new(DialoguerUi::new()),
+        ui.clone(),
         resolver.clone(),
+        None,
     )
     .await
     .unwrap();
@@ -104,11 +115,12 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &["new-realm".to_string()],
-        Arc::new(DialoguerUi::new()),
+        ui.clone(),
         resolver.clone(),
+        None,
     )
     .await;
-    // It should fail when trying to parse roles or something if we put it in a sub-dir
+
     let roles_dir = realm_dir.join("roles");
     fs::create_dir_all(&roles_dir).unwrap();
     fs::write(roles_dir.join("invalid.yaml"), "invalid: [yaml").unwrap();
@@ -118,8 +130,9 @@ async fn test_plan_edge_cases() {
         false,
         false,
         &["new-realm".to_string()],
-        Arc::new(DialoguerUi::new()),
+        ui.clone(),
         resolver,
+        None,
     )
     .await;
     assert!(res.is_err());
@@ -142,19 +155,39 @@ async fn test_apply_edge_cases() {
         std::collections::HashMap::new(),
     )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
 
+    let ui = Arc::new(MockUi {
+        inputs: std::sync::Mutex::new(Vec::new()),
+        confirms: std::sync::Mutex::new(Vec::new()),
+        selects: std::sync::Mutex::new(Vec::new()),
+        passwords: std::sync::Mutex::new(Vec::new()),
+    });
+
     // 1. Test run with non-existent directory
     let res = apply::run(
         &client,
         workspace_dir.join("non-existent"),
         &[],
         true,
+        false,
+        ui.clone(),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_err());
 
     // 2. Test run with empty directory (no realms)
-    let res = apply::run(&client, workspace_dir.clone(), &[], true, resolver.clone()).await;
+    let res = apply::run(
+        &client,
+        workspace_dir.clone(),
+        &[],
+        true,
+        false,
+        ui.clone(),
+        resolver.clone(),
+        None,
+    )
+    .await;
     assert!(res.is_ok());
 
     // 3. Test with .secrets file
@@ -175,9 +208,18 @@ async fn test_apply_edge_cases() {
     .unwrap();
 
     // 4. Test auto-discovery of realms
-    apply::run(&client, workspace_dir.clone(), &[], true, resolver.clone())
-        .await
-        .unwrap();
+    apply::run(
+        &client,
+        workspace_dir.clone(),
+        &[],
+        true,
+        false,
+        ui.clone(),
+        resolver.clone(),
+        None,
+    )
+    .await
+    .unwrap();
 
     // 5. Test with empty .kcdplan
     fs::write(workspace_dir.join(".kcdplan"), "[]").unwrap();
@@ -186,7 +228,10 @@ async fn test_apply_edge_cases() {
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        false,
+        ui.clone(),
         resolver.clone(),
+        None,
     )
     .await
     .unwrap();
@@ -200,7 +245,10 @@ async fn test_apply_edge_cases() {
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        false,
+        ui,
         resolver,
+        None,
     )
     .await;
     assert!(res.is_err());
@@ -220,14 +268,23 @@ async fn test_check_keys_drift() {
     let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
         std::collections::HashMap::new(),
     )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+
+    let ui = Arc::new(MockUi {
+        inputs: std::sync::Mutex::new(Vec::new()),
+        confirms: std::sync::Mutex::new(Vec::new()),
+        selects: std::sync::Mutex::new(Vec::new()),
+        passwords: std::sync::Mutex::new(Vec::new()),
+    });
+
     plan::run(
         &client,
         workspace_dir,
         true,
         false,
         &["test-realm".to_string()],
-        Arc::new(DialoguerUi::new()),
+        ui,
         resolver,
+        None,
     )
     .await
     .unwrap();

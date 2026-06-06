@@ -385,13 +385,23 @@ async fn test_apply() {
     )
     .unwrap();
 
+    let ui = Arc::new(kcd::utils::ui::MockUi {
+        inputs: std::sync::Mutex::new(Vec::new()),
+        confirms: std::sync::Mutex::new(Vec::new()),
+        selects: std::sync::Mutex::new(Vec::new()),
+        passwords: std::sync::Mutex::new(Vec::new()),
+    });
+
     // Run apply
     apply::run(
         &client,
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        false,
+        ui.clone(),
         resolver.clone(),
+        None,
     )
     .await
     .expect("Apply failed");
@@ -406,7 +416,10 @@ async fn test_apply() {
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        false,
+        ui.clone(),
         resolver.clone(),
+        None,
     )
     .await
     .expect("Apply with plan failed");
@@ -418,8 +431,52 @@ async fn test_apply() {
         workspace_dir.clone(),
         &["test-realm".to_string()],
         true,
+        false,
+        ui.clone(),
         resolver.clone(),
+        None,
     )
     .await
     .expect("Apply with empty plan failed");
+
+    // 4. Test review mode (interactive)
+    ui.confirms.lock().unwrap().push(false); // Reject first change
+    ui.confirms.lock().unwrap().push(true); // Accept second change
+    // We need to know how many resources are being applied to fill the confirms queue correctly.
+    // Actually, let's just test a single resource type to be safe.
+
+    let single_resource_dir = workspace_dir.join("review-realm");
+    fs::create_dir_all(single_resource_dir.join("roles")).unwrap();
+    fs::write(
+        single_resource_dir.join("realm.yaml"),
+        "realm: review-realm\n",
+    )
+    .unwrap();
+    fs::write(single_resource_dir.join("roles/r1.yaml"), "name: r1\n").unwrap();
+
+    let mut review_client = client.clone();
+    review_client.set_target_realm("review-realm".to_string());
+
+    // Clear confirms and add one 'true' for the initial prompt and one 'false' for the resource review
+    {
+        let mut confirms = ui.confirms.lock().unwrap();
+        confirms.clear();
+        confirms.push(true); // Yes, send everything anyway
+        confirms.push(false); // No, don't apply this specific role
+    }
+
+    apply::run(
+        &review_client,
+        workspace_dir.clone(),
+        &["review-realm".to_string()],
+        false, // yes = false
+        true,  // review = true
+        ui.clone(),
+        resolver.clone(),
+        None,
+    )
+    .await
+    .expect("Apply with review failed");
+
+    // If it was rejected, it shouldn't have failed, just skipped.
 }

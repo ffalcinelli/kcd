@@ -1,5 +1,6 @@
 pub mod secrets;
 pub mod ui;
+pub mod yaml;
 use anyhow::Context;
 use serde::Serialize;
 use std::path::Path;
@@ -98,6 +99,21 @@ pub fn to_sorted_yaml<T: Serialize>(value: &T) -> anyhow::Result<String> {
         serde_json::to_value(value).context("Failed to serialize to JSON value")?;
     recursive_sort(&mut json_value);
     serde_yaml::to_string(&json_value).context("Failed to serialize to sorted YAML")
+}
+
+pub async fn join_all_tasks<T: 'static>(
+    mut set: tokio::task::JoinSet<anyhow::Result<T>>,
+    context_msg: Option<&str>,
+) -> anyhow::Result<Vec<T>> {
+    let mut results = Vec::new();
+    while let Some(res) = set.join_next().await {
+        if let Some(msg) = context_msg {
+            results.push(res.context(msg.to_string())??);
+        } else {
+            results.push(res??);
+        }
+    }
+    Ok(results)
 }
 
 #[cfg(test)]
@@ -430,18 +446,4 @@ mod tests {
             })
         );
     }
-}
-pub async fn join_all_tasks<T: 'static>(
-    mut set: tokio::task::JoinSet<anyhow::Result<T>>,
-    context_msg: Option<&str>,
-) -> anyhow::Result<Vec<T>> {
-    let mut results = Vec::new();
-    while let Some(res) = set.join_next().await {
-        if let Some(msg) = context_msg {
-            results.push(res.context(msg.to_string())??);
-        } else {
-            results.push(res??);
-        }
-    }
-    Ok(results)
 }

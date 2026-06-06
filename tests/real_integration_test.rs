@@ -107,14 +107,16 @@ standardFlowEnabled: true
     let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
         std::collections::HashMap::new(),
     )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+    let ui = Arc::new(DialoguerUi::new());
     plan::run(
         &client,
         workspace_dir.clone(),
         true,
         false,
         &["master".to_string()],
-        Arc::new(DialoguerUi::new()),
+        ui.clone(),
         resolver.clone(),
+        None,
     )
     .await?;
 
@@ -125,7 +127,10 @@ standardFlowEnabled: true
         workspace_dir.clone(),
         &["master".to_string()],
         true,
+        false,
+        ui,
         resolver,
+        None,
     )
     .await?;
 

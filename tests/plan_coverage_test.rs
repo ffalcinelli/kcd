@@ -24,6 +24,7 @@ async fn test_plan_non_existent_workspace() {
         Arc::new(kcd::utils::secrets::EnvResolver::new(
             std::collections::HashMap::new(),
         )),
+        None,
     )
     .await;
     assert!(res.is_err());
@@ -43,6 +44,7 @@ async fn test_plan_empty_workspace() {
         &[],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -74,6 +76,7 @@ async fn test_plan_with_secrets_file() {
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -107,6 +110,7 @@ async fn test_plan_cleanup_old_plan_file() {
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -150,6 +154,7 @@ async fn test_plan_realm_not_found_remote() {
         &["new-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -193,6 +198,7 @@ async fn test_plan_resources_creation() {
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -241,6 +247,7 @@ description: ${KEYCLOAK_ROLE_DESC}
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -279,6 +286,7 @@ async fn test_plan_resources_invalid_yaml() {
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_err());
@@ -313,6 +321,7 @@ async fn test_plan_resources_missing_identity() {
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_err());
@@ -357,6 +366,7 @@ async fn test_plan_resources_update() {
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -404,6 +414,7 @@ async fn test_plan_resources_changes_only() {
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -460,6 +471,7 @@ async fn test_plan_interactive_include() {
         &["test-realm".to_string()],
         ui,
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -515,6 +527,7 @@ async fn test_plan_interactive_exclude() {
         &["test-realm".to_string()],
         ui,
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -551,6 +564,7 @@ async fn test_plan_error_paths() {
         &["error-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_err());
@@ -571,6 +585,7 @@ async fn test_plan_error_paths() {
         &["error-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_err());
@@ -590,6 +605,7 @@ async fn test_plan_error_paths() {
         &["error-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_err());
@@ -617,6 +633,7 @@ async fn test_plan_empty_realms_list() {
         &[],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -674,6 +691,7 @@ async fn test_plan_auto_discovery_no_realm_yaml() {
         &[],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -726,6 +744,7 @@ async fn test_plan_resources_ignore_non_yaml() {
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -771,6 +790,7 @@ async fn test_plan_resources_with_id_no_clear() {
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
     assert!(res.is_ok());
@@ -811,6 +831,7 @@ description: ${KEYCLOAK_ROLE_MISSING_SECRET}
         &["test-realm".to_string()],
         Arc::new(DialoguerUi::new()),
         resolver.clone(),
+        None,
     )
     .await;
 

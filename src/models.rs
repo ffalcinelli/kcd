@@ -2,9 +2,45 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+pub trait ToOptionString {
+    fn to_option_string(&self) -> Option<String>;
+}
+
+impl ToOptionString for String {
+    fn to_option_string(&self) -> Option<String> {
+        Some(self.clone())
+    }
+}
+
+impl ToOptionString for Option<String> {
+    fn to_option_string(&self) -> Option<String> {
+        self.clone()
+    }
+}
+pub trait FromOptionString {
+    fn set_from_option_string(&mut self, val: Option<String>);
+}
+
+impl FromOptionString for String {
+    fn set_from_option_string(&mut self, val: Option<String>) {
+        if let Some(v) = val {
+            *self = v;
+        }
+    }
+}
+
+impl FromOptionString for Option<String> {
+    fn set_from_option_string(&mut self, val: Option<String>) {
+        if val.is_some() {
+            *self = val;
+        }
+    }
+}
 pub trait KeycloakResource {
     const API_PATH: &'static str;
     const DIR_NAME: &'static str = Self::API_PATH;
+    fn get_id(&self) -> Option<String>;
+    fn set_id(&mut self, id: Option<String>);
     fn get_identity(&self) -> Option<String>;
     fn get_name(&self) -> String;
     fn object_path(id: &str) -> String {
@@ -29,6 +65,7 @@ macro_rules! impl_keycloak_resource {
         $type:ty,
         api_path = $api_path:expr,
         $(dir_name = $dir_name:expr,)?
+        $(id_field = $id_field:ident,)?
         identity = |$id_self:ident| $id_expr:expr,
         name = |$name_self:ident| $name_expr:expr
         $(, has_id = |$has_id_self:ident| $has_id_expr:expr)?
@@ -39,6 +76,16 @@ macro_rules! impl_keycloak_resource {
         impl KeycloakResource for $type {
             const API_PATH: &'static str = $api_path;
             $(const DIR_NAME: &'static str = $dir_name;)?
+
+            fn get_id(&self) -> Option<String> {
+                $( return self.$id_field.to_option_string(); )?
+                #[allow(unreachable_code)]
+                None
+            }
+
+            fn set_id(&mut self, _id: Option<String>) {
+                $( self.$id_field.set_from_option_string(_id); )?
+            }
 
             fn get_identity(&$id_self) -> Option<String> { $id_expr }
             fn get_name(&$name_self) -> String { $name_expr }
@@ -92,6 +139,7 @@ pub struct RealmRepresentation {
 impl_keycloak_resource!(
     RealmRepresentation,
     api_path = "realms",
+    id_field = realm,
     identity = |self| Some(self.realm.clone()),
     name = |self| self.realm.clone()
 );
@@ -185,6 +233,7 @@ impl_keycloak_resource!(
     IdentityProviderRepresentation,
     api_path = "identity-provider/instances",
     dir_name = "identity-providers",
+    id_field = internal_id,
     identity = |self| self.alias.clone().or_else(|| self.internal_id.clone()),
     name = |self| self.alias.clone().unwrap_or_else(|| "unknown".to_string()),
     has_id = |self| self.internal_id.is_some(),
@@ -233,6 +282,7 @@ pub struct ClientRepresentation {
 impl_keycloak_resource!(
     ClientRepresentation,
     api_path = "clients",
+    id_field = id,
     identity = |self| self.client_id.clone().or_else(|| self.id.clone()),
     name = |self| self
         .client_id
@@ -271,6 +321,7 @@ pub struct RoleRepresentation {
 impl_keycloak_resource!(
     RoleRepresentation,
     api_path = "roles",
+    id_field = id,
     identity = |self| Some(self.name.clone()).or_else(|| self.id.clone()),
     name = |self| self.name.clone(),
     has_id = |self| self.id.is_some(),
@@ -302,6 +353,7 @@ pub struct ClientScopeRepresentation {
 impl_keycloak_resource!(
     ClientScopeRepresentation,
     api_path = "client-scopes",
+    id_field = id,
     identity = |self| self.name.clone().or_else(|| self.id.clone()),
     name = |self| self.name.clone().unwrap_or_else(|| "unknown".to_string()),
     has_id = |self| self.id.is_some(),
@@ -333,6 +385,7 @@ pub struct GroupRepresentation {
 impl_keycloak_resource!(
     GroupRepresentation,
     api_path = "groups",
+    id_field = id,
     identity = |self| self
         .path
         .clone()
@@ -411,6 +464,7 @@ pub struct UserRepresentation {
 impl_keycloak_resource!(
     UserRepresentation,
     api_path = "users",
+    id_field = id,
     identity = |self| self
         .username
         .as_ref()
@@ -479,6 +533,7 @@ impl_keycloak_resource!(
     AuthenticationFlowRepresentation,
     api_path = "authentication/flows",
     dir_name = "authentication-flows",
+    id_field = id,
     identity = |self| self.alias.clone().or_else(|| self.id.clone()),
     name = |self| self.alias.clone().unwrap_or_else(|| "unknown".to_string()),
     has_id = |self| self.id.is_some(),
@@ -517,6 +572,7 @@ impl_keycloak_resource!(
     RequiredActionProviderRepresentation,
     api_path = "authentication/required-actions",
     dir_name = "required-actions",
+    id_field = alias,
     identity = |self| self.alias.clone(),
     name = |self| self.alias.clone().unwrap_or_else(|| "unknown".to_string())
 );
@@ -567,6 +623,7 @@ impl std::fmt::Debug for ComponentRepresentation {
 impl_keycloak_resource!(
     ComponentRepresentation,
     api_path = "components",
+    id_field = id,
     identity = |self| self.id.clone().or_else(|| self.name.clone()),
     name = |self| self.name.clone().unwrap_or_else(|| "unknown".to_string()),
     has_id = |self| self.id.is_some(),
@@ -781,5 +838,74 @@ mod tests {
         assert_eq!(json_val["emailVerified"], true);
 
         assert_eq!(deserialized.first_name, Some("John".to_string()));
+    }
+
+    #[test]
+    fn test_debug_implementations() {
+        let mut config = HashMap::new();
+        config.insert("clientSecret".to_string(), "sensitive".to_string());
+        let idp = IdentityProviderRepresentation {
+            internal_id: None,
+            alias: Some("google".to_string()),
+            provider_id: Some("google".to_string()),
+            enabled: Some(true),
+            update_profile_first_login_mode: None,
+            trust_email: None,
+            store_token: None,
+            add_read_token_role_on_create: None,
+            authenticate_by_default: None,
+            link_only: None,
+            first_broker_login_flow_alias: None,
+            post_broker_login_flow_alias: None,
+            display_name: None,
+            config: Some(config),
+            extra: HashMap::new(),
+        };
+        let debug_str = format!("{:?}", idp);
+        assert!(debug_str.contains("********"));
+
+        let cred = CredentialRepresentation {
+            id: Some("id".to_string()),
+            type_: Some("password".to_string()),
+            value: Some("mypassword".to_string()),
+            temporary: Some(false),
+            extra: HashMap::new(),
+        };
+        assert!(format!("{:?}", cred).contains("********"));
+
+        let mut comp_config = HashMap::new();
+        comp_config.insert("secret".to_string(), serde_json::json!("sensitive"));
+        let comp = ComponentRepresentation {
+            id: Some("id".to_string()),
+            name: Some("comp".to_string()),
+            provider_id: Some("p".to_string()),
+            provider_type: Some("t".to_string()),
+            parent_id: None,
+            sub_type: None,
+            config: Some(comp_config),
+            extra: HashMap::new(),
+        };
+        assert!(format!("{:?}", comp).contains("********"));
+    }
+
+    #[test]
+    fn test_to_from_option_string() {
+        let s = "test".to_string();
+        assert_eq!(s.to_option_string(), Some("test".to_string()));
+
+        let os: Option<String> = Some("test".to_string());
+        assert_eq!(os.to_option_string(), Some("test".to_string()));
+
+        let mut s2 = "old".to_string();
+        s2.set_from_option_string(Some("new".to_string()));
+        assert_eq!(s2, "new");
+        s2.set_from_option_string(None);
+        assert_eq!(s2, "new");
+
+        let mut os2: Option<String> = Some("old".to_string());
+        os2.set_from_option_string(Some("new".to_string()));
+        assert_eq!(os2, Some("new".to_string()));
+        os2.set_from_option_string(None);
+        assert_eq!(os2, Some("new".to_string()));
     }
 }

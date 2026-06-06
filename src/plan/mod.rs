@@ -20,6 +20,23 @@ pub struct PlanOptions {
     pub interactive: bool,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PlanSummary {
+    pub created: usize,
+    pub updated: usize,
+}
+
+impl PlanSummary {
+    pub fn add(&mut self, other: &PlanSummary) {
+        self.created += other.created;
+        self.updated += other.updated;
+    }
+
+    pub fn total(&self) -> usize {
+        self.created + self.updated
+    }
+}
+
 pub struct PlanContext<'a> {
     pub client: &'a KeycloakClient,
     pub workspace_dir: &'a std::path::Path,
@@ -27,8 +44,10 @@ pub struct PlanContext<'a> {
     pub resolver: Arc<dyn SecretResolver>,
     pub realm_name: &'a str,
     pub ui: &'a dyn Ui,
+    pub profile: Option<String>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run(
     client: &KeycloakClient,
     workspace_dir: PathBuf,
@@ -37,6 +56,7 @@ pub async fn run(
     realms_to_plan: &[String],
     ui: Arc<dyn Ui>,
     resolver: Arc<dyn SecretResolver>,
+    profile: Option<String>,
 ) -> Result<()> {
     if !workspace_dir.exists() {
         anyhow::bail!("Input directory {:?} does not exist", workspace_dir);
@@ -72,6 +92,7 @@ pub async fn run(
         let realm_dir = workspace_dir.join(&realm_name);
         let resolver = Arc::clone(&resolver);
         let ui = Arc::clone(&ui);
+        let profile = profile.clone();
 
         set.spawn(async move {
             println!(
@@ -83,6 +104,7 @@ pub async fn run(
             );
 
             let mut changed_files = Vec::new();
+            let mut summary = PlanSummary::default();
             let options = PlanOptions {
                 changes_only,
                 interactive,
@@ -94,20 +116,21 @@ pub async fn run(
                 resolver,
                 realm_name: &realm_name,
                 ui: ui.as_ref(),
+                profile,
             };
-            plan_single_realm(ctx, &mut changed_files).await?;
+            plan_single_realm(ctx, &mut changed_files, &mut summary).await?;
 
-            Ok::<Vec<PathBuf>, anyhow::Error>(changed_files)
+            Ok::<(Vec<PathBuf>, PlanSummary), anyhow::Error>((changed_files, summary))
         });
     }
 
     let mut changed_files = Vec::new();
-    changed_files.extend(
-        crate::utils::join_all_tasks(set, None)
-            .await?
-            .into_iter()
-            .flatten(),
-    );
+    let mut total_summary = PlanSummary::default();
+    for res in crate::utils::join_all_tasks(set, None).await? {
+        let (files, summary) = res;
+        changed_files.extend(files);
+        total_summary.add(&summary);
+    }
     changed_files.sort();
 
     let plan_file = workspace_dir.join(".kcdplan");
@@ -115,9 +138,28 @@ pub async fn run(
         if async_fs::try_exists(&plan_file).await? {
             async_fs::remove_file(&plan_file).await?;
         }
+        println!(
+            "\n{} {}",
+            CHECK,
+            style("No changes planned. Your infrastructure is in sync.")
+                .green()
+                .bold()
+        );
     } else {
         let content = serde_json::to_string_pretty(&changed_files)?;
         async_fs::write(&plan_file, content).await?;
+        println!(
+            "\n{} {}",
+            MEMO,
+            style(format!(
+                "Plan summary: {} to create, {} to update ({} total changes).",
+                total_summary.created,
+                total_summary.updated,
+                total_summary.total()
+            ))
+            .cyan()
+            .bold()
+        );
     }
 
     Ok(())
@@ -129,19 +171,23 @@ use crate::models::{
     RoleRepresentation, UserRepresentation,
 };
 
-async fn plan_single_realm(ctx: PlanContext<'_>, changed_files: &mut Vec<PathBuf>) -> Result<()> {
+async fn plan_single_realm(
+    ctx: PlanContext<'_>,
+    changed_files: &mut Vec<PathBuf>,
+    summary: &mut PlanSummary,
+) -> Result<()> {
     let (
-        mut realm_changes,
-        mut role_changes,
-        mut client_changes,
-        mut idp_changes,
-        mut client_scope_changes,
-        mut group_changes,
-        mut user_changes,
-        mut auth_flow_changes,
-        mut required_action_changes,
-        mut component_changes,
-        mut key_changes,
+        (mut realm_changes, realm_summary),
+        (mut role_changes, role_summary),
+        (mut client_changes, client_summary),
+        (mut idp_changes, idp_summary),
+        (mut client_scope_changes, client_scope_summary),
+        (mut group_changes, group_summary),
+        (mut user_changes, user_summary),
+        (mut auth_flow_changes, auth_flow_summary),
+        (mut required_action_changes, required_action_summary),
+        (mut component_changes, component_summary),
+        (mut key_changes, key_summary),
         _,
     ) = tokio::try_join!(
         realm::plan_realm(&ctx),
@@ -169,6 +215,18 @@ async fn plan_single_realm(ctx: PlanContext<'_>, changed_files: &mut Vec<PathBuf
     changed_files.append(&mut required_action_changes);
     changed_files.append(&mut component_changes);
     changed_files.append(&mut key_changes);
+
+    summary.add(&realm_summary);
+    summary.add(&role_summary);
+    summary.add(&client_summary);
+    summary.add(&idp_summary);
+    summary.add(&client_scope_summary);
+    summary.add(&group_summary);
+    summary.add(&user_summary);
+    summary.add(&auth_flow_summary);
+    summary.add(&required_action_summary);
+    summary.add(&component_summary);
+    summary.add(&key_summary);
 
     Ok(())
 }

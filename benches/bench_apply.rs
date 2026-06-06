@@ -1,6 +1,7 @@
 use kcd::apply;
 use kcd::client::KeycloakClient;
 use kcd::utils::secrets::{EnvResolver, SecretResolver};
+use kcd::utils::ui::DialoguerUi;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -46,6 +47,7 @@ fn main() {
 
         let mut total_time = std::time::Duration::new(0, 0);
         let iters = 10;
+        let ui = Arc::new(DialoguerUi::new());
 
         for _ in 0..iters {
             let start = std::time::Instant::now();
@@ -54,7 +56,10 @@ fn main() {
                 workspace_dir.clone(),
                 &realms,
                 true,
+                false,
+                ui.clone(),
                 resolver.clone(),
+                None,
             )
             .await
             .unwrap();
