@@ -32,9 +32,7 @@ fn test_no_args() {
     cmd.env_clear()
         .assert()
         .failure()
-        .stderr(predicate::str::contains(
-            "Usage: kcd [OPTIONS] --server <SERVER> <COMMAND>",
-        ));
+        .stderr(predicate::str::contains("Usage: kcd [OPTIONS] <COMMAND>"));
 }
 
 #[test]

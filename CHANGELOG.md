@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Calendar Versioning (CalVer)](https://calver.org/) in the format `YYMM.MICRO.MODIFIER`.
 
+## [2606.1.0] - 2026-06-05
+### Added
+- **Generic Reconciliation Engine**: Consolidated reconciliation logic for all resource types into a single, maintainable generic engine.
+- **Environment Profiles**: Support for multiple environments (Dev, Staging, Prod) via `--profile` flag and `profiles/` directory.
+- **Resource Overlays**: Support for `resource.{profile}.yaml` overlays with deep-merging.
+- **Dependency-Aware (Staged) Application**: Ensured correct resource application order (Stages 0-3) to prevent race conditions.
+- **Interactive Review Mode**: Added `--review` flag to `apply` command for granular change confirmation.
+- **Enhanced UX**: Integrated `indicatif` for high-quality progress bars and spinners.
+- **Plan Summary**: Added a concise summary of actions to the `plan` command.
+
+### Changed
+- Refactored `src/apply/` to remove hundreds of lines of redundant boilerplate code.
+- Enhanced `KeycloakResource` trait to support generic ID management.
+- Updated `plan` and `apply` command signatures to support profiles and enhanced UX.
+
 ## [2603.1.0] - 2026-03-22
 ### Added
 - Adopted Calendar Versioning (CalVer).

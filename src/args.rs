@@ -8,8 +8,8 @@ pub struct Cli {
     pub command: Commands,
 
     /// Keycloak Server URL
-    #[arg(long, env = "KEYCLOAK_URL")]
-    pub server: String,
+    #[arg(long, env = "KEYCLOAK_URL", required_unless_present = "profile")]
+    pub server: Option<String>,
 
     /// Keycloak Realms to consider. If empty, all realms are considered.
     #[arg(long, env = "KEYCLOAK_REALMS", value_delimiter = ',')]
@@ -30,6 +30,10 @@ pub struct Cli {
     /// Keycloak Client Secret (for client credentials grant)
     #[arg(skip)]
     pub client_secret: Option<String>,
+
+    /// Profile name to load from profiles/ directory
+    #[arg(long, short = 'p')]
+    pub profile: Option<String>,
 
     /// HashiCorp Vault URL
     #[arg(long, env = "VAULT_ADDR")]
@@ -67,6 +71,10 @@ pub enum Commands {
         /// Skip confirmation prompt
         #[arg(long, short = 'y', default_value = "false")]
         yes: bool,
+
+        /// Ask for confirmation before applying each resource
+        #[arg(long, short = 'r', default_value = "false")]
+        review: bool,
     },
     /// Plan the application of the local Keycloak configuration
     Plan {

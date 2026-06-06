@@ -1,15 +1,16 @@
 use crate::models::{KeycloakResource, ResourceMeta};
 use crate::utils::secrets::substitute_secrets;
 use crate::utils::ui::SPARKLE;
+use crate::utils::yaml::{is_overlay_file, load_yaml_with_overlay};
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs as async_fs;
 
-use super::{PlanContext, print_diff};
+use super::{PlanContext, PlanSummary, print_diff};
 
-pub async fn plan_resources<T>(ctx: &PlanContext<'_>) -> Result<Vec<PathBuf>>
+pub async fn plan_resources<T>(ctx: &PlanContext<'_>) -> Result<(Vec<PathBuf>, PlanSummary)>
 where
     T: KeycloakResource
         + ResourceMeta
@@ -23,8 +24,9 @@ where
     let dir_name = T::DIR_NAME;
     let resources_dir = ctx.workspace_dir.join(dir_name);
     let mut changed_files = Vec::new();
+    let mut summary = PlanSummary::default();
     if !async_fs::try_exists(&resources_dir).await? {
-        return Ok(changed_files);
+        return Ok((changed_files, summary));
     }
 
     let existing_resources =
@@ -44,19 +46,18 @@ where
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
         if path.is_file() && path.extension().is_some_and(|ext| ext == "yaml") {
+            // Skip overlay files themselves
+            if is_overlay_file(&path, ctx.profile.as_deref()) {
+                continue;
+            }
+
             let resolver = Arc::clone(&ctx.resolver);
             let existing_map = Arc::clone(&existing_map);
             let realm_name = ctx.realm_name.to_string();
+            let profile = ctx.profile.clone();
 
             set.spawn(async move {
-                let content = async_fs::read_to_string(&path).await?;
-                let mut val: serde_json::Value =
-                    serde_yaml::from_str(&content).with_context(|| {
-                        format!(
-                            "Failed to parse YAML file {:?} in realm '{}'",
-                            path, realm_name
-                        )
-                    })?;
+                let mut val = load_yaml_with_overlay(&path, profile.as_deref()).await?;
                 substitute_secrets(&mut val, resolver).await?;
                 let local: T = serde_json::from_value(val).with_context(|| {
                     format!(
@@ -83,6 +84,7 @@ where
     for res in crate::utils::join_all_tasks(set, None).await? {
         let (local, path, remote) = res;
 
+        let is_update = remote.is_some();
         let changed = if let Some(remote) = remote {
             let mut remote_clone = remote.clone();
             // If local doesn't have an ID, clear it from remote clone for diffing
@@ -114,8 +116,13 @@ where
             }
             if include {
                 changed_files.push(path);
+                if is_update {
+                    summary.updated += 1;
+                } else {
+                    summary.created += 1;
+                }
             }
         }
     }
-    Ok(changed_files)
+    Ok((changed_files, summary))
 }

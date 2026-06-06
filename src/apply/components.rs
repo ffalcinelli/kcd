@@ -39,6 +39,8 @@ pub fn build_component_indices(
     (by_identity, by_details)
 }
 
+use crate::utils::yaml::{is_overlay_file, load_yaml_with_overlay};
+
 pub async fn process_component_file(
     path: PathBuf,
     client: KeycloakClient,
@@ -46,10 +48,9 @@ pub async fn process_component_file(
     by_details: Arc<HashMap<ComponentKey, ComponentRepresentation>>,
     resolver: Arc<dyn SecretResolver>,
     realm_name: String,
+    profile: Option<String>,
 ) -> Result<()> {
-    let content = async_fs::read_to_string(&path).await?;
-    let mut val: serde_json::Value = serde_yaml::from_str(&content)
-        .with_context(|| format!("Failed to parse YAML file: {:?}", path))?;
+    let mut val = load_yaml_with_overlay(&path, profile.as_deref()).await?;
     substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
     let mut component_rep: ComponentRepresentation = serde_json::from_value(val)?;
 
@@ -93,6 +94,7 @@ pub async fn apply_components_or_keys(
     resolver: Arc<dyn SecretResolver>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
     realm_name: &str,
+    profile: Option<String>,
 ) -> Result<()> {
     let components_dir = workspace_dir.join(dir_name);
     if !async_fs::try_exists(&components_dir).await? {
@@ -121,15 +123,28 @@ pub async fn apply_components_or_keys(
         if path.extension().is_none_or(|ext| ext != "yaml") {
             continue;
         }
+        // Skip overlay files themselves
+        if is_overlay_file(&path, profile.as_deref()) {
+            continue;
+        }
 
         let client = client.clone();
         let by_identity = Arc::clone(&by_identity);
         let by_details = Arc::clone(&by_details);
         let resolver = Arc::clone(&resolver);
         let realm_name = realm_name.to_string();
+        let profile = profile.clone();
         set.spawn(async move {
-            process_component_file(path, client, by_identity, by_details, resolver, realm_name)
-                .await
+            process_component_file(
+                path,
+                client,
+                by_identity,
+                by_details,
+                resolver,
+                realm_name,
+                profile,
+            )
+            .await
         });
     }
     crate::utils::join_all_tasks(set, None).await?;
@@ -223,6 +238,7 @@ mod tests {
             Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
+            None,
         )
         .await;
         assert!(res.is_err());
@@ -246,6 +262,7 @@ mod tests {
             Arc::clone(&resolver) as Arc<dyn SecretResolver>,
             Arc::new(None),
             "test",
+            None,
         )
         .await;
         assert!(res.is_err());

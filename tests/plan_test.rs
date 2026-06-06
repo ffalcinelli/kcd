@@ -396,6 +396,7 @@ async fn test_plan() {
         &["test-realm".to_string()],
         ui.clone(),
         resolver.clone(),
+        None,
     )
     .await
     .expect("Plan failed");
@@ -409,6 +410,7 @@ async fn test_plan() {
         &["test-realm".to_string()],
         ui.clone(),
         resolver.clone(),
+        None,
     )
     .await
     .expect("Plan with changes_only failed");
@@ -422,6 +424,7 @@ async fn test_plan() {
         &["non-existent".to_string()],
         ui,
         resolver,
+        None,
     )
     .await
     .expect("Plan for non-existent realm failed");

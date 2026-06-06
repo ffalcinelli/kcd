@@ -17,11 +17,6 @@ pub struct KeycloakClient {
     token: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
-struct TokenResponse {
-    access_token: String,
-}
-
 impl KeycloakClient {
     pub fn new(base_url: String) -> Self {
         let target_realm = "".to_string();
@@ -36,6 +31,10 @@ impl KeycloakClient {
 
     pub fn set_target_realm(&mut self, target_realm: String) {
         self.target_realm = target_realm;
+    }
+
+    pub fn get_base_url(&self) -> &str {
+        &self.base_url
     }
 
     fn realm_admin_url(&self) -> String {
@@ -401,6 +400,11 @@ impl KeycloakClient {
             .context("Failed to send login request")?;
 
         let response = Self::check_response(response, "Login failed").await?;
+
+        #[derive(Deserialize)]
+        struct TokenResponse {
+            access_token: String,
+        }
 
         let token_response: TokenResponse = response
             .json()

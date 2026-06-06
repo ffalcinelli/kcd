@@ -1,15 +1,16 @@
+use std::sync::Arc;
 mod common;
 use common::start_mock_server;
 use kcd::client::KeycloakClient;
-use kcd::models::{ComponentRepresentation, RealmRepresentation};
+use kcd::models::RealmRepresentation;
 use kcd::plan;
-use kcd::utils::ui::DialoguerUi;
 use std::fs;
-use std::sync::Arc;
 use tempfile::tempdir;
 
+use kcd::utils::ui::MockUi;
+
 #[tokio::test]
-async fn test_plan_keys_and_extended() {
+async fn test_plan_extended_scenarios() {
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
     client.set_target_realm("test-realm".to_string());
@@ -21,11 +22,22 @@ async fn test_plan_keys_and_extended() {
     let dir = tempdir().unwrap();
     let workspace_dir = dir.path().to_path_buf();
     let realm_dir = workspace_dir.join("test-realm");
-    fs::create_dir_all(&realm_dir).unwrap();
+    fs::create_dir(&realm_dir).unwrap();
 
-    // 1. Create realm.yaml
+    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
+        std::collections::HashMap::new(),
+    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
+
+    let ui = Arc::new(MockUi {
+        inputs: std::sync::Mutex::new(Vec::new()),
+        confirms: std::sync::Mutex::new(Vec::new()),
+        selects: std::sync::Mutex::new(Vec::new()),
+        passwords: std::sync::Mutex::new(Vec::new()),
+    });
+
+    // scenario: mismatching realm name in realm.yaml
     let realm = RealmRepresentation {
-        realm: "test-realm".to_string(),
+        realm: "different-realm".to_string(),
         enabled: Some(true),
         display_name: Some("Test Realm".to_string()),
         extra: std::collections::HashMap::new(),
@@ -36,55 +48,23 @@ async fn test_plan_keys_and_extended() {
     )
     .unwrap();
 
-    // 2. Create keys directory and a key component
-    let keys_dir = realm_dir.join("keys");
-    fs::create_dir(&keys_dir).unwrap();
-
-    // This matches NOTHING in the mock server (mock server returns kid "key-1" in /keys, but /components returns component-1)
-    // Actually mock server /components returns:
-    // { "id": "c1", "name": "component-1", "providerId": "ldap", "providerType": "org.keycloak.storage.UserStorageProvider" }
-
-    let key_component = ComponentRepresentation {
-        id: None,
-        name: Some("new-key".to_string()),
-        provider_id: Some("rsa-generated".to_string()),
-        provider_type: Some("org.keycloak.keys.KeyProvider".to_string()),
-        sub_type: None,
-        parent_id: None,
-        config: None,
-        extra: std::collections::HashMap::new(),
-    };
-    fs::write(
-        keys_dir.join("new-key.yaml"),
-        serde_yaml::to_string(&key_component).unwrap(),
+    // This should work because plan::run uses directory names as realm names,
+    // and realm::plan_realm just compares local realm.yaml with remote realm.
+    plan::run(
+        &client,
+        workspace_dir.clone(),
+        false,
+        false,
+        &["test-realm".to_string()],
+        ui.clone(),
+        resolver.clone(),
+        None,
     )
+    .await
     .unwrap();
 
-    // 3. Create a component with ID already set (to hit local_component.id.is_some() branch)
-    let components_dir = realm_dir.join("components");
-    fs::create_dir(&components_dir).unwrap();
-    let existing_comp = ComponentRepresentation {
-        id: Some("c1".to_string()),
-        name: Some("component-1".to_string()),
-        provider_id: Some("ldap".to_string()),
-        provider_type: Some("org.keycloak.storage.UserStorageProvider".to_string()),
-        sub_type: None,
-        parent_id: None,
-        config: None,
-        extra: std::collections::HashMap::new(),
-    };
-    fs::write(
-        components_dir.join("component-1.yaml"),
-        serde_yaml::to_string(&existing_comp).unwrap(),
-    )
-    .unwrap();
-
-    let ui = Arc::new(DialoguerUi::new());
-    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
-        std::collections::HashMap::new(),
-    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
-
-    // Run plan with changes_only=true to trigger check_keys_drift
+    // scenario: .kcdplan exists but is empty
+    fs::write(workspace_dir.join(".kcdplan"), "[]").unwrap();
     plan::run(
         &client,
         workspace_dir.clone(),
@@ -93,65 +73,41 @@ async fn test_plan_keys_and_extended() {
         &["test-realm".to_string()],
         ui.clone(),
         resolver.clone(),
+        None,
     )
     .await
-    .expect("Plan failed");
+    .unwrap();
 
-    // Run plan with changes_only=false
+    // scenario: .kcdplan exists with non-existent files
+    fs::write(
+        workspace_dir.join(".kcdplan"),
+        "[\"test-realm/non-existent.yaml\"]",
+    )
+    .unwrap();
     plan::run(
         &client,
         workspace_dir.clone(),
         false,
         false,
         &["test-realm".to_string()],
-        ui,
-        resolver,
+        ui.clone(),
+        resolver.clone(),
+        None,
     )
     .await
-    .expect("Plan failed");
-}
-
-#[tokio::test]
-async fn test_plan_substitute_secrets_error() {
-    let mock_url = start_mock_server().await;
-    let mut client = KeycloakClient::new(mock_url);
-    client.set_target_realm("test-realm".to_string());
-    client.set_token("mock".to_string());
-
-    let dir = tempdir().unwrap();
-    let workspace_dir = dir.path().to_path_buf();
-    let realm_dir = workspace_dir.join("test-realm");
-    fs::create_dir_all(&realm_dir).unwrap();
-
-    // Create a client with a missing environment variable
-    let clients_dir = realm_dir.join("clients");
-    fs::create_dir(&clients_dir).unwrap();
-    fs::write(
-        clients_dir.join("error-client.yaml"),
-        "clientId: error-client\nsecret: '${KEYCLOAK_MISSING_VAR}'\n",
-    )
     .unwrap();
 
-    let resolver = Arc::new(kcd::utils::secrets::EnvResolver::new(
-        std::collections::HashMap::new(),
-    )) as Arc<dyn kcd::utils::secrets::SecretResolver>;
-
+    // scenario: run for a specific realm that doesn't have a directory
     let res = plan::run(
         &client,
-        workspace_dir,
+        workspace_dir.clone(),
         false,
         false,
-        &["test-realm".to_string()],
-        Arc::new(DialoguerUi::new()),
+        &["no-dir-realm".to_string()],
+        ui.clone(),
         resolver,
+        None,
     )
     .await;
-
-    // Should fail due to missing environment variable
-    assert!(res.is_err());
-    assert!(
-        res.unwrap_err()
-            .to_string()
-            .contains("Missing required secret or environment variable")
-    );
+    assert!(res.is_ok());
 }

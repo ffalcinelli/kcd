@@ -29,6 +29,7 @@ async fn test_plan_components_no_dir() {
         resolver,
         realm_name: "master",
         ui: &ui,
+        profile: None,
     };
 
     // Should not fail if directory doesn't exist
@@ -77,6 +78,7 @@ async fn test_plan_components_with_invalid_yaml() {
         resolver,
         realm_name: "master",
         ui: &ui,
+        profile: None,
     };
 
     let res = plan_components_or_keys(&ctx, "components").await;
@@ -122,6 +124,7 @@ async fn test_plan_components_no_identity() {
         resolver,
         realm_name: "master",
         ui: &ui,
+        profile: None,
     };
 
     let components_dir = workspace_dir.join("components");

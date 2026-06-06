@@ -2,6 +2,7 @@ use crate::client::KeycloakClient;
 use crate::models::RealmRepresentation;
 use crate::utils::secrets::{SecretResolver, substitute_secrets};
 use crate::utils::ui::SUCCESS_UPDATE;
+use crate::utils::yaml::load_yaml_with_overlay;
 use anyhow::{Context, Result};
 use console::style;
 use std::collections::HashSet;
@@ -15,6 +16,7 @@ pub async fn apply_realm(
     resolver: Arc<dyn SecretResolver>,
     planned_files: Arc<Option<HashSet<PathBuf>>>,
     realm_name: &str,
+    profile: Option<String>,
 ) -> Result<()> {
     // 1. Apply Realm
     let realm_path = workspace_dir.join("realm.yaml");
@@ -24,9 +26,7 @@ pub async fn apply_realm(
         return Ok(());
     }
     if async_fs::try_exists(&realm_path).await? {
-        let content = async_fs::read_to_string(&realm_path).await?;
-        let mut val: serde_json::Value = serde_yaml::from_str(&content)
-            .with_context(|| format!("Failed to parse YAML file: {:?}", realm_path))?;
+        let mut val = load_yaml_with_overlay(&realm_path, profile.as_deref()).await?;
         substitute_secrets(&mut val, Arc::clone(&resolver)).await?;
         let realm_rep: RealmRepresentation = serde_json::from_value(val)?;
         client

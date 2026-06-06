@@ -25,6 +25,30 @@ pub trait Ui: Send + Sync {
     fn print_warn(&self, msg: &str);
 }
 
+pub fn create_progress_bar(len: u64, msg: &str) -> indicatif::ProgressBar {
+    let pb = indicatif::ProgressBar::new(len);
+    pb.set_style(
+        indicatif::ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+            .unwrap()
+            .progress_chars("#>-"),
+    );
+    pb.set_message(msg.to_string());
+    pb
+}
+
+pub fn create_spinner(msg: &str) -> indicatif::ProgressBar {
+    let pb = indicatif::ProgressBar::new_spinner();
+    pb.enable_steady_tick(std::time::Duration::from_millis(120));
+    pb.set_style(
+        indicatif::ProgressStyle::default_spinner()
+            .template("{spinner:.green} {msg}")
+            .unwrap(),
+    );
+    pb.set_message(msg.to_string());
+    pb
+}
+
 pub struct DialoguerUi {
     pub term: Option<console::Term>,
 }
