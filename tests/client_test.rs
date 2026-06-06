@@ -40,6 +40,26 @@ async fn test_login_fail() {
 }
 
 #[tokio::test]
+async fn test_login_parse_failure() {
+    let mock_url = start_mock_server().await;
+    let mut client = KeycloakClient::new(mock_url);
+    client.set_target_realm("test-realm".to_string());
+
+    // With username "bad_json", the mock server returns 200 OK but with invalid JSON structure
+    // which should cause the JSON parsing into `TokenResponse` to fail.
+    let result = client
+        .login("admin-cli", None, Some("bad_json"), Some("admin"))
+        .await;
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to parse token response")
+    );
+}
+
+#[tokio::test]
 async fn test_get_realm() {
     let mock_url = start_mock_server().await;
     let mut client = KeycloakClient::new(mock_url);
