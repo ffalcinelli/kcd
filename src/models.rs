@@ -839,4 +839,73 @@ mod tests {
 
         assert_eq!(deserialized.first_name, Some("John".to_string()));
     }
+
+    #[test]
+    fn test_debug_implementations() {
+        let mut config = HashMap::new();
+        config.insert("clientSecret".to_string(), "sensitive".to_string());
+        let idp = IdentityProviderRepresentation {
+            internal_id: None,
+            alias: Some("google".to_string()),
+            provider_id: Some("google".to_string()),
+            enabled: Some(true),
+            update_profile_first_login_mode: None,
+            trust_email: None,
+            store_token: None,
+            add_read_token_role_on_create: None,
+            authenticate_by_default: None,
+            link_only: None,
+            first_broker_login_flow_alias: None,
+            post_broker_login_flow_alias: None,
+            display_name: None,
+            config: Some(config),
+            extra: HashMap::new(),
+        };
+        let debug_str = format!("{:?}", idp);
+        assert!(debug_str.contains("********"));
+
+        let cred = CredentialRepresentation {
+            id: Some("id".to_string()),
+            type_: Some("password".to_string()),
+            value: Some("mypassword".to_string()),
+            temporary: Some(false),
+            extra: HashMap::new(),
+        };
+        assert!(format!("{:?}", cred).contains("********"));
+
+        let mut comp_config = HashMap::new();
+        comp_config.insert("secret".to_string(), serde_json::json!("sensitive"));
+        let comp = ComponentRepresentation {
+            id: Some("id".to_string()),
+            name: Some("comp".to_string()),
+            provider_id: Some("p".to_string()),
+            provider_type: Some("t".to_string()),
+            parent_id: None,
+            sub_type: None,
+            config: Some(comp_config),
+            extra: HashMap::new(),
+        };
+        assert!(format!("{:?}", comp).contains("********"));
+    }
+
+    #[test]
+    fn test_to_from_option_string() {
+        let s = "test".to_string();
+        assert_eq!(s.to_option_string(), Some("test".to_string()));
+
+        let os: Option<String> = Some("test".to_string());
+        assert_eq!(os.to_option_string(), Some("test".to_string()));
+
+        let mut s2 = "old".to_string();
+        s2.set_from_option_string(Some("new".to_string()));
+        assert_eq!(s2, "new");
+        s2.set_from_option_string(None);
+        assert_eq!(s2, "new");
+
+        let mut os2: Option<String> = Some("old".to_string());
+        os2.set_from_option_string(Some("new".to_string()));
+        assert_eq!(os2, Some("new".to_string()));
+        os2.set_from_option_string(None);
+        assert_eq!(os2, Some("new".to_string()));
+    }
 }
