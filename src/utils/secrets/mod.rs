@@ -189,14 +189,14 @@ pub async fn substitute_secrets(
         Value::Object(map) => {
             let futures: Vec<_> = map
                 .values_mut()
-                .map(|v| substitute_secrets(v, Arc::clone(&resolver)))
+                .map(|v| Box::pin(substitute_secrets(v, Arc::clone(&resolver))))
                 .collect();
             futures::future::try_join_all(futures).await?;
         }
         Value::Array(arr) => {
             let futures: Vec<_> = arr
                 .iter_mut()
-                .map(|v| substitute_secrets(v, Arc::clone(&resolver)))
+                .map(|v| Box::pin(substitute_secrets(v, Arc::clone(&resolver))))
                 .collect();
             futures::future::try_join_all(futures).await?;
         }
