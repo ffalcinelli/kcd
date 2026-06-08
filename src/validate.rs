@@ -221,7 +221,9 @@ fn validate_users(users: &[(PathBuf, UserRepresentation)]) -> Result<()> {
     Ok(())
 }
 
-fn validate_authentication_flows(flows: &[(PathBuf, AuthenticationFlowRepresentation)]) -> Result<()> {
+fn validate_authentication_flows(
+    flows: &[(PathBuf, AuthenticationFlowRepresentation)],
+) -> Result<()> {
     for (path, flow) in flows {
         if flow.alias.as_deref().unwrap_or_default().is_empty() {
             anyhow::bail!(
@@ -239,7 +241,9 @@ fn validate_authentication_flows(flows: &[(PathBuf, AuthenticationFlowRepresenta
     Ok(())
 }
 
-fn validate_required_actions(actions: &[(PathBuf, RequiredActionProviderRepresentation)]) -> Result<()> {
+fn validate_required_actions(
+    actions: &[(PathBuf, RequiredActionProviderRepresentation)],
+) -> Result<()> {
     for (path, action) in actions {
         if action.alias.as_deref().unwrap_or_default().is_empty() {
             anyhow::bail!("Required Action alias is missing or empty in {:?}", path);
