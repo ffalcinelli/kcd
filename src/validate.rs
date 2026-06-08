@@ -97,8 +97,7 @@ pub async fn run(workspace_dir: PathBuf, realms_to_validate: &[String]) -> Resul
     Ok(())
 }
 
-async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
-    // 1. Validate Realm
+async fn validate_realm_config(workspace_dir: &Path) -> Result<()> {
     let realm_path = workspace_dir.join("realm.yaml");
     if !fs::try_exists(&realm_path).await? {
         anyhow::bail!("realm.yaml not found in {:?}", workspace_dir);
@@ -118,6 +117,152 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
         style("Realm configuration is valid:").dim(),
         style(&realm.realm).green()
     );
+    Ok(())
+}
+
+fn validate_roles(roles: &[(PathBuf, RoleRepresentation)]) -> Result<()> {
+    let mut role_names = HashSet::new();
+    for (path, role) in roles {
+        if role.name.is_empty() {
+            anyhow::bail!("Role name is empty in {:?}", path);
+        }
+        if role_names.contains(&role.name) {
+            anyhow::bail!("Duplicate role name: {}", role.name);
+        }
+        role_names.insert(role.name.clone());
+    }
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated roles:").dim(),
+        style(roles.len()).green()
+    );
+    Ok(())
+}
+
+fn validate_clients(clients: &[(PathBuf, ClientRepresentation)]) -> Result<()> {
+    for (path, client) in clients {
+        if client.client_id.as_deref().unwrap_or_default().is_empty() {
+            anyhow::bail!("Client ID is missing or empty in {:?}", path);
+        }
+    }
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated clients:").dim(),
+        style(clients.len()).green()
+    );
+    Ok(())
+}
+
+fn validate_idps(idps: &[(PathBuf, IdentityProviderRepresentation)]) -> Result<()> {
+    for (path, idp) in idps {
+        if idp.alias.as_deref().unwrap_or_default().is_empty() {
+            anyhow::bail!("Identity Provider alias is missing or empty in {:?}", path);
+        }
+        if idp.provider_id.as_deref().unwrap_or_default().is_empty() {
+            anyhow::bail!(
+                "Identity Provider providerId is missing or empty in {:?}",
+                path
+            );
+        }
+    }
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated Identity Providers:").dim(),
+        style(idps.len()).green()
+    );
+    Ok(())
+}
+
+fn validate_client_scopes(scopes: &[(PathBuf, ClientScopeRepresentation)]) -> Result<()> {
+    for (path, scope) in scopes {
+        if scope.name.as_deref().unwrap_or_default().is_empty() {
+            anyhow::bail!("Client Scope name is missing or empty in {:?}", path);
+        }
+    }
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated client scopes:").dim(),
+        style(scopes.len()).green()
+    );
+    Ok(())
+}
+
+fn validate_groups(groups: &[(PathBuf, GroupRepresentation)]) -> Result<()> {
+    for (path, group) in groups {
+        if group.name.as_deref().unwrap_or_default().is_empty() {
+            anyhow::bail!("Group name is missing or empty in {:?}", path);
+        }
+    }
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated groups:").dim(),
+        style(groups.len()).green()
+    );
+    Ok(())
+}
+
+fn validate_users(users: &[(PathBuf, UserRepresentation)]) -> Result<()> {
+    for (path, user) in users {
+        if user.username.as_deref().unwrap_or_default().is_empty() {
+            anyhow::bail!("User username is missing or empty in {:?}", path);
+        }
+    }
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated users:").dim(),
+        style(users.len()).green()
+    );
+    Ok(())
+}
+
+fn validate_authentication_flows(flows: &[(PathBuf, AuthenticationFlowRepresentation)]) -> Result<()> {
+    for (path, flow) in flows {
+        if flow.alias.as_deref().unwrap_or_default().is_empty() {
+            anyhow::bail!(
+                "Authentication Flow alias is missing or empty in {:?}",
+                path
+            );
+        }
+    }
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated authentication flows:").dim(),
+        style(flows.len()).green()
+    );
+    Ok(())
+}
+
+fn validate_required_actions(actions: &[(PathBuf, RequiredActionProviderRepresentation)]) -> Result<()> {
+    for (path, action) in actions {
+        if action.alias.as_deref().unwrap_or_default().is_empty() {
+            anyhow::bail!("Required Action alias is missing or empty in {:?}", path);
+        }
+        if action.provider_id.as_deref().unwrap_or_default().is_empty() {
+            anyhow::bail!(
+                "Required Action providerId is missing or empty in {:?}",
+                path
+            );
+        }
+    }
+    println!(
+        "  {} {} {}",
+        CHECK,
+        style("Validated required actions:").dim(),
+        style(actions.len()).green()
+    );
+    Ok(())
+}
+
+async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
+    // 1. Validate Realm
+    validate_realm_config(&workspace_dir).await?;
 
     // Read all resource directories concurrently
     let roles_dir = workspace_dir.join("roles");
@@ -140,131 +285,17 @@ async fn validate_realm(workspace_dir: PathBuf) -> Result<()> {
         read_yaml_files::<RequiredActionProviderRepresentation>(&actions_dir, "required-action"),
     )?;
 
-    // 2. Validate Roles
-    let mut role_names = HashSet::new();
-    for (path, role) in &roles {
-        if role.name.is_empty() {
-            anyhow::bail!("Role name is empty in {:?}", path);
-        }
-        if role_names.contains(&role.name) {
-            anyhow::bail!("Duplicate role name: {}", role.name);
-        }
-        role_names.insert(role.name.clone());
-    }
-    println!(
-        "  {} {} {}",
-        CHECK,
-        style("Validated roles:").dim(),
-        style(roles.len()).green()
-    );
+    // Validate resources
+    validate_roles(&roles)?;
+    validate_clients(&clients)?;
+    validate_idps(&idps)?;
+    validate_client_scopes(&scopes)?;
+    validate_groups(&groups)?;
+    validate_users(&users)?;
+    validate_authentication_flows(&flows)?;
+    validate_required_actions(&actions)?;
 
-    // 3. Validate Clients
-    for (path, client) in &clients {
-        if client.client_id.as_deref().unwrap_or_default().is_empty() {
-            anyhow::bail!("Client ID is missing or empty in {:?}", path);
-        }
-    }
-    println!(
-        "  {} {} {}",
-        CHECK,
-        style("Validated clients:").dim(),
-        style(clients.len()).green()
-    );
-
-    // 4. Validate Identity Providers
-    for (path, idp) in &idps {
-        if idp.alias.as_deref().unwrap_or_default().is_empty() {
-            anyhow::bail!("Identity Provider alias is missing or empty in {:?}", path);
-        }
-        if idp.provider_id.as_deref().unwrap_or_default().is_empty() {
-            anyhow::bail!(
-                "Identity Provider providerId is missing or empty in {:?}",
-                path
-            );
-        }
-    }
-    println!(
-        "  {} {} {}",
-        CHECK,
-        style("Validated Identity Providers:").dim(),
-        style(idps.len()).green()
-    );
-
-    // 5. Validate Client Scopes
-    for (path, scope) in &scopes {
-        if scope.name.as_deref().unwrap_or_default().is_empty() {
-            anyhow::bail!("Client Scope name is missing or empty in {:?}", path);
-        }
-    }
-    println!(
-        "  {} {} {}",
-        CHECK,
-        style("Validated client scopes:").dim(),
-        style(scopes.len()).green()
-    );
-
-    // 6. Validate Groups
-    for (path, group) in &groups {
-        if group.name.as_deref().unwrap_or_default().is_empty() {
-            anyhow::bail!("Group name is missing or empty in {:?}", path);
-        }
-    }
-    println!(
-        "  {} {} {}",
-        CHECK,
-        style("Validated groups:").dim(),
-        style(groups.len()).green()
-    );
-
-    // 7. Validate Users
-    for (path, user) in &users {
-        if user.username.as_deref().unwrap_or_default().is_empty() {
-            anyhow::bail!("User username is missing or empty in {:?}", path);
-        }
-    }
-    println!(
-        "  {} {} {}",
-        CHECK,
-        style("Validated users:").dim(),
-        style(users.len()).green()
-    );
-
-    // 8. Validate Authentication Flows
-    for (path, flow) in &flows {
-        if flow.alias.as_deref().unwrap_or_default().is_empty() {
-            anyhow::bail!(
-                "Authentication Flow alias is missing or empty in {:?}",
-                path
-            );
-        }
-    }
-    println!(
-        "  {} {} {}",
-        CHECK,
-        style("Validated authentication flows:").dim(),
-        style(flows.len()).green()
-    );
-
-    // 9. Validate Required Actions
-    for (path, action) in &actions {
-        if action.alias.as_deref().unwrap_or_default().is_empty() {
-            anyhow::bail!("Required Action alias is missing or empty in {:?}", path);
-        }
-        if action.provider_id.as_deref().unwrap_or_default().is_empty() {
-            anyhow::bail!(
-                "Required Action providerId is missing or empty in {:?}",
-                path
-            );
-        }
-    }
-    println!(
-        "  {} {} {}",
-        CHECK,
-        style("Validated required actions:").dim(),
-        style(actions.len()).green()
-    );
-
-    // 10. Validate Components and Keys
+    // Validate Components and Keys
     tokio::try_join!(
         validate_components_in_dir(&workspace_dir, "components"),
         validate_components_in_dir(&workspace_dir, "keys")
