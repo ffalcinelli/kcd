@@ -465,13 +465,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_token() {
-        let mut client = KeycloakClient::new("http://127.0.0.1:1".to_string());
+    fn test_get_token_missing() {
+        let client = KeycloakClient::new("http://127.0.0.1:1".to_string());
 
         // Initially, there's no token
         let result = client.get_token();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().to_string(), "Not authenticated");
+    }
+
+    #[test]
+    fn test_get_token_present() {
+        let mut client = KeycloakClient::new("http://127.0.0.1:1".to_string());
 
         // Set token
         client.set_token("mock_token".to_string());
