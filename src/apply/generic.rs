@@ -49,7 +49,7 @@ where
             let identity = r.get_identity();
             let id = r.get_id();
             match (identity, id) {
-                (Some(identity), Some(id)) => Some((identity, id)),
+                (Some(identity), Some(id)) => Some((identity, id.to_string())),
                 _ => None,
             }
         })
