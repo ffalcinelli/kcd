@@ -3,18 +3,18 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 pub trait ToOptionString {
-    fn to_option_string(&self) -> Option<String>;
+    fn to_option_string(&self) -> Option<&str>;
 }
 
 impl ToOptionString for String {
-    fn to_option_string(&self) -> Option<String> {
-        Some(self.clone())
+    fn to_option_string(&self) -> Option<&str> {
+        Some(self.as_str())
     }
 }
 
 impl ToOptionString for Option<String> {
-    fn to_option_string(&self) -> Option<String> {
-        self.clone()
+    fn to_option_string(&self) -> Option<&str> {
+        self.as_deref()
     }
 }
 pub trait FromOptionString {
@@ -39,7 +39,7 @@ impl FromOptionString for Option<String> {
 pub trait KeycloakResource {
     const API_PATH: &'static str;
     const DIR_NAME: &'static str = Self::API_PATH;
-    fn get_id(&self) -> Option<String>;
+    fn get_id(&self) -> Option<&str>;
     fn set_id(&mut self, id: Option<String>);
     fn get_identity(&self) -> Option<String>;
     fn get_name(&self) -> String;
@@ -77,7 +77,7 @@ macro_rules! impl_keycloak_resource {
             const API_PATH: &'static str = $api_path;
             $(const DIR_NAME: &'static str = $dir_name;)?
 
-            fn get_id(&self) -> Option<String> {
+            fn get_id(&self) -> Option<&str> {
                 $( return self.$id_field.to_option_string(); )?
                 #[allow(unreachable_code)]
                 None
@@ -891,10 +891,10 @@ mod tests {
     #[test]
     fn test_to_from_option_string() {
         let s = "test".to_string();
-        assert_eq!(s.to_option_string(), Some("test".to_string()));
+        assert_eq!(s.to_option_string(), Some("test"));
 
         let os: Option<String> = Some("test".to_string());
-        assert_eq!(os.to_option_string(), Some("test".to_string()));
+        assert_eq!(os.to_option_string(), Some("test"));
 
         let mut s2 = "old".to_string();
         s2.set_from_option_string(Some("new".to_string()));
