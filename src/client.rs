@@ -459,6 +459,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_set_target_realm() {
+        let mut client = KeycloakClient::new("http://127.0.0.1:1".to_string());
+        assert_eq!(client.target_realm, "");
+
+        client.set_target_realm("new_realm".to_string());
+        assert_eq!(client.target_realm, "new_realm");
+    }
+
+    #[test]
     fn test_get_token_missing() {
         let client = KeycloakClient::new("http://127.0.0.1:1".to_string());
 
