@@ -164,19 +164,19 @@ async fn write_if_changed_with_mutex(
             let mut file = fs::OpenOptions::from(options)
                 .open(path)
                 .await
-                .context(format!("Failed to open {:?}", path))?;
+                .with_context(|| format!("Failed to open {:?}", path))?;
             file.write_all(content.as_bytes())
                 .await
-                .context(format!("Failed to write {:?}", path))?;
+                .with_context(|| format!("Failed to write {:?}", path))?;
             file.flush()
                 .await
-                .context(format!("Failed to flush {:?}", path))?;
+                .with_context(|| format!("Failed to flush {:?}", path))?;
         }
         #[cfg(not(unix))]
         {
             fs::write(path, content)
                 .await
-                .context(format!("Failed to write {:?}", path))?;
+                .with_context(|| format!("Failed to write {:?}", path))?;
         }
     }
 
@@ -207,11 +207,11 @@ where
 
     if !fs::try_exists(&*target_dir)
         .await
-        .context(format!("Failed to check {} directory", T::LABEL))?
+        .with_context(|| format!("Failed to check {} directory", T::LABEL))?
     {
         fs::create_dir_all(&*target_dir)
             .await
-            .context(format!("Failed to create {} directory", T::LABEL))?;
+            .with_context(|| format!("Failed to create {} directory", T::LABEL))?;
     }
 
     let mut set = tokio::task::JoinSet::new();

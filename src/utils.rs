@@ -18,7 +18,7 @@ pub async fn write_secure(path: &Path, content: &str) -> anyhow::Result<()> {
         if fs::try_exists(path).await.unwrap_or(false) {
             fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
                 .await
-                .context(format!("Failed to set permissions for {:?}", path))?;
+                .with_context(|| format!("Failed to set permissions for {:?}", path))?;
         }
 
         let mut options = fs::OpenOptions::new();
@@ -27,19 +27,19 @@ pub async fn write_secure(path: &Path, content: &str) -> anyhow::Result<()> {
         let mut file = options
             .open(path)
             .await
-            .context(format!("Failed to open {:?}", path))?;
+            .with_context(|| format!("Failed to open {:?}", path))?;
         file.write_all(content.as_bytes())
             .await
-            .context(format!("Failed to write to {:?}", path))?;
+            .with_context(|| format!("Failed to write to {:?}", path))?;
         file.flush()
             .await
-            .context(format!("Failed to flush {:?}", path))?;
+            .with_context(|| format!("Failed to flush {:?}", path))?;
     }
     #[cfg(not(unix))]
     {
         fs::write(path, content)
             .await
-            .context(format!("Failed to write {:?}", path))?;
+            .with_context(|| format!("Failed to write {:?}", path))?;
     }
     Ok(())
 }

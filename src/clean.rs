@@ -75,11 +75,11 @@ pub async fn run(workspace_dir: PathBuf, yes: bool, realms_to_clean: &[String]) 
                     if file_type.is_dir() {
                         fs::remove_dir_all(&path)
                             .await
-                            .context(format!("Failed to remove dir {:?}", path))
+                            .with_context(|| format!("Failed to remove dir {:?}", path))
                     } else {
                         fs::remove_file(&path)
                             .await
-                            .context(format!("Failed to remove file {:?}", path))
+                            .with_context(|| format!("Failed to remove file {:?}", path))
                     }
                 });
             }
@@ -92,15 +92,15 @@ pub async fn run(workspace_dir: PathBuf, yes: bool, realms_to_clean: &[String]) 
             set.spawn(async move {
                 let metadata = fs::metadata(&target)
                     .await
-                    .context(format!("Failed to get metadata for {:?}", target))?;
+                    .with_context(|| format!("Failed to get metadata for {:?}", target))?;
                 if metadata.is_dir() {
                     fs::remove_dir_all(&target)
                         .await
-                        .context(format!("Failed to remove dir {:?}", target))
+                        .with_context(|| format!("Failed to remove dir {:?}", target))
                 } else {
                     fs::remove_file(&target)
                         .await
-                        .context(format!("Failed to remove file {:?}", target))
+                        .with_context(|| format!("Failed to remove file {:?}", target))
                 }
             });
         }
