@@ -212,3 +212,27 @@ impl Ui for MockUi {
     fn print_error(&self, _msg: &str) {}
     fn print_warn(&self, _msg: &str) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dialoguer_ui_new() {
+        let ui = DialoguerUi::new();
+        assert!(ui.term.is_none());
+    }
+
+    #[test]
+    fn test_dialoguer_ui_with_term() {
+        let term = console::Term::stdout();
+        let ui = DialoguerUi::with_term(term);
+        assert!(ui.term.is_some());
+    }
+
+    #[test]
+    fn test_dialoguer_ui_default() {
+        let ui = DialoguerUi::default();
+        assert!(ui.term.is_none());
+    }
+}
