@@ -10,7 +10,7 @@ use anyhow::{Context, Result};
 use console::style;
 use dialoguer::{Confirm, theme::ColorfulTheme};
 use sanitize_filename::sanitize;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
@@ -41,7 +41,7 @@ pub async fn run(
         realms_to_inspect.to_vec()
     };
 
-    let all_secrets = Arc::new(Mutex::new(HashMap::new()));
+    let all_secrets = Arc::new(Mutex::new(BTreeMap::new()));
     let prompt_mutex = Arc::new(Mutex::new(()));
 
     let mut set = tokio::task::JoinSet::new();
@@ -83,10 +83,8 @@ pub async fn run(
     if !secrets_lock.is_empty() {
         let env_path = workspace_dir.join(".secrets");
         let mut env_content = String::new();
-        let mut keys: Vec<&String> = secrets_lock.keys().collect();
-        keys.sort();
-        for key in keys {
-            env_content.push_str(&format!("{}={}\n", key, secrets_lock[key]));
+        for (key, value) in secrets_lock.iter() {
+            env_content.push_str(&format!("{}={}\n", key, value));
         }
 
         let mut existing_env = String::new();
@@ -187,7 +185,7 @@ async fn inspect_resources<T>(
     client: &KeycloakClient,
     realm_name: &str,
     target_dir: Arc<PathBuf>,
-    all_secrets: Arc<Mutex<HashMap<String, String>>>,
+    all_secrets: Arc<Mutex<BTreeMap<String, String>>>,
     yes: bool,
     prompt_mutex: Arc<Mutex<()>>,
 ) -> Result<()>
@@ -223,7 +221,7 @@ where
         set.spawn(async move {
             let filename = format!("{}.yaml", sanitize(res.get_filename()));
             let path = target_dir.join(filename);
-            let mut local_secrets = HashMap::new();
+            let mut local_secrets = BTreeMap::new();
             let prefix = format!("realm_{}_{}", realm_name, T::SECRET_PREFIX);
             let yaml = to_sorted_yaml_with_secrets(&res, &prefix, &mut local_secrets).context(
                 format!("Failed to serialize {} {}", T::LABEL, res.get_name()),
@@ -257,7 +255,7 @@ async fn inspect_realm(
     client: &KeycloakClient,
     realm_name: &str,
     workspace_dir: PathBuf,
-    all_secrets: Arc<Mutex<HashMap<String, String>>>,
+    all_secrets: Arc<Mutex<BTreeMap<String, String>>>,
     yes: bool,
     prompt_mutex: Arc<Mutex<()>>,
 ) -> Result<()> {
@@ -282,7 +280,7 @@ async fn inspect_realm(
         let prompt_mutex = Arc::clone(&prompt_mutex);
         set.spawn(async move {
             let realm = client.get_realm().await.context("Failed to fetch realm")?;
-            let mut local_secrets = HashMap::new();
+            let mut local_secrets = BTreeMap::new();
             let realm_prefix = format!("realm_{}", realm_name);
             let realm_yaml = to_sorted_yaml_with_secrets(&realm, &realm_prefix, &mut local_secrets)
                 .context("Failed to serialize realm")?;
@@ -402,7 +400,7 @@ fn spawn_inspect<T>(
     client: &KeycloakClient,
     realm_name: &str,
     workspace_dir: &Arc<PathBuf>,
-    all_secrets: &Arc<Mutex<HashMap<String, String>>>,
+    all_secrets: &Arc<Mutex<BTreeMap<String, String>>>,
     yes: bool,
     prompt_mutex: &Arc<Mutex<()>>,
 ) where
