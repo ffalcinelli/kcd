@@ -317,10 +317,7 @@ impl KeycloakClient {
             .json(body)
             .send()
             .await
-            .with_context(|| format!(
-                "Failed to send POST request to {}",
-                redact_url(url)
-            ))?;
+            .with_context(|| format!("Failed to send POST request to {}", redact_url(url)))?;
 
         Self::check_response(response, "POST request failed").await?;
         Ok(())
@@ -351,10 +348,7 @@ impl KeycloakClient {
             .bearer_auth(token)
             .send()
             .await
-            .with_context(|| format!(
-                "Failed to send DELETE request to {}",
-                redact_url(url)
-            ))?;
+            .with_context(|| format!("Failed to send DELETE request to {}", redact_url(url)))?;
 
         Self::check_response(response, "DELETE request failed").await?;
         Ok(())
