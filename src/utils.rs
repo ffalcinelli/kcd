@@ -85,7 +85,7 @@ pub fn recursive_sort(value: &mut serde_json::Value) {
 pub fn to_sorted_yaml_with_secrets<T: Serialize>(
     value: &T,
     prefix: &str,
-    secrets: &mut std::collections::HashMap<String, String>,
+    secrets: &mut std::collections::BTreeMap<String, String>,
 ) -> anyhow::Result<String> {
     let mut json_value =
         serde_json::to_value(value).context("Failed to serialize to JSON value")?;
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn test_to_sorted_yaml_with_secrets() {
-        let mut secrets = std::collections::HashMap::new();
+        let mut secrets = std::collections::BTreeMap::new();
         let val = serde_json::json!({
             "clientId": "myclient",
             "secret": "very-secret",

@@ -129,7 +129,11 @@ fn format_env_var_name(prefix: &str, key: &str) -> String {
 }
 
 /// Recursively extract secrets and replace them with ${ENV_VAR}
-pub fn extract_secrets(value: &mut Value, prefix: &str, secrets: &mut HashMap<String, String>) {
+pub fn extract_secrets(
+    value: &mut Value,
+    prefix: &str,
+    secrets: &mut std::collections::BTreeMap<String, String>,
+) {
     match value {
         Value::Object(map) => {
             let id = get_object_identifier(map);
@@ -276,7 +280,7 @@ mod tests {
             "clientSecret": "my_super_secret",
             "storeToken": "true"
         });
-        let mut secrets = HashMap::new();
+        let mut secrets = std::collections::BTreeMap::new();
         extract_secrets(&mut val, "client", &mut secrets);
 
         assert_eq!(
@@ -290,7 +294,7 @@ mod tests {
         );
 
         let mut val2 = json!({"clientSecret": "secret_value_2"});
-        let mut secrets2 = HashMap::new();
+        let mut secrets2 = std::collections::BTreeMap::new();
         extract_secrets(&mut val2, "", &mut secrets2);
         assert_eq!(val2["clientSecret"], "${KEYCLOAK_CLIENTSECRET}");
         assert_eq!(
@@ -299,7 +303,7 @@ mod tests {
         );
 
         let mut val3 = json!({"clientSecret-special": "secret_value_3"});
-        let mut secrets3 = HashMap::new();
+        let mut secrets3 = std::collections::BTreeMap::new();
         extract_secrets(&mut val3, "prefix", &mut secrets3);
         assert_eq!(
             val3["clientSecret-special"],
