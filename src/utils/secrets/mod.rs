@@ -132,8 +132,6 @@ fn format_env_var_name(prefix: &str, key: &str) -> String {
 pub fn extract_secrets(value: &mut Value, prefix: &str, secrets: &mut HashMap<String, String>) {
     match value {
         Value::Object(map) => {
-            let mut keys_to_update = Vec::new();
-
             let id = get_object_identifier(map);
 
             let current_prefix = if let Some(id_str) = id {
@@ -149,7 +147,9 @@ pub fn extract_secrets(value: &mut Value, prefix: &str, secrets: &mut HashMap<St
             for (k, v) in map.iter_mut() {
                 if let Value::String(s) = v {
                     if is_secret_key(k, &current_prefix) && !is_boolean_string(s) {
-                        keys_to_update.push(k.clone());
+                        let env_var_name = format_env_var_name(&current_prefix, k);
+                        secrets.insert(env_var_name.clone(), s.clone());
+                        *s = format!("${{{}}}", env_var_name);
                     }
                 } else if v.is_object() || v.is_array() {
                     let new_prefix = if current_prefix.is_empty() {
@@ -158,14 +158,6 @@ pub fn extract_secrets(value: &mut Value, prefix: &str, secrets: &mut HashMap<St
                         format!("{}_{}", current_prefix, k)
                     };
                     extract_secrets(v, &new_prefix, secrets);
-                }
-            }
-
-            for k in keys_to_update {
-                if let Some(Value::String(s)) = map.get_mut(&k) {
-                    let env_var_name = format_env_var_name(&current_prefix, &k);
-                    secrets.insert(env_var_name.clone(), s.clone());
-                    *s = format!("${{{}}}", env_var_name);
                 }
             }
         }
@@ -235,8 +227,6 @@ fn obfuscate_string(s: &str) -> String {
 pub fn obfuscate_secrets(value: &mut Value, prefix: &str) {
     match value {
         Value::Object(map) => {
-            let mut keys_to_obfuscate = Vec::new();
-
             let id = get_object_identifier(map);
 
             let current_prefix = if let Some(id_str) = id {
@@ -250,8 +240,10 @@ pub fn obfuscate_secrets(value: &mut Value, prefix: &str) {
             };
 
             for (k, v) in map.iter_mut() {
-                if v.is_string() && is_secret_key(k, &current_prefix) {
-                    keys_to_obfuscate.push(k.clone());
+                if let Value::String(s) = v {
+                    if is_secret_key(k, &current_prefix) {
+                        *s = obfuscate_string(s);
+                    }
                 } else if v.is_object() || v.is_array() {
                     let new_prefix = if current_prefix.is_empty() {
                         k.clone()
@@ -259,12 +251,6 @@ pub fn obfuscate_secrets(value: &mut Value, prefix: &str) {
                         format!("{}_{}", current_prefix, k)
                     };
                     obfuscate_secrets(v, &new_prefix);
-                }
-            }
-
-            for k in keys_to_obfuscate {
-                if let Some(Value::String(s)) = map.get_mut(&k) {
-                    *s = obfuscate_string(s);
                 }
             }
         }
