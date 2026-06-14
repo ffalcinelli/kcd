@@ -30,9 +30,9 @@ async fn read_yaml_files<T: DeserializeOwned + Send + 'static>(
                 join_set.spawn(async move {
                     let content = fs::read_to_string(&path)
                         .await
-                        .context(format!("Failed to read {} file {:?}", ft, path))?;
+                        .with_context(|| format!("Failed to read {} file {:?}", ft, path))?;
                     let item: T = serde_yaml::from_str(&content)
-                        .context(format!("Failed to parse {} file {:?}", ft, path))?;
+                        .with_context(|| format!("Failed to parse {} file {:?}", ft, path))?;
                     Ok::<(PathBuf, T), anyhow::Error>((path, item))
                 });
             }
