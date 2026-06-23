@@ -446,4 +446,55 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn test_recursive_sort_edge_cases() {
+        // 1. Array of empty objects
+        let mut val_empty_objs = serde_json::json!([{}, {}]);
+        recursive_sort(&mut val_empty_objs);
+        assert_eq!(val_empty_objs, serde_json::json!([{}, {}]));
+
+        // 2. Array of arrays of arrays
+        let mut val_deep_arrays = serde_json::json!([[[2, 1]], [[4, 3]]]);
+        recursive_sort(&mut val_deep_arrays);
+        assert_eq!(val_deep_arrays, serde_json::json!([[[1, 2]], [[3, 4]]]));
+
+        // 3. Array with Null mixed with primitives
+        let mut val_mixed_null = serde_json::json!([1, null, "a"]);
+        recursive_sort(&mut val_mixed_null);
+        // Does not sort because not all are string/number/boolean
+        assert_eq!(val_mixed_null, serde_json::json!([1, null, "a"]));
+
+        // 4. Integer sort keys
+        let mut val_int_keys = serde_json::json!([
+            { "id": 2, "val": "b" },
+            { "id": 1, "val": "a" },
+            { "id": 10, "val": "c" }
+        ]);
+        recursive_sort(&mut val_int_keys);
+        // Sorted by exact string representation of the numbers: "1", "10", "2"
+        assert_eq!(
+            val_int_keys,
+            serde_json::json!([
+                { "id": 1, "val": "a" },
+                { "id": 10, "val": "c" },
+                { "id": 2, "val": "b" }
+            ])
+        );
+
+        // 5. Null sort keys
+        let mut val_null_keys = serde_json::json!([
+            { "id": null, "val": "b" },
+            { "id": 1, "val": "a" }
+        ]);
+        recursive_sort(&mut val_null_keys);
+        // string representations: "null" vs "1"
+        assert_eq!(
+            val_null_keys,
+            serde_json::json!([
+                { "id": 1, "val": "a" },
+                { "id": null, "val": "b" }
+            ])
+        );
+    }
 }
