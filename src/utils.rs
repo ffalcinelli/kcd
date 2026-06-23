@@ -473,11 +473,14 @@ mod tests {
         ]);
         recursive_sort(&mut val_int_keys);
         // Sorted by exact string representation of the numbers: "1", "10", "2"
-        assert_eq!(val_int_keys, serde_json::json!([
-            { "id": 1, "val": "a" },
-            { "id": 10, "val": "c" },
-            { "id": 2, "val": "b" }
-        ]));
+        assert_eq!(
+            val_int_keys,
+            serde_json::json!([
+                { "id": 1, "val": "a" },
+                { "id": 10, "val": "c" },
+                { "id": 2, "val": "b" }
+            ])
+        );
 
         // 5. Null sort keys
         let mut val_null_keys = serde_json::json!([
@@ -486,9 +489,12 @@ mod tests {
         ]);
         recursive_sort(&mut val_null_keys);
         // string representations: "null" vs "1"
-        assert_eq!(val_null_keys, serde_json::json!([
-            { "id": 1, "val": "a" },
-            { "id": null, "val": "b" }
-        ]));
+        assert_eq!(
+            val_null_keys,
+            serde_json::json!([
+                { "id": 1, "val": "a" },
+                { "id": null, "val": "b" }
+            ])
+        );
     }
 }
