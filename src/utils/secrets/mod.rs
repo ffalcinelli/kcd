@@ -317,6 +317,47 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_extract_secrets_edge_cases() {
+        let mut secrets = std::collections::BTreeMap::new();
+
+        // Null
+        let mut val = json!(null);
+        extract_secrets(&mut val, "prefix", &mut secrets);
+        assert_eq!(val, json!(null));
+        assert!(secrets.is_empty());
+
+        // Bool
+        let mut val = json!(true);
+        extract_secrets(&mut val, "prefix", &mut secrets);
+        assert_eq!(val, json!(true));
+        assert!(secrets.is_empty());
+
+        // Number
+        let mut val = json!(42);
+        extract_secrets(&mut val, "prefix", &mut secrets);
+        assert_eq!(val, json!(42));
+        assert!(secrets.is_empty());
+
+        // String
+        let mut val = json!("just a string");
+        extract_secrets(&mut val, "prefix", &mut secrets);
+        assert_eq!(val, json!("just a string"));
+        assert!(secrets.is_empty());
+
+        // Empty object
+        let mut val = json!({});
+        extract_secrets(&mut val, "prefix", &mut secrets);
+        assert_eq!(val, json!({}));
+        assert!(secrets.is_empty());
+
+        // Empty array
+        let mut val = json!([]);
+        extract_secrets(&mut val, "prefix", &mut secrets);
+        assert_eq!(val, json!([]));
+        assert!(secrets.is_empty());
+    }
+
     #[tokio::test]
     async fn test_substitute_secrets() {
         let mut vars = HashMap::new();
