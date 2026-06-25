@@ -52,10 +52,11 @@ pub fn is_overlay_file(path: &Path, profile: Option<&str>) -> bool {
         }
 
         // Pattern: *.profile.yaml or *.profile.yml
-        if let Some(p) = profile {
-            if file_name.ends_with(&format!(".{}.yaml", p)) || file_name.ends_with(&format!(".{}.yml", p)) {
-                return true;
-            }
+        if let Some(p) = profile
+            && (file_name.ends_with(&format!(".{}.yaml", p))
+                || file_name.ends_with(&format!(".{}.yml", p)))
+        {
+            return true;
         }
 
         // Generic pattern for any profile: *.*.yaml or *.*.yml
