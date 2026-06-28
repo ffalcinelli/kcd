@@ -235,4 +235,17 @@ mod tests {
         let ui = DialoguerUi::default();
         assert!(ui.term.is_none());
     }
+
+    #[test]
+    fn test_create_progress_bar() {
+        let pb = create_progress_bar(100, "test progress");
+        assert_eq!(pb.length(), Some(100));
+        assert_eq!(pb.message(), "test progress");
+    }
+
+    #[test]
+    fn test_create_spinner() {
+        let pb = create_spinner("test spinner");
+        assert_eq!(pb.message(), "test spinner");
+    }
 }
