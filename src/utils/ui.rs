@@ -30,7 +30,7 @@ pub fn create_progress_bar(len: u64, msg: &str) -> indicatif::ProgressBar {
     pb.set_style(
         indicatif::ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-            .unwrap()
+            .expect("Invalid progress bar template format")
             .progress_chars("#>-"),
     );
     pb.set_message(msg.to_string());
@@ -43,7 +43,7 @@ pub fn create_spinner(msg: &str) -> indicatif::ProgressBar {
     pb.set_style(
         indicatif::ProgressStyle::default_spinner()
             .template("{spinner:.green} {msg}")
-            .unwrap(),
+            .expect("Invalid spinner template format"),
     );
     pb.set_message(msg.to_string());
     pb
