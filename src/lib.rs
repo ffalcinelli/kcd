@@ -113,7 +113,12 @@ pub async fn init_secrets(
     Ok(Arc::new(CompositeResolver::new(resolvers)))
 }
 
-async fn handle_inspect(cli: &Cli, profile: Option<&Profile>, workspace: &std::path::Path, yes: bool) -> Result<()> {
+async fn handle_inspect(
+    cli: &Cli,
+    profile: Option<&Profile>,
+    workspace: &std::path::Path,
+    yes: bool,
+) -> Result<()> {
     let client = init_client(cli, profile).await?;
     println!(
         "{} {}",
@@ -144,7 +149,13 @@ async fn handle_validate(cli: &Cli, workspace: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-async fn handle_apply(cli: &Cli, profile: Option<&Profile>, workspace: &std::path::Path, yes: bool, review: bool) -> Result<()> {
+async fn handle_apply(
+    cli: &Cli,
+    profile: Option<&Profile>,
+    workspace: &std::path::Path,
+    yes: bool,
+    review: bool,
+) -> Result<()> {
     let client = init_client(cli, profile).await?;
     let resolver = init_secrets(cli, workspace, profile).await?;
     println!(
@@ -171,7 +182,13 @@ async fn handle_apply(cli: &Cli, profile: Option<&Profile>, workspace: &std::pat
     Ok(())
 }
 
-async fn handle_plan(cli: &Cli, profile: Option<&Profile>, workspace: &std::path::Path, changes_only: bool, interactive: bool) -> Result<()> {
+async fn handle_plan(
+    cli: &Cli,
+    profile: Option<&Profile>,
+    workspace: &std::path::Path,
+    changes_only: bool,
+    interactive: bool,
+) -> Result<()> {
     let client = init_client(cli, profile).await?;
     let resolver = init_secrets(cli, workspace, profile).await?;
     println!(
@@ -198,7 +215,11 @@ async fn handle_plan(cli: &Cli, profile: Option<&Profile>, workspace: &std::path
     Ok(())
 }
 
-async fn handle_drift(cli: &Cli, profile: Option<&Profile>, workspace: &std::path::Path) -> Result<()> {
+async fn handle_drift(
+    cli: &Cli,
+    profile: Option<&Profile>,
+    workspace: &std::path::Path,
+) -> Result<()> {
     let client = init_client(cli, profile).await?;
     let resolver = init_secrets(cli, workspace, profile).await?;
     println!(
@@ -226,7 +247,11 @@ async fn handle_drift(cli: &Cli, profile: Option<&Profile>, workspace: &std::pat
 }
 
 async fn handle_cli(workspace: &std::path::Path) -> Result<()> {
-    cli::run(workspace.to_path_buf(), &crate::utils::ui::DialoguerUi::new()).await?;
+    cli::run(
+        workspace.to_path_buf(),
+        &crate::utils::ui::DialoguerUi::new(),
+    )
+    .await?;
     Ok(())
 }
 
@@ -269,11 +294,26 @@ pub async fn run_app(cli: Cli) -> Result<()> {
         Commands::Validate { workspace } => {
             handle_validate(&cli, workspace).await?;
         }
-        Commands::Apply { workspace, yes, review } => {
+        Commands::Apply {
+            workspace,
+            yes,
+            review,
+        } => {
             handle_apply(&cli, profile.as_ref(), workspace, *yes, *review).await?;
         }
-        Commands::Plan { workspace, changes_only, interactive } => {
-            handle_plan(&cli, profile.as_ref(), workspace, *changes_only, *interactive).await?;
+        Commands::Plan {
+            workspace,
+            changes_only,
+            interactive,
+        } => {
+            handle_plan(
+                &cli,
+                profile.as_ref(),
+                workspace,
+                *changes_only,
+                *interactive,
+            )
+            .await?;
         }
         Commands::Drift { workspace } => {
             handle_drift(&cli, profile.as_ref(), workspace).await?;
