@@ -247,5 +247,8 @@ mod tests {
     fn test_create_spinner() {
         let pb = create_spinner("test spinner");
         assert_eq!(pb.message(), "test spinner");
+        assert_eq!(pb.length(), None);
+        assert_eq!(pb.position(), 0);
+        assert!(!pb.is_finished());
     }
 }
